@@ -23,8 +23,20 @@ the device).
 - Persistence: NEVER the nRF internal filesystem (~28 KB limit). All durable
   state — identity, keys, message store — goes to external SPI flash.
 - Adafruit nRF52 BSP: the SoftDevice owns flash regions and IRQ priorities.
-  For SX1262 issues check init order, OCP, and regulator mode first
-  (see microReticulum_Firmware branch `rak4631`).
+- **"RAK4631 won't transmit" — read this before debugging RF.** The root cause
+  reported upstream was **interference avoidance**, inherited from
+  RNode_Firmware, which the maintainer says "seems to completely hose nRF52
+  boards". Build with `-DDISABLE_IA` (on microReticulum_Firmware master since
+  2026-07-09; **not** in the 1.86.4 tag — flashing that release means running
+  `rnodeconf --ia-disable` by hand).
+- The `rak4631` branch is **contested, unmerged, and disowned by its author**
+  ("I felt like I was barking up the wrong tree"); the reporter who
+  cherry-picked it later retracted. Do not cite it as the fix. The live,
+  better-sourced work is **open PR #91** (RadioLib/Meshtastic backport): TCXO
+  3.3 V → 1.8 V for RAK4631 — master sets 1.8 V for every *other* SX1262 board,
+  so this looks like an oversight — plus Semtech erratum 15.3 RTC-stop and OCP
+  140 mA. Note the OCP register is 2.5 mA/LSB, so `0x28` is 100 mA and `0x38`
+  is 140 mA; the branch's own commit message miscounts this.
 - Determinism: scripts build/flash; changes are judged by build + on-target
   behavior, not by reading tea leaves.
 
