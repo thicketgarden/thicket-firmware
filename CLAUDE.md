@@ -47,10 +47,13 @@ entire combined work, so porting any of it would convert this repo from
 GPL-3.0-or-later to AGPL.
 
 **Do not port, copy, or adapt Ratspeak code into this repo.** Reading their
-code to understand the problem is fine; lifting it is not. Studying their
-approach and reimplementing independently is the expected path. If a
-relicensing answer ever changes this, it will arrive as an explicit ruling —
-not as an inference from a maintainer's friendly comment.
+code to understand the problem is fine; transcribing it is not. If a
+relicensing grant ever changes this, it arrives as an explicit ruling — not as
+an inference from a maintainer's friendly comment.
+
+The messenger layer is written against **microReticulum's Apache-2.0 API** and
+the LXMF spec. That is the plan of record, not a fallback; nothing in this repo
+waits on an upstream licensing answer.
 
 Note that `ratspeak/microReticulum` (their fork) is Apache-2.0 and is not
 covered by this restriction.
