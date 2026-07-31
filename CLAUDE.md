@@ -22,6 +22,24 @@ the device).
   upstream.
 - Persistence: NEVER the nRF internal filesystem (~28 KB limit). All durable
   state — identity, keys, message store — goes to external SPI flash.
+  **There is a second, sharper reason than capacity:** an nRF52840 flash erase
+  takes ~85 ms with interrupts disabled, which makes RadioLib's SPI commands to
+  the SX1262 time out (-5). Persisting paths during the announce rebroadcast
+  chain therefore breaks the *radio*, not just storage. Measured and fixed
+  upstream in the only shipping nRF52840 Reticulum firmware.
+- **Heap pool sizing is a hard-fault landmine.** A pool above ~75% of SRAM
+  faults silently *before USB enumerates*, so it looks like a dead board.
+  Working reference uses `RNS_HEAP_POOL_BUFFER_SIZE=98304` (96 KiB), or 80 KiB
+  with BLE active; start at 64 KiB when bringing up. **microReticulum's own
+  `wiscore_rak4631` env ships 204800 (200 KiB ≈ 78% of SRAM) — that is inside
+  the fault zone. Do not adopt the upstream default unmodified.**
+- **Flash, not RAM, is the binding constraint.** A transport-only build — no
+  display, no font, no UI, no message store, no LXMF receive — measures
+  **86.1% of the 815 KB app region**, leaving ~110 KiB for everything Thicket
+  adds. Budget flash first; see `docs/nrf-prior-art.md` in hq.
+- **BLE and LoRa do not coexist** in the only working reference: it suspends the
+  entire Reticulum stack whenever a BLE client is connected, to avoid SoftDevice
+  supervision timeouts. Assume this constrains any BLE-based feature.
 - Adafruit nRF52 BSP: the SoftDevice owns flash regions and IRQ priorities.
 - **"RAK4631 won't transmit" — read this before debugging RF.** The root cause
   reported upstream was **interference avoidance**, inherited from
