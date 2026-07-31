@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "input=$(cat); path=$(echo \"$input\" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"file_path\",\"\"))'); case \"$path\" in *.cpp|*.h|*.c|*.ino|*platformio.ini) cd \"$CLAUDE_PROJECT_DIR\" && pio run -e wiscore_rak4631 >/dev/null 2>&1 || { echo 'pio run -e wiscore_rak4631 FAILED — fix the build before continuing' >&2; exit 2; } ;; esac"
+          }
+        ]
+      }
+    ]
+  }
+}
