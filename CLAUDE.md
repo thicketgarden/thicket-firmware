@@ -30,5 +30,27 @@ the device).
 
 ## License
 
-GPL-3.0-or-later (matches microReticulum_Firmware, our derivation base).
-Keep third-party notices intact when carrying code along.
+**GPL-3.0-or-later** (matches microReticulum_Firmware, our derivation base).
+Keep third-party notices intact when carrying code along. Source files carry
+the standard GPL notice.
+
+Shipping firmware on hardware means conveying a binary: publish the full
+Corresponding Source for every shipped version, keep GPL notices visible in
+docs and UI, and never lock the bootloader — buyers must be able to flash
+modified firmware.
+
+### Ratspeak: study only
+
+All Ratspeak project code (`ratspeak/Ratspeak`, `ratspeak/rsCardputer`) is
+**AGPL-3.0-or-later**. AGPL §13's network-source obligation propagates to the
+entire combined work, so porting any of it would convert this repo from
+GPL-3.0-or-later to AGPL.
+
+**Do not port, copy, or adapt Ratspeak code into this repo.** Reading their
+code to understand the problem is fine; lifting it is not. Studying their
+approach and reimplementing independently is the expected path. If a
+relicensing answer ever changes this, it will arrive as an explicit ruling —
+not as an inference from a maintainer's friendly comment.
+
+Note that `ratspeak/microReticulum` (their fork) is Apache-2.0 and is not
+covered by this restriction.
