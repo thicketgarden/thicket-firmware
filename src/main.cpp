@@ -507,6 +507,20 @@ static bool bringup_reticulum() {
 	// A handheld is a leaf, not a router: it must not rebroadcast other
 	// people's traffic on battery. Relay (a separate product) is what carries
 	// transport_enabled(true).
+	//
+	// ⚠ This line is load-bearing in a way it does not look. Upstream
+	// microReticulum initialises its path table, known-destinations and packet
+	// hashlist stores ONLY inside `if (Reticulum::transport_enabled())`
+	// (Transport.cpp:380). Against stock upstream, this correct setting makes
+	// Identity::remember() fail on every inbound announce, so the device
+	// announces, looks healthy, and can never address a peer — all four of
+	// upstream's own test_interop scenarios fail on it.
+	//
+	// We build against our fork's `thicket/integration`, which moves those store
+	// initialisations out of the gate. Do NOT re-point lib_deps at upstream
+	// without carrying that fix, and do not "simplify" this to
+	// transport_enabled(true) to make symptoms go away — that would turn a
+	// battery-powered handheld into a router. See tasks/T19.
 	g_reticulum.transport_enabled(false);
 	g_reticulum.probe_destination_enabled(true);
 	g_reticulum.start();
