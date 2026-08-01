@@ -259,8 +259,19 @@ void LoRaInterface::loop() {
 			int state = _radio->readData(rxBuf, len);
 
 			if (state == RADIOLIB_ERR_NONE && len > 1) {
-				Serial.println("RSSI: " + String(_radio->getRSSI()));
-				Serial.println("Snr: "  + String(_radio->getSNR()));
+				// Thicket modification: latch the link quality of this frame so
+				// the application can read it. RadioLib's getRSSI()/getSNR()
+				// report the LAST received packet and are clobbered by the next
+				// one, and upstream only ever printed them — by the time an
+				// LXMF message surfaces in a delivery callback the values are
+				// unreachable. Stored here, at the only point where they are
+				// known to belong to the frame just read.
+				_last_rssi = _radio->getRSSI();
+				_last_snr  = _radio->getSNR();
+				_signal_valid = true;
+
+				Serial.println("RSSI: " + String(_last_rssi));
+				Serial.println("Snr: "  + String(_last_snr));
 
 				uint8_t hdr = rxBuf[0];
 				uint8_t seq = packetSequence(hdr);

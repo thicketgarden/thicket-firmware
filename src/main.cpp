@@ -20,12 +20,18 @@
 // step failed instead of going quiet.
 //
 // What is real here: external-flash persistence, an identity that survives a
-// power cycle, the SX1262 on air, Reticulum transport, an announce, and a live
-// LXMF router with its delivery destination registered.
+// power cycle, the SX1262 on air, Reticulum transport, an announce, a live LXMF
+// router with its delivery destination registered, and an on-device composed,
+// signed and encrypted reply sent back over LoRa to whoever wrote to us.
 //
-// What is NOT here yet, and is marked TODO(M1) at each site: sending a message,
-// a message store, a UI, input, and any conformance check against Python RNS.
-// Nothing below fakes those.
+// That last part is what makes the whole claim provable with nothing attached.
+// The device has no screen and no buttons; the *peer's* screen is the output
+// device. Send it a message from a T-Deck or a Sideband instance and a reply
+// appears there, composed here. No cable, no serial console, no host.
+//
+// What is NOT here yet, and is marked TODO(M1) at each site: a message store,
+// a UI, input, and any conformance check against Python RNS. Nothing below
+// fakes those.
 // ---------------------------------------------------------------------------
 
 // Arduino.h first, then kill its abs()/round() function-like macros. Every
@@ -48,9 +54,13 @@
 
 #include <LoRaInterface.h>
 #include <LXMF/LXMRouter.h>
+#include <LXMF/LXMessage.h>
 
 #include <memory>
 #include <string>
+#include <cmath>
+#include <cstdio>
+#include <cstring>
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -82,6 +92,58 @@ static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 // timer once there is a UI.
 static const double ANNOUNCE_INTERVAL_S = 120.0;
 
+// Auto-reply. The device answers anything delivered to it, addressed to the
+// source hash carried by the inbound message — nothing about the peer is
+// compiled in, so no reflash is needed when the far end's address changes or a
+// second peer appears. This is the M1 proof: it needs no screen here and no
+// host, because the reply lands on the sender's screen.
+//
+// The pause exists because LoRaInterface::send_outgoing() blocks for the whole
+// air time (~400 ms for a full frame at SF8/125 kHz) and the peer that just
+// transmitted needs its own receiver back before we answer.
+static const uint32_t REPLY_DELAY_MS = 1500;
+
+// Single-LoRa-packet content budget, in bytes.
+//
+// microLXMF picks OPPORTUNISTIC (one packet, no link) over DIRECT (establish a
+// link first) when packed_size() <= LORA_ENCRYPTED_PACKET_MDU = 159. Packed
+// size is 16 (dest) + 16 (source) + 64 (signature) + msgpack payload, and the
+// payload of a titleless message costs 15 bytes of framing: array header 1,
+// float64 timestamp 9, empty title bin 2, content bin header 2, empty field
+// map 1. 159 - 96 - 15 = 48 bytes of content.
+//
+// Over budget is not an error — the router just falls back to link delivery,
+// which is slower and needs a path first. Under budget is worth staying.
+// The reply carries no title for the same reason: a title is 1-2 more bytes of
+// header plus its own text, and the peer already shows who sent it.
+static const size_t REPLY_CONTENT_BUDGET = 48;
+
+// Room to format without truncating; the budget above is a preference, not a
+// limit, and a body that overruns it should be visible rather than clipped.
+static const size_t BODY_BUF = 72;
+
+// Optional timed send — OFF unless both flags are compiled in.
+//
+//   -DTHICKET_AUTOSEND_INTERVAL_S=60
+//   -DTHICKET_AUTOSEND_DEST=<32 hex chars, the peer's lxmf.delivery hash>
+//
+// This is the fallback for the case where auto-reply misbehaves and the founder
+// needs to know whether the transmit path works at all. It is deliberately not
+// the default: a stock build transmits announces and replies, and never
+// unsolicited traffic. It also requires knowing the peer's destination hash at
+// build time, which is exactly the reflash-after-you-find-out problem that
+// auto-reply exists to avoid.
+#if defined(THICKET_AUTOSEND_INTERVAL_S) && !defined(THICKET_AUTOSEND_DEST)
+#error "THICKET_AUTOSEND_INTERVAL_S set without THICKET_AUTOSEND_DEST=<32 hex chars>"
+#endif
+#if defined(THICKET_AUTOSEND_DEST) && !defined(THICKET_AUTOSEND_INTERVAL_S)
+#error "THICKET_AUTOSEND_DEST set without THICKET_AUTOSEND_INTERVAL_S=<seconds>"
+#endif
+
+// -D on the command line delivers a bare token, not a string literal.
+#define THICKET_STR_(x) #x
+#define THICKET_STR(x) THICKET_STR_(x)
+
 // ---------------------------------------------------------------------------
 // State
 // ---------------------------------------------------------------------------
@@ -96,8 +158,41 @@ static RNS::Identity g_identity({RNS::Type::NONE});
 // on the heap once the identity exists.
 static std::unique_ptr<LXMF::LXMRouter> g_router;
 
+// Observer pointer to the same object g_lora_interface owns. RNS::Interface
+// wraps an InterfaceImpl* in a shared_ptr and exposes no way back down to the
+// concrete type, and last_rssi()/last_snr() are LoRaInterface's, not
+// InterfaceImpl's. Both are file-scope globals with program lifetime, so this
+// never dangles; it must not be deleted here.
+static LoRaInterface* g_lora = nullptr;
+
 static bool g_stack_up = false;
 static double g_last_announce = 0.0;
+
+// Counts every message this device has composed since boot — replies and, if
+// compiled in, timed sends. It is the first field of the body precisely so a
+// missing number on the peer's screen means a dropped packet, unambiguously.
+static uint32_t g_send_counter = 0;
+
+// One pending reply, not a queue. If a second message arrives before the first
+// reply is composed, the newer source wins and one reply goes out: this is a
+// bring-up diagnostic, and answering a flood packet-for-packet on a shared
+// 125 kHz channel is antisocial. The router's own outbound pool (16) is the
+// backstop.
+struct ReplyRequest {
+	bool     armed = false;
+	uint32_t due_ms = 0;
+	RNS::Bytes to;
+	bool     signal_valid = false;
+	float    rssi = 0.0f;
+	float    snr = 0.0f;
+};
+static ReplyRequest g_reply;
+
+#ifdef THICKET_AUTOSEND_INTERVAL_S
+static RNS::Bytes g_autosend_dest;
+static bool   g_autosend_ok = false;
+static double g_last_autosend = 0.0;
+#endif
 
 // ---------------------------------------------------------------------------
 // Serial diagnostics
@@ -136,6 +231,153 @@ static void info_u32(const char* key, uint32_t value) {
 static void fail(const char* what) {
 	Serial.print("      FAIL : ");
 	Serial.println(what);
+}
+
+// ---------------------------------------------------------------------------
+// Message composition
+//
+// Everything below runs on the device. The content is built here, the message
+// is signed here with the private key on external flash, and microReticulum
+// encrypts it to the recipient here. Nothing is templated by a host.
+// ---------------------------------------------------------------------------
+
+// Formats one line of diagnostics, small enough to fit a single LoRa packet and
+// short enough to read off a T-Deck without scrolling. Shape:
+//
+//     #7 up812s r-96 s+8.2 id3f9ac114
+//
+// counter, uptime in seconds, RSSI in dBm, SNR in dB, and the first four bytes
+// of this device's identity hash — the same hash the boot banner prints, so a
+// peer can confirm which physical board answered without a cable.
+//
+// Deliberately no %f: the float formatter is a chunk of newlib we would be
+// linking for one number, and fixed-point tenths from an integer is exact.
+static size_t build_diag_body(char* out, size_t out_size,
+                              bool signal_valid, float rssi, float snr) {
+	char rssi_buf[8] = "?";
+	char snr_buf[10] = "?";
+
+	if (signal_valid) {
+		// Clamped to what an SX1262 can physically report, so the body length
+		// is bounded no matter what RadioLib hands back after a bad read.
+		// -Wformat-truncation is right to care: an unbounded number here could
+		// push the message past the single-packet budget.
+		long r = lroundf(rssi);
+		if (r < -200) { r = -200; } else if (r > 20) { r = 20; }
+		snprintf(rssi_buf, sizeof(rssi_buf), "%ld", r);
+
+		long tenths = lroundf(snr * 10.0f);
+		if (tenths < -300) { tenths = -300; } else if (tenths > 300) { tenths = 300; }
+		long mag = (tenths < 0) ? -tenths : tenths;
+		snprintf(snr_buf, sizeof(snr_buf), "%c%ld.%ld",
+		         (tenths < 0) ? '-' : '+', mag / 10, mag % 10);
+	}
+
+	// toHex() on a 32-byte hash is 64 chars; the first 8 are 4 bytes, which is
+	// plenty to disambiguate one board on a bench and cheap on the wire.
+	std::string id = g_identity.hash().toHex();
+	if (id.size() > 8) { id.resize(8); }
+
+	int n = snprintf(out, out_size, "#%lu up%lus r%s s%s id%s",
+	                 (unsigned long)g_send_counter,
+	                 (unsigned long)(millis() / 1000UL),
+	                 rssi_buf, snr_buf, id.c_str());
+	return (n < 0) ? 0 : (size_t)n;
+}
+
+// Compose, sign, encrypt and queue one LXMF message. No MessageStore is
+// involved and none is needed: LXMRouter takes the message by reference, packs
+// it, and copies it into its own fixed outbound pool. Persistence of sent
+// messages is a separate feature, not a precondition for sending one.
+static bool send_lxmf(const RNS::Bytes& destination_hash,
+                      const char* body, const char* why) {
+	if (!g_router) { return false; }
+
+	// 16 bytes is RNS's truncated destination hash. A wrong length here means
+	// the source hash or the build flag is malformed, and quietly transmitting
+	// to a garbage address is worse than refusing.
+	if (destination_hash.size() != 16) {
+		Serial.print("SEND refused (");
+		Serial.print(why);
+		Serial.print("): destination hash is ");
+		Serial.print((uint32_t)destination_hash.size());
+		Serial.println(" bytes, expected 16");
+		return false;
+	}
+
+	size_t len = strlen(body);
+
+	Serial.println();
+	Serial.println("--- LXMF message send ---");
+	Serial.print("  reason : ");
+	Serial.println(why);
+	Serial.print("  to     : ");
+	Serial.println(destination_hash.toHex().c_str());
+	Serial.print("  body   : ");
+	Serial.println(body);
+	Serial.print("  length : ");
+	Serial.print((uint32_t)len);
+	Serial.print(" B (single-packet content budget ");
+	Serial.print((uint32_t)REPLY_CONTENT_BUDGET);
+	Serial.println(" B)");
+	if (len > REPLY_CONTENT_BUDGET) {
+		Serial.println("  note   : over budget, router will need a link (DIRECT), not one packet");
+	}
+
+	try {
+		// The destination is passed as NONE and the hash set afterwards: we
+		// know the peer's address but not necessarily its public key yet, and
+		// RNS::Destination cannot be built without an Identity. The router
+		// resolves the identity at send time via Identity::recall(), and asks
+		// Transport for a path if it cannot.
+		//
+		// The source, by contrast, must be a real Destination — LXMessage::pack
+		// signs with it and throws if it is absent. delivery_destination() is
+		// ours, SINGLE, backed by the identity loaded from external flash.
+		//
+		// Heap, not stack, and not by preference: sizeof(LXMF::LXMessage) is
+		// 800 bytes (measured at the pinned commit — 16 FieldEntry slots of two
+		// RNS::Bytes each dominate it), and the Adafruit nRF52 core runs loop()
+		// on a FreeRTOS task with LOOP_STACK_SZ = 256*4 words = 4,096 bytes
+		// total. A 20%-of-stack local in front of pack(), which nests msgpack
+		// and SHA-256 and Ed25519, is not a margin worth having. The router
+		// copies the message into its own pool anyway, so this lives exactly as
+		// long as the call.
+		std::unique_ptr<LXMF::LXMessage> message(new LXMF::LXMessage(
+			RNS::Destination(RNS::Type::NONE),
+			g_router->delivery_destination(),
+			RNS::Bytes((const uint8_t*)body, len),
+			RNS::Bytes(),                          // no title — see REPLY_CONTENT_BUDGET
+			LXMF::Type::Message::OPPORTUNISTIC
+		));
+		if (!message) {
+			Serial.println("  FAILED : out of heap composing message");
+			Serial.println("-------------------------");
+			return false;
+		}
+		message->destination_hash(destination_hash);
+
+		// OPPORTUNISTIC and not DIRECT on purpose. DIRECT establishes an RNS
+		// link first, which is several round trips before any payload moves; on
+		// a half-duplex 125 kHz channel that is the most fragile thing we could
+		// ask of an unproven radio. One encrypted packet either arrives or does
+		// not, and the answer is legible either way.
+		g_router->handle_outbound(*message);
+		++g_send_counter;
+
+		Serial.println("  queued : yes (process_outbound will send it)");
+		Serial.println("-------------------------");
+		return true;
+
+	} catch (const std::exception& e) {
+		// pack() throws if the source destination cannot sign. Catching here
+		// keeps a composition failure from unwinding through the main loop and
+		// taking the radio down with it.
+		Serial.print("  FAILED : ");
+		Serial.println(e.what());
+		Serial.println("-------------------------");
+		return false;
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -233,7 +475,11 @@ static bool bringup_radio() {
 	info("band", "915.0 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm");
 	info("spi", "SPI1 (radio) - SPI stays on the flash bus");
 
-	g_lora_interface = new LoRaInterface();
+	// Keep a typed handle before the Interface wrapper swallows it — see
+	// g_lora. RNS::Interface takes ownership via shared_ptr; this is an
+	// observer, never deleted here.
+	g_lora = new LoRaInterface();
+	g_lora_interface = g_lora;
 
 	// MODE_GATEWAY, matching upstream's own example: this interface is a
 	// full participant, not a leaf or an access point.
@@ -292,32 +538,103 @@ static bool bringup_lxmf() {
 	g_router->set_display_name(DISPLAY_NAME);
 
 	g_router->register_delivery_callback([](LXMF::LXMessage& message) {
-		// TODO(M1): this is the receive path's only consumer. It prints and
-		// drops. It needs a MessageStore (retuned to 8x32) behind it and,
-		// later, the UI and the A9 alert ladder.
+		// Link quality of the last LoRa frame the interface saw. This is a
+		// close approximation of "how well did THIS message arrive", not a
+		// guarantee: the delivery callback fires from process_inbound(), one
+		// or more main-loop iterations after the frame was read, and a split
+		// payload reports its second half. Good enough to tell a peer across
+		// the room from a peer across a valley; not a calibrated measurement.
+		bool  sig  = (g_lora != nullptr) && g_lora->signal_valid();
+		float rssi = sig ? g_lora->last_rssi() : 0.0f;
+		float snr  = sig ? g_lora->last_snr()  : 0.0f;
+
+		// The tethered case. Untethered is the proof, but when there IS a
+		// terminal attached this is the whole receive path in one block.
 		Serial.println();
 		Serial.println("--- LXMF message received ---");
 		Serial.print("  from   : ");
 		Serial.println(message.source_hash().toHex().c_str());
+		Serial.print("  length : ");
+		Serial.print((uint32_t)message.content().size());
+		Serial.println(" B content");
+		Serial.print("  rssi   : ");
+		if (sig) { Serial.print(rssi); Serial.println(" dBm"); } else { Serial.println("unavailable"); }
+		Serial.print("  snr    : ");
+		if (sig) { Serial.print(snr);  Serial.println(" dB");  } else { Serial.println("unavailable"); }
+		Serial.print("  signed : ");
+		Serial.println(message.signature_validated() ? "yes" : "NO - source identity not known yet");
 		Serial.print("  title  : ");
 		Serial.println(message.title().toString().c_str());
 		Serial.print("  content: ");
 		Serial.println(message.content().toString().c_str());
 		Serial.println("-----------------------------");
+
+		// Arm the reply. Deliberately does NOT send from inside this callback:
+		// we are being called from LXMRouter::process_inbound(), inside its
+		// try block, with the inbound queue head still live. handle_outbound()
+		// packs and can throw, and a throw here would be caught by the
+		// router's own handler and reported as a receive failure. Latch the
+		// address, send from loop() where the failure is legible.
+		if (message.source_hash().size() != 16) {
+			Serial.println("REPLY skipped: source hash malformed");
+			return;
+		}
+		if (message.source_hash() == g_router->delivery_destination().hash()) {
+			// Our own message, arriving back at us. Replying would loop.
+			Serial.println("REPLY skipped: source is this device");
+			return;
+		}
+
+		g_reply.armed        = true;
+		g_reply.due_ms       = millis() + REPLY_DELAY_MS;
+		g_reply.to           = message.source_hash();
+		g_reply.signal_valid = sig;
+		g_reply.rssi         = rssi;
+		g_reply.snr          = snr;
+
+		Serial.print("REPLY armed for ");
+		Serial.print(g_reply.to.toHex().c_str());
+		Serial.print(" in ");
+		Serial.print(REPLY_DELAY_MS);
+		Serial.println(" ms");
+
+		// TODO(M1): this is still the receive path's only consumer beyond the
+		// reply. Nothing is retained. It needs a MessageStore (retuned to 8x32)
+		// behind it and, later, the UI and the A9 alert ladder.
+	});
+
+	g_router->register_sent_callback([](LXMF::LXMessage& message) {
+		Serial.print("LXMF: sent ");
+		Serial.println(message.hash().toHex().c_str());
+	});
+
+	g_router->register_delivered_callback([](LXMF::LXMessage& message) {
+		// A proof came back: the peer decrypted it and acknowledged. This is
+		// the strongest signal the untethered loop actually closed, and it is
+		// the one line worth watching for on a terminal.
+		Serial.print("LXMF: DELIVERED (proof received) ");
+		Serial.println(message.hash().toHex().c_str());
 	});
 
 	g_router->register_failed_callback([](LXMF::LXMessage& message) {
 		Serial.print("LXMF: delivery failed for ");
 		Serial.println(message.hash().toHex().c_str());
+		Serial.println("      (no path to peer, or peer never announced - check both announce)");
 	});
 
-	// TODO(M1): no MessageStore is attached. microLXMF's LXMRouter does not
-	// reference MessageStore at all - it is application-owned - so the class is
-	// dropped from the image entirely until we instantiate one. When we do, its
-	// pool constants must be overridden first: they are `static constexpr` in
-	// MessageStore.h with no #ifndef guard, and at upstream's 32x256 the object
-	// is 266,896 bytes and the link fails outright. Guarding them is a six-line
-	// upstream patch and should be our first contribution to microLXMF.
+	// TODO(M1): no MessageStore is attached, and sending does not need one.
+	// Verified against microLXMF at the pinned commit: LXMRouter never
+	// references MessageStore - it is application-owned - and handle_outbound()
+	// packs the message and copies it into the router's own fixed
+	// _pending_outbound_pool (16 slots). Construct, send, discard is the whole
+	// lifecycle; persistence of sent and received messages is a separate
+	// feature, not a precondition for either direction.
+	//
+	// When we do attach one, its pool constants must be overridden first: they
+	// are `static constexpr` in MessageStore.h with no #ifndef guard, and at
+	// upstream's 32x256 the object is 266,896 bytes and the link fails
+	// outright. Guarding them is a six-line upstream patch and should be our
+	// first contribution to microLXMF.
 
 	// TODO(M1): no stamps. Sideband ships lxmf_require_stamps = False and
 	// announces a nil inbound stamp cost, Python LXMF skips the whole stamp
@@ -342,6 +659,48 @@ static void announce(const char* why) {
 	g_last_announce = RNS::Utilities::OS::time();
 }
 
+// Timed send, compiled out entirely unless both flags are given.
+//
+// Parsed and validated at boot rather than at first send, because a typo in a
+// -D reaching the radio as a mangled address is the kind of failure that looks
+// like broken RF. Bytes::assignHex() does not validate: it maps any character
+// through arithmetic and produces garbage silently, so the check is ours.
+#ifdef THICKET_AUTOSEND_INTERVAL_S
+static void bringup_autosend() {
+	const char* hex = THICKET_STR(THICKET_AUTOSEND_DEST);
+	size_t n = strlen(hex);
+
+	Serial.println();
+	Serial.println("TIMED SEND is compiled in (this is not the default build)");
+	info("dest hex", hex);
+	info_u32("interval (s)", (uint32_t)(THICKET_AUTOSEND_INTERVAL_S));
+
+	if (n != 32) {
+		fail("THICKET_AUTOSEND_DEST must be exactly 32 hex characters (16-byte dest hash)");
+		info_u32("got length", (uint32_t)n);
+		return;
+	}
+	for (size_t i = 0; i < n; ++i) {
+		char c = hex[i];
+		bool is_hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+		if (!is_hex) {
+			fail("THICKET_AUTOSEND_DEST contains a non-hex character");
+			return;
+		}
+	}
+
+	g_autosend_dest.assignHex(hex);
+	if (g_autosend_dest.size() != 16) {
+		fail("THICKET_AUTOSEND_DEST did not decode to 16 bytes");
+		return;
+	}
+
+	g_autosend_ok = true;
+	g_last_autosend = RNS::Utilities::OS::time();
+	ok("timed send armed");
+}
+#endif
+
 // ---------------------------------------------------------------------------
 
 static void print_addresses() {
@@ -360,6 +719,11 @@ static void print_addresses() {
 	Serial.println(" The identity hash must be identical after a power cycle.");
 	Serial.println(" If it is not, external-flash persistence is broken and");
 	Serial.println(" nothing else in this build can be trusted.");
+	Serial.println();
+	Serial.println(" Send a message to the lxmf.delivery address above and this");
+	Serial.println(" device will answer it. The reply is composed, signed and");
+	Serial.println(" encrypted here; the address it goes to is learned from the");
+	Serial.println(" message, never compiled in. Nothing needs to be attached.");
 	Serial.println("=========================================================");
 	Serial.println();
 }
@@ -406,6 +770,10 @@ void setup() {
 	step(6, "Announce");
 	announce("boot");
 
+#ifdef THICKET_AUTOSEND_INTERVAL_S
+	bringup_autosend();
+#endif
+
 	print_addresses();
 	g_stack_up = true;
 	digitalWrite(LED_GREEN, HIGH);
@@ -437,12 +805,43 @@ void loop() {
 		announce("timer");
 	}
 
-	// TODO(M1): compose and send. The path is
-	// LXMF::LXMessage(destination, source, content, title, method) then
-	// router->handle_outbound(msg); it needs a destination to send to, which
-	// needs an announce list, which needs Transport path-table enumeration -
-	// upstream is mid-migration to a microStore-backed path table with no
-	// enumeration API, so path_table() returns empty. That is M2's first wall.
+	// Auto-reply. The address came off the wire, so this closes the loop with
+	// nothing compiled in and nothing attached.
+	//
+	// Note what this sidesteps: sending to a peer we have NOT heard from still
+	// needs a way to pick a destination, and there is no way to enumerate known
+	// destinations - upstream is mid-migration to a microStore-backed path
+	// table with no enumeration API, so path_table() returns empty. Answering
+	// is possible because the source hash arrives with the message. Initiating
+	// remains M2's first wall.
+	if (g_reply.armed && (int32_t)(millis() - g_reply.due_ms) >= 0) {
+		g_reply.armed = false;
+
+		char body[BODY_BUF];
+		build_diag_body(body, sizeof(body),
+		                g_reply.signal_valid, g_reply.rssi, g_reply.snr);
+		send_lxmf(g_reply.to, body, "auto-reply");
+	}
+
+#ifdef THICKET_AUTOSEND_INTERVAL_S
+	// Timed send. Only reachable when both build flags were given AND the
+	// destination parsed; a stock build never compiles this block at all.
+	if (g_autosend_ok &&
+	    (RNS::Utilities::OS::time() - g_last_autosend) > (double)(THICKET_AUTOSEND_INTERVAL_S)) {
+		g_last_autosend = RNS::Utilities::OS::time();
+
+		// No inbound frame to attribute the signal figures to, so report the
+		// interface's most recent frame if it has ever seen one. On a silent
+		// channel these read "?" and that is the honest answer.
+		bool  sig  = (g_lora != nullptr) && g_lora->signal_valid();
+		float rssi = sig ? g_lora->last_rssi() : 0.0f;
+		float snr  = sig ? g_lora->last_snr()  : 0.0f;
+
+		char body[BODY_BUF];
+		build_diag_body(body, sizeof(body), sig, rssi, snr);
+		send_lxmf(g_autosend_dest, body, "timed send");
+	}
+#endif
 
 	// TODO(M1): no sleep. A26's always-listening contract does not mean a busy
 	// loop; it means the receiver stays powered while the CPU idles. This spins

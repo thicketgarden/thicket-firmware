@@ -29,10 +29,9 @@ Consequence: **this copy does not update when the `microReticulum` pin in
 
 ## Thicket modifications
 
-Apache-2.0 §4(b) requires modified files to say so. All changes are in
+Apache-2.0 §4(b) requires modified files to say so. Changes 1–3 are in
 `src/LoRaInterface.cpp`, inside the `BOARD_RAK4631` branch, each marked with a
-`Thicket modification` comment. `src/LoRaInterface.h` gained only a provenance
-header.
+`Thicket modification` comment. Change 4 spans both files and is marked in place.
 
 1. **Radio moved to `SPI1`.** Upstream calls
    `SPI.setPins(MISO, SCK, MOSI); SPI.begin();`, repointing the single Arduino
@@ -59,6 +58,19 @@ header.
    is ~140 mA. The OCP register is 2.5 mA/LSB (`0x28` = 100 mA, `0x38` =
    140 mA); RadioLib's `setCurrentLimit()` takes milliamps. This raises a
    ceiling — transmit power is untouched at upstream's +17 dBm.
+
+4. **Last-frame RSSI/SNR are readable,** `last_rssi()`, `last_snr()`,
+   `signal_valid()`. Upstream reads `getRSSI()`/`getSNR()` in `loop()` and
+   prints them to `Serial`, then drops them. RadioLib overwrites both on the
+   next packet, so by the time a received LXMF message reaches an application
+   delivery callback there is no way to ask how well it arrived. `loop()` now
+   latches the two values at the same point it already printed them; the
+   printing is unchanged. Thicket's auto-reply puts them in the reply body, which
+   is how link quality gets read off a peer's screen with no display of our own.
+
+   Caveat carried in the header comment: these are **frame** figures. A payload
+   split across two LoRa transmissions reports the second half, and a reader
+   one main-loop iteration late may see a newer, unrelated frame.
 
 Nothing else is changed: the split-packet framing, the 915 MHz / BW 125 kHz /
 SF8 / CR4:5 parameters, `setDio2AsRfSwitch(true)`, DC-DC regulator mode

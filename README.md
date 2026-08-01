@@ -8,16 +8,45 @@ composed and delivered over LoRa/LXMF without a host.
 
 ## Status
 
-Early bring-up, pre-hardware. `src/main.cpp` is the real application skeleton:
-it brings up the SX1262, mounts external SPI flash, creates or loads a
-persistent Reticulum identity, starts transport, announces, and instantiates an
-LXMF router. Both build environments link. **None of it has run on a board
-yet** — the numbers below are link-time numbers and every one of them is a
-hypothesis until a RAK4631 is on the bench.
+Early bring-up, pre-hardware. `src/main.cpp` is the real application: it brings
+up the SX1262, mounts external SPI flash, creates or loads a persistent
+Reticulum identity, starts transport, announces, runs an LXMF router — and
+**answers messages sent to it**. A message delivered to its `lxmf.delivery`
+address gets a reply composed, signed and encrypted on the device and sent back
+over LoRa. The reply address is learned from the inbound message, so nothing
+about the peer is compiled in.
 
-Not yet wired, and marked `TODO(M1)` at each site in the source: message
-composition and send, a message store, display, input, and conformance testing
-against Python RNS.
+That is deliberately the shape of the proof. The board has no screen and no
+buttons yet; the peer's screen is the output device, and a reply arriving there
+demonstrates on-device identity, on-device encryption and LoRa delivery with
+nothing tethered. The reply body is diagnostic — a counter, uptime, the RSSI
+and SNR of the frame that arrived, and the first bytes of this device's
+identity hash — sized to fit a single LoRa packet.
+
+A timed send exists as a fallback and is **off by default**; it requires both
+`-DTHICKET_AUTOSEND_INTERVAL_S=<n>` and `-DTHICKET_AUTOSEND_DEST=<32 hex chars>` at
+build time. A stock build transmits announces and replies, never unsolicited
+traffic.
+
+**Always listening** is the design contract, not an aspiration deferred to
+later: the receiver stays on, so a message arrives when it is sent rather than
+when the device next polls or syncs. That is also the reason for the part
+choice. ESP32-class standalone Reticulum handhelds are two-to-three-day
+devices; low-power silicon plus a memory LCD that holds an image without redraw
+is what makes staying awake affordable at all. The design target is on the
+order of **two weeks of continuous listening on an 18650**, derived from
+datasheet figures — SX1262 receive in DC-DC mode, nRF52840 in System-ON idle,
+static memory LCD — and **not measured**. The real budget is still being
+derived and no figure is claimed until hardware produces one. The current
+firmware busy-loops the CPU and would not meet any of it.
+
+**None of this has run on a board yet.** Both build environments link; the
+numbers below are link-time numbers and every one of them is a hypothesis until
+a RAK4631 is on the bench.
+
+Not yet wired, and marked `TODO(M1)` at each site in the source: a message
+store, initiating a conversation with a peer that has not written first,
+display, input, sleep, and conformance testing against Python RNS.
 
 ## Building
 
@@ -35,10 +64,10 @@ Flash figure omits `.ARM.extab`, which is not small on a stack that throws):
 
 | env | image | app region | used | free |
 |---|---|---|---|---|
-| `wiscore_rak4631` | 439,936 B | 815,104 B | 53.97% | 375,168 B |
-| `wiscore_rak4631-noble` | 440,080 B | 966,656 B | 45.53% | 526,576 B |
+| `wiscore_rak4631` | 452,180 B | 815,104 B | 55.48% | 362,924 B |
+| `wiscore_rak4631-noble` | 452,324 B | 966,656 B | 46.79% | 514,332 B |
 
-Static RAM is 25,600 B (`.data` + `.bss`) in both envs, against a linker RAM
+Static RAM is 25,648 B (`.data` + `.bss`) in both envs, against a linker RAM
 region of 237,568 B. The Reticulum heap pool is a further
 65,536 B allocated at runtime, so it appears in no static size report;
 `scripts/mapsize.py` prints that reminder along with per-origin attribution.

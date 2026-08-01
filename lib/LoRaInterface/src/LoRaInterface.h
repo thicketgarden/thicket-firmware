@@ -6,8 +6,8 @@
  * Copyright (c) 2026 Chad Attermann
  * Licensed under the Apache License, Version 2.0. See ./LICENSE.
  *
- * Unmodified by Thicket except for this notice; the modifications live in
- * LoRaInterface.cpp and are listed in lib/LoRaInterface/README.md.
+ * Thicket modifications are listed in lib/LoRaInterface/README.md. In this file:
+ * the last-frame RSSI/SNR accessors below.
  */
 
 #pragma once
@@ -40,6 +40,18 @@ public:
 
 	//virtual inline std::string toString() const { return "LoRaInterface[" + name() + "]"; }
 
+	// Thicket addition — link quality of the most recently received LoRa frame.
+	//
+	// RadioLib's getRSSI()/getSNR() are only meaningful immediately after
+	// readData() and are overwritten by the next packet, so loop() latches them
+	// there. These are the *frame* figures, not per-RNS-packet: a frame split
+	// across two LoRa transmissions reports the second half, and an application
+	// that reads them one main-loop iteration after delivery may be reading a
+	// later, unrelated frame. Diagnostics, not telemetry.
+	inline float last_rssi() const { return _last_rssi; }   // dBm
+	inline float last_snr() const { return _last_snr; }     // dB
+	inline bool signal_valid() const { return _signal_valid; }
+
 private:
 	virtual bool send_outgoing(const RNS::Bytes& data);
 	void on_incoming(const RNS::Bytes& data);
@@ -58,6 +70,13 @@ private:
 
 	uint8_t _rx_seq     = SEQ_UNSET;  // sequence of split RX in progress
 	uint8_t _tx_seq_ctr = 0;          // rolling TX split sequence counter
+
+	// Thicket addition — see last_rssi()/last_snr() above. Declared outside the
+	// ARDUINO guard so the accessors compile on native builds too; only
+	// written by the Arduino receive path.
+	float _last_rssi    = 0.0f;
+	float _last_snr     = 0.0f;
+	bool  _signal_valid = false;
 
 	// Radio parameters (RadioLib units: MHz, kHz)
 	const float frequency = 915.0;   // MHz
