@@ -121,11 +121,33 @@ extern "C"
 /*
  * SPI Interfaces
  */
-#define SPI_INTERFACES_COUNT 1
+/* Thicket modification, 2026-08-01. Upstream (attermann/microReticulum_Firmware,
+ * and identically attermann/microReticulum examples/lora_announce) declares one
+ * SPI interface — the WisBlock IO-slot bus — and its LoRaInterface then calls
+ * SPI.setPins() at radio start to repoint that single instance at the SX1262's
+ * pins (P1.10-P1.15). That works only because the upstream examples keep no
+ * state on external SPI flash; on nRF52 they fall back to microStore's
+ * InternalFSFileSystem.
+ *
+ * Thicket keeps identity, keys and the message store on the RAK15001 external
+ * flash (never the ~28 KB internal FS), which sits on the IO-slot bus. If the
+ * radio repointed that bus, storage would break the moment the SX1262 came up.
+ * So the radio gets its own instance: SPI stays the IO-slot bus, SPI1 is the
+ * SX1262. Adafruit's nRF52 SPI library supports two (SPI=SPIM3, SPI1=SPIM2).
+ */
+#define SPI_INTERFACES_COUNT 2
 
+/* SPI  — WisBlock IO slot. RAK15001 external flash (CS = WB_SPI_CS = 26). */
 #define PIN_SPI_MISO (29)
 #define PIN_SPI_MOSI (30)
 #define PIN_SPI_SCK (3)
+
+/* SPI1 — SX1262 LoRa radio, nRF52840 P1.11/P1.12/P1.13. CS is P1.10 (42),
+ * BUSY P1.14 (46), DIO1 P1.15 (47), NRESET P1.06 (38); those are held by
+ * LoRaInterface, not here, because RadioLib's Module owns them. */
+#define PIN_SPI1_MISO (45)
+#define PIN_SPI1_MOSI (44)
+#define PIN_SPI1_SCK (43)
 
 	static const uint8_t SS = 26;
 	static const uint8_t MOSI = PIN_SPI_MOSI;
