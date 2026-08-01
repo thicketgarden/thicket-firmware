@@ -55,6 +55,15 @@ the device).
   so this looks like an oversight — plus Semtech erratum 15.3 RTC-stop and OCP
   140 mA. Note the OCP register is 2.5 mA/LSB, so `0x28` is 100 mA and `0x38`
   is 140 mA; the branch's own commit message miscounts this.
+- **OCP is a power ceiling, not just a safety setting.** RAK's datasheet rates
+  the module at **22 dBm in PA Boost mode**, drawing **125 mA at 20 dBm**
+  (92 mA at 17 dBm). Semtech's setting for high-power PA operation is ~140 mA.
+  microReticulum master ships OCP at `0x28` = **100 mA**, which is below what
+  +22 dBm draws — so **the stock firmware caps output below the hardware's
+  capability**, and over-current foldback is a plausible contributor to the
+  "RAK4631 won't transmit" reports. PR #91's 140 mA is what unlocks full power.
+  Do not conclude the module is limited to 15.8 dBm: that figure is the *FCC
+  grant's* tested level, not a hardware limit.
 - Determinism: scripts build/flash; changes are judged by build + on-target
   behavior, not by reading tea leaves.
 
