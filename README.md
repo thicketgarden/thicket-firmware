@@ -2,7 +2,7 @@
 
 Firmware for **Thicket** — a standalone, low-power handheld communicator for the
 [Reticulum](https://github.com/markqvist/Reticulum) network: nRF52840 + SX1262
-(RAK4631), 915 MHz, Sharp Memory LCD, weeks-not-days battery life. The stack
+(RAK4631), 915 MHz, Sharp Memory LCD, always listening. The stack
 runs **on the device**: on-device identity, on-device encryption, messages
 composed and delivered over LoRa/LXMF without a host.
 
