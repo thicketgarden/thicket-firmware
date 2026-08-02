@@ -29,7 +29,7 @@
 // device. Send it a message from a T-Deck or a Sideband instance and a reply
 // appears there, composed here. No cable, no serial console, no host.
 //
-// What is NOT here yet, and is marked TODO(M1) at each site: a message store,
+// What is NOT here yet, and is marked TODO(bring-up) at each site: a message store,
 // a UI, input, and any conformance check against Python RNS. Nothing below
 // fakes those.
 // ---------------------------------------------------------------------------
@@ -72,7 +72,7 @@
 static const char* IDENTITY_PATH = "/thicket_identity";
 
 // microLXMF's storage root. The router takes it now; it is only used once a
-// MessageStore is attached. TODO(M1): attach one, retuned — upstream's
+// MessageStore is attached. TODO(bring-up): attach one, retuned — upstream's
 // MAX_CONVERSATIONS=32 x MAX_MESSAGES_PER_CONVERSATION=256 is a 266,896-byte
 // object and will not link on this part. 8x32 costs 9,488 B and does.
 static const char* LXMF_STORAGE_PATH = "/lxmf";
@@ -88,7 +88,7 @@ static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 
 // How often to re-announce, seconds. Reticulum's own guidance is sparing;
 // this is a bring-up value chosen so the founder does not have to wait around
-// with a T-Deck. TODO(M1): drive announces from user action plus a much longer
+// with a T-Deck. TODO(bring-up): drive announces from user action plus a much longer
 // timer once there is a UI.
 static const double ANNOUNCE_INTERVAL_S = 120.0;
 
@@ -591,7 +591,7 @@ static bool bringup_radio() {
 
 	// MODE_GATEWAY, matching upstream's own example: this interface is a
 	// full participant, not a leaf or an access point.
-	// TODO(M1): revisit against A26's always-listening idle contract once
+	// TODO(bring-up): revisit against A26's always-listening idle contract once
 	// there is a power measurement to argue with.
 	g_lora_interface.mode(RNS::Type::Interface::MODE_GATEWAY);
 	RNS::Transport::register_interface(g_lora_interface);
@@ -720,7 +720,7 @@ static bool bringup_lxmf() {
 		Serial.print(REPLY_DELAY_MS);
 		Serial.println(" ms");
 
-		// TODO(M1): this is still the receive path's only consumer beyond the
+		// TODO(bring-up): this is still the receive path's only consumer beyond the
 		// reply. Nothing is retained. It needs a MessageStore (retuned to 8x32)
 		// behind it and, later, the UI and the A9 alert ladder.
 	});
@@ -744,7 +744,7 @@ static bool bringup_lxmf() {
 		Serial.println("      (no path to peer, or peer never announced - check both announce)");
 	});
 
-	// TODO(M1): no MessageStore is attached, and sending does not need one.
+	// TODO(bring-up): no MessageStore is attached, and sending does not need one.
 	// Verified against microLXMF at the pinned commit: LXMRouter never
 	// references MessageStore - it is application-owned - and handle_outbound()
 	// packs the message and copies it into the router's own fixed
@@ -758,7 +758,7 @@ static bool bringup_lxmf() {
 	// outright. Guarding them is a six-line upstream patch and should be our
 	// first contribution to microLXMF.
 
-	// TODO(M1): no stamps. Sideband ships lxmf_require_stamps = False and
+	// TODO(bring-up): no stamps. Sideband ships lxmf_require_stamps = False and
 	// announces a nil inbound stamp cost, Python LXMF skips the whole stamp
 	// block when the cost is None, and microLXMF hard-codes packNil() for its
 	// own announced cost, so nothing on either side allocates LXStamper's
@@ -878,7 +878,7 @@ void setup() {
 
 	// INFO is the right default here: TRACE is what upstream's examples use and
 	// it is both enormous and slow enough to change LoRa timing.
-	// TODO(M1): make this a build flag once bring-up is done.
+	// TODO(bring-up): make this a build flag once bring-up is done.
 	RNS::loglevel(RNS::LOG_INFO);
 
 	// Each step reports its own failure and we stop at the first one. A stack
@@ -966,7 +966,7 @@ void loop() {
 	}
 #endif
 
-	// TODO(M1): no sleep. A26's always-listening contract does not mean a busy
+	// TODO(bring-up): no sleep. A26's always-listening contract does not mean a busy
 	// loop; it means the receiver stays powered while the CPU idles. This spins
 	// the M4 at 64 MHz and will not meet any battery target.
 }

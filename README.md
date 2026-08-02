@@ -44,7 +44,7 @@ firmware busy-loops the CPU and would not meet any of it.
 numbers below are link-time numbers and every one of them is a hypothesis until
 a RAK4631 is on the bench.
 
-Not yet wired, and marked `TODO(M1)` at each site in the source: a message
+Not yet wired, and marked with a TODO at each site in the source: a message
 store, initiating a conversation with a peer that has not written first,
 display, input, sleep, and conformance testing against Python RNS.
 
