@@ -279,11 +279,29 @@ static void report_silicon_and_approtect() {
 	snprintf(line, sizeof(line), "0x%08lX  %s", (unsigned long)approt, meaning);
 	info("UICR.APPROTECT", line);
 
-	// On a hardware-APPROTECT part an erased UICR means LOCKED, which is the
-	// opposite of the older parts. Say so rather than leaving it to be read
-	// off a hex value at 2am on bring-up day.
-	if (hw_approtect_part && approt == 0xFFFFFFFFul) {
-		info("APPROTECT note", "erased on a rev3+ part means LOCKED by default");
+	// The two build-code families default in OPPOSITE directions, so an erased
+	// UICR means different things and neither is guessable from the hex value.
+	// Product Specification, Debug and trace / access port protection:
+	//   Dxx and earlier - hardware only, DISABLED by default
+	//   Fxx and later   - hardware + software, ENABLED by default
+	if (hw_approtect_part) {
+		if (approt == 0xFFFFFFFFul || (approt & 0xFF) != 0x5A) {
+			info("APPROTECT", "LOCKED. Fxx+ defaults enabled; opening it needs "
+			                  "UICR=HwDisabled AND firmware writing "
+			                  "APPROTECT.DISABLE. We never write it.");
+		}
+	}
+	else {
+		// The dangerous case, and the quiet one.
+		if (approt == 0xFFFFFFFFul || (approt & 0xFF) == 0x5A) {
+			info("APPROTECT", "*** DEBUG PORT OPEN *** Dxx-or-earlier part "
+			                  "defaults DISABLED. Internal flash is readable "
+			                  "over SWD with no attack required.");
+		}
+		else {
+			info("APPROTECT", "enabled, but hardware-only on a Dxx-or-earlier "
+			                  "part: defeated by the 2020 DEC1 voltage glitch.");
+		}
 	}
 }
 
