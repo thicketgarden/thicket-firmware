@@ -270,6 +270,11 @@ static void report_silicon_and_approtect() {
 	         hw_approtect_part ? " (rev3+/Fx0, hardware APPROTECT)" : "");
 	info("silicon", line);
 
+	// ERASEALL over CTRL-AP is ALWAYS available and cannot be disabled on any
+	// build code. An attacker with the device can therefore always wipe it to
+	// factory state. That is destruction, not disclosure: it costs us the data
+	// and gives them nothing. Stated here so nobody reads it later as a hole in
+	// the scheme, and so nobody tries to "fix" it.
 	const uint8_t approt_b = (uint8_t)(approt & 0xFF);
 	const char* meaning;
 	if (approt == 0xFFFFFFFFul)   meaning = "erased (0xFFFFFFFF)";
