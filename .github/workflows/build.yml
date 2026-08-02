@@ -49,3 +49,23 @@ jobs:
         # visible in the diff of two runs rather than discovered at link time
         # on the day the image stops fitting.
         run: pio run -e ${{ matrix.env }} 2>&1 | grep -E "RAM:|Flash:" || true
+
+  test:
+    # Host-side unit tests. This is the first CI job that exercises OUR code
+    # rather than a dependency — the interop workflow proves microReticulum
+    # talks to Python RNS, and proved nothing about anything we wrote.
+    name: unit tests (native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Run native unit tests
+        run: pio test -e native
+
