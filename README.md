@@ -1,6 +1,6 @@
 # thicket-firmware
 
-Firmware for **Thicket** — a standalone, low-power handheld communicator for the
+Firmware for the **Thicket Handheld** — a standalone, low-power communicator for the
 [Reticulum](https://github.com/markqvist/Reticulum) network: nRF52840 + SX1262
 (RAK4631), 915 MHz, Sharp Memory LCD, always listening. The stack
 runs **on the device**: on-device identity, on-device encryption, messages
