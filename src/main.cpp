@@ -251,6 +251,15 @@ static void info_u32(const char* key, uint32_t value) {
 // yields ciphertext and no key. That is only worth anything if the debug port
 // cannot simply be used to read internal flash back out.
 // ---------------------------------------------------------------------------
+// Set by report_silicon_and_approtect(). False means the debug port is open,
+// or open-by-default, on this particular chip.
+//
+// This exists to be GATED ON, not merely printed. Anything that stores a secret
+// in internal flash (docs/open-questions.md Q9, the "pepper") must refuse when
+// this is false: a secret on a chip whose SWD is open is worse than no secret,
+// because it looks protected and is not.
+static bool g_debug_port_protected = false;
+
 static void report_silicon_and_approtect() {
 	const uint32_t part    = NRF_FICR->INFO.PART;
 	const uint32_t variant = NRF_FICR->INFO.VARIANT;   // ASCII, e.g. 'AAF0'
@@ -308,6 +317,23 @@ static void report_silicon_and_approtect() {
 			                  "part: defeated by the 2020 DEC1 voltage glitch.");
 		}
 	}
+
+	// Only Fxx+ silicon with the software half never disabled is protected.
+	// Hardware-only protection on an older part does not count: the 2020 DEC1
+	// glitch defeats it for about $5.
+	g_debug_port_protected = hw_approtect_part && (approt_b != 0x5A);
+
+	// A STABLE, MACHINE-READABLE line. A flasher can reconnect after DFU, read
+	// this, and tell the user in the browser what their particular chip is —
+	// which matters because tasks/T16 invites anyone with a RAK4631 to flash
+	// this, and their silicon is not ours. Serial prose warns only whoever is
+	// already staring at a terminal.
+	//
+	// Format is contractual. Parsers depend on it; change it deliberately.
+	char m[80];
+	snprintf(m, sizeof(m), "THICKET-SEC v1 variant=%s approtect=%s", var_s,
+	         g_debug_port_protected ? "protected" : "OPEN");
+	Serial.println(m);
 }
 
 static void fail(const char* what) {
