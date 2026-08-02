@@ -472,7 +472,7 @@ static bool bringup_identity() {
 // receive.
 static bool bringup_radio() {
 	step(3, "SX1262 radio (LoRaInterface)");
-	info("band", "915.0 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm");
+	info("band", "914.875 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm");
 	info("spi", "SPI1 (radio) - SPI stays on the flash bus");
 
 	// Keep a typed handle before the Interface wrapper swallows it — see

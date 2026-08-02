@@ -79,7 +79,17 @@ private:
 	bool  _signal_valid = false;
 
 	// Radio parameters (RadioLib units: MHz, kHz)
-	const float frequency = 915.0;   // MHz
+	//
+	// 914.875 is the US Reticulum community frequency, NOT a round 915.0.
+	// Corrected 2026-08-01 after the founder's working Pi<->T-Deck LoRa link
+	// was read: it runs 914.875 and we were 125 kHz above it — exactly one
+	// channel width, so the passbands barely overlap and the two ends are
+	// mutually deaf. This would have presented on bring-up as "the radio is
+	// dead": announces into silence, nothing heard, no error anywhere.
+	//
+	// frequency, bandwidth and spreading factor must match a peer EXACTLY.
+	// Coding rate and TX power do not (docs/lora-parameters.md).
+	const float frequency = 914.875; // MHz
 	const float bandwidth = 125.0;   // kHz
 	const int   spreading = 8;
 	const int   coding    = 5;
