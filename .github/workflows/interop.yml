@@ -1,0 +1,183 @@
+name: interop
+
+# Runs the four microReticulum interop scenarios (packet, link, request,
+# resource) against a real Python RNS peer.
+#
+# WHY THIS EXISTS
+#
+# microReticulum declares no target RNS version anywhere — no constant, no
+# README statement, no CHANGELOG entry. So our interoperation with current
+# Reticulum is demonstrated BY TEST and never BY CONTRACT, which means it can
+# regress with no signal at all: no compile error, no version warning. The
+# device would announce, look healthy, and quietly stop being reachable.
+#
+# Two jobs, doing two different things:
+#
+#   interop-pinned  — every push, against a KNOWN RNS version. Deterministic.
+#                     Must pass. Catches us breaking ourselves, and fires
+#                     automatically whenever the microReticulum pin is bumped
+#                     (because the pin is read out of platformio.ini below).
+#
+#   interop-latest  — weekly, against whatever RNS is CURRENT. Allowed to
+#                     fail, and a failure is the entire point: it is the only
+#                     early warning that the ecosystem moved out from under
+#                     us. A red scheduled run emails the repo owner, which
+#                     turns an unmonitorable risk into a Tuesday morning.
+#
+# The interop senders live in the microReticulum repo, not here, so this tests
+# the stack we pin rather than our application code. That is deliberate: the
+# thing that can silently regress is the dependency.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    paths:
+      - 'platformio.ini'
+      - '.github/workflows/interop.yml'
+  schedule:
+    # Mondays 07:00 UTC. Weekly is enough — RNS releases are not daily, and a
+    # week of exposure is acceptable for something nothing currently watches.
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+
+jobs:
+  interop-pinned:
+    name: interop (RNS pinned)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout firmware
+        uses: actions/checkout@v4
+
+      - name: Resolve the pinned microReticulum revision
+        id: pin
+        # Read the pin out of platformio.ini so this test always exercises
+        # exactly what the firmware ships. Bumping the pin re-runs this job
+        # automatically, which is the standing regression check the register
+        # requires rather than one that depends on someone remembering.
+        run: |
+          set -euo pipefail
+          LINE="$(grep -oE 'https://github\.com/[A-Za-z0-9_.-]+/microReticulum\.git#[0-9a-f]+' platformio.ini | head -1)"
+          if [ -z "$LINE" ]; then
+            echo "::error::No pinned microReticulum git URL found in platformio.ini"
+            exit 1
+          fi
+          REPO_URL="${LINE%%#*}"
+          SHA="${LINE##*#}"
+          # Validate before it reaches actions/checkout. A ref taken from a
+          # file and passed unchecked into checkout is a ref-injection route,
+          # even when the file is ours.
+          if ! printf '%s' "$SHA" | grep -qE '^[0-9a-f]{40}$'; then
+            echo "::error::Refusing to check out a revision that is not a 40-char hex SHA: $SHA"
+            exit 1
+          fi
+          SLUG="$(printf '%s' "$REPO_URL" | sed -E 's#https://github\.com/([^/]+/[^/]+)\.git#\1#')"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA"   >> "$GITHUB_OUTPUT"
+          echo "Pinned: $SLUG @ $SHA"
+
+      - name: Checkout pinned microReticulum
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.slug }}
+          ref: ${{ steps.pin.outputs.sha }}
+          path: microReticulum
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO and Python RNS
+        env:
+          # The version we have actually demonstrated interoperation against.
+          # Change this deliberately, with a run to back it up — not to make
+          # a red build go green.
+          RNS_VERSION: '1.4.2'
+        run: |
+          set -euo pipefail
+          pip install --upgrade platformio
+          pip install "rns==${RNS_VERSION}"
+          python -c "import RNS; print('RNS', RNS.__version__)"
+
+      - name: Run all four interop scenarios
+        working-directory: microReticulum
+        run: bash test_interop/run_all.sh
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p interop-logs
+          cp -r /tmp/microreticulum_interop_* interop-logs/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: interop-logs-pinned
+          path: interop-logs
+          if-no-files-found: ignore
+
+  interop-latest:
+    name: interop (RNS latest — early warning)
+    # Scheduled and manual only. On every push it would be noise; weekly it is
+    # a signal. A failure here does NOT mean we are broken today — it means
+    # current RNS and our pinned stack have diverged and someone should look.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout firmware
+        uses: actions/checkout@v4
+
+      - name: Resolve the pinned microReticulum revision
+        id: pin
+        run: |
+          set -euo pipefail
+          LINE="$(grep -oE 'https://github\.com/[A-Za-z0-9_.-]+/microReticulum\.git#[0-9a-f]+' platformio.ini | head -1)"
+          [ -n "$LINE" ] || { echo "::error::No pinned microReticulum git URL in platformio.ini"; exit 1; }
+          SHA="${LINE##*#}"
+          printf '%s' "$SHA" | grep -qE '^[0-9a-f]{40}$' || { echo "::error::Bad SHA: $SHA"; exit 1; }
+          SLUG="$(printf '%s' "${LINE%%#*}" | sed -E 's#https://github\.com/([^/]+/[^/]+)\.git#\1#')"
+          echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
+          echo "sha=$SHA"   >> "$GITHUB_OUTPUT"
+
+      - name: Checkout pinned microReticulum
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.pin.outputs.slug }}
+          ref: ${{ steps.pin.outputs.sha }}
+          path: microReticulum
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO and the CURRENT Python RNS
+        run: |
+          set -euo pipefail
+          pip install --upgrade platformio
+          pip install --upgrade rns
+          python -c "import RNS; print('RNS', RNS.__version__)"
+
+      - name: Record which RNS version this ran against
+        # Whatever the outcome, the version has to be in the log. "It worked"
+        # is worthless without knowing what it worked against.
+        run: |
+          echo "### Ran against RNS $(python -c 'import RNS; print(RNS.__version__)')" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Run all four interop scenarios
+        working-directory: microReticulum
+        run: bash test_interop/run_all.sh
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p interop-logs
+          cp -r /tmp/microreticulum_interop_* interop-logs/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: interop-logs-latest
+          path: interop-logs
+          if-no-files-found: ignore

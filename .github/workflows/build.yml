@@ -1,0 +1,51 @@
+name: build
+
+# Both envs must build on every push. The no-BLE env is not optional here:
+# it exists as the flash/compliance fallback and a fallback that has rotted
+# is not a fallback.
+#
+# This job also exists to catch scripts/patch_deps.py failing. Those patches
+# are anchored to exact upstream text and sys.exit(1) when a pin moves —
+# which is correct, but until now the only place that alarm could fire was
+# someone's laptop, whenever they happened to build.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [wiscore_rak4631, wiscore_rak4631-noble]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+          restore-keys: pio-${{ runner.os }}-
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build ${{ matrix.env }}
+        run: pio run -e ${{ matrix.env }}
+
+      - name: Report size
+        # Informational. Flash and RAM numbers belong in the log so a jump is
+        # visible in the diff of two runs rather than discovered at link time
+        # on the day the image stops fitting.
+        run: pio run -e ${{ matrix.env }} 2>&1 | grep -E "RAM:|Flash:" || true
