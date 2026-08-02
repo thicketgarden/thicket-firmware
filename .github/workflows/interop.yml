@@ -181,3 +181,79 @@ jobs:
           name: interop-logs-latest
           path: interop-logs
           if-no-files-found: ignore
+
+  verify-upstream-bug:
+    # Manual only. Runs UNPATCHED upstream attermann/microReticulum and expects
+    # the interop scenarios to FAIL.
+    #
+    # This exists because our other interop jobs test our FORK, which carries
+    # the transport_enabled store-init fix — so they can prove the fix works
+    # and can never demonstrate the bug it fixes. Before telling a maintainer
+    # that his own test suite fails, we should be able to show it failing.
+    #
+    # A green run here means "the bug reproduces, as reported".
+    # A red run here means "upstream is fine and our issue is wrong" — which
+    # is the outcome worth catching before it is sent, not after.
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout UNPATCHED upstream at the SHA we forked from
+        uses: actions/checkout@v4
+        with:
+          repository: attermann/microReticulum
+          ref: 40fa628809d57140180c1c833559ab96fec992c1
+          path: upstream
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO and Python RNS
+        run: |
+          set -euo pipefail
+          pip install --upgrade platformio
+          pip install "rns==1.4.2"
+          python -c "import RNS; print('RNS', RNS.__version__)"
+
+      - name: Confirm the gate is present in this checkout
+        working-directory: upstream
+        run: |
+          set -euo pipefail
+          echo "--- Transport.cpp around the store-init gate ---"
+          sed -n '378,382p' src/microReticulum/Transport.cpp
+          grep -q 'if (Reticulum::transport_enabled())' src/microReticulum/Transport.cpp \
+            || { echo "::error::gate not found — upstream moved, re-anchor this job"; exit 1; }
+
+      - name: Confirm the senders run with transport disabled
+        working-directory: upstream
+        run: grep -rn "transport_enabled(false)" test_interop/ || true
+
+      - name: Run interop and EXPECT FAILURE
+        working-directory: upstream
+        run: |
+          set +e
+          bash test_interop/run_all.sh
+          rc=$?
+          set -e
+          echo "run_all.sh exit code: $rc"
+          if [ "$rc" -eq 0 ]; then
+            echo "::error::Upstream interop PASSED. The bug does not reproduce as reported —"
+            echo "::error::do NOT send the issue until this is understood."
+            exit 1
+          fi
+          echo "Upstream interop failed as expected. The reported bug reproduces."
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p upstream-logs
+          cp -r /tmp/microreticulum_interop_* upstream-logs/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: upstream-unpatched-logs
+          path: upstream-logs
+          if-no-files-found: ignore
+
