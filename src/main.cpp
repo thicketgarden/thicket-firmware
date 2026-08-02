@@ -228,6 +228,65 @@ static void info_u32(const char* key, uint32_t value) {
 	Serial.println(value);
 }
 
+// ---------------------------------------------------------------------------
+// Silicon identity and debug-port protection state.
+//
+// Printed at boot because it cannot be inferred and needs no debugger to read.
+//
+// nRF52840 revision 3 (build codes Fx0) carries Nordic's improved hardware
+// APPROTECT and SHIPS LOCKED FROM THE FACTORY. Earlier revisions ship open.
+// UICR.APPROTECT at 0x10001208: 0x00 = Enabled, 0x5A = HwDisabled.
+//   https://devzone.nordicsemi.com/nordic/nordic-blog/b/blog/posts/
+//     working-with-the-nrf52-series-improved-approtect
+//
+// Firmware built against MDK >= 8.45.0 without ENABLE_APPROTECT reads that
+// register at startup and writes APPROTECT.DISABLE, i.e. it unlocks the part
+// on every boot so a developer can attach a debugger. Our BSP does NOT do
+// this: APPROTECT appears only in the register headers of
+// framework-arduinoadafruitnrf52, never in system_nrf52840.c. So whatever
+// state the module arrives in is the state it stays in.
+//
+// Why we care: docs/open-questions.md Q9 considers holding an encryption
+// "pepper" in the MCU's internal flash so that dumping the external SPI flash
+// yields ciphertext and no key. That is only worth anything if the debug port
+// cannot simply be used to read internal flash back out.
+// ---------------------------------------------------------------------------
+static void report_silicon_and_approtect() {
+	const uint32_t part    = NRF_FICR->INFO.PART;
+	const uint32_t variant = NRF_FICR->INFO.VARIANT;   // ASCII, e.g. 'AAF0'
+	const uint32_t approt  = NRF_UICR->APPROTECT;
+
+	char var_s[5] = {
+		(char)((variant >> 24) & 0xFF), (char)((variant >> 16) & 0xFF),
+		(char)((variant >>  8) & 0xFF), (char)( variant        & 0xFF), 0
+	};
+	// Third character of the variant code is the revision letter; 'F' and
+	// later indicate the hardware-APPROTECT parts on nRF52840.
+	const bool hw_approtect_part = (var_s[2] >= 'F' && var_s[2] <= 'Z');
+
+	char line[96];
+	snprintf(line, sizeof(line), "part=0x%05lX variant=%s%s",
+	         (unsigned long)part, var_s,
+	         hw_approtect_part ? " (rev3+/Fx0, hardware APPROTECT)" : "");
+	info("silicon", line);
+
+	const uint8_t approt_b = (uint8_t)(approt & 0xFF);
+	const char* meaning;
+	if (approt == 0xFFFFFFFFul)   meaning = "erased (0xFFFFFFFF)";
+	else if (approt_b == 0x5A)    meaning = "HwDisabled - debug port OPEN";
+	else if (approt_b == 0x00)    meaning = "Enabled - debug port LOCKED";
+	else                          meaning = "unrecognised value";
+	snprintf(line, sizeof(line), "0x%08lX  %s", (unsigned long)approt, meaning);
+	info("UICR.APPROTECT", line);
+
+	// On a hardware-APPROTECT part an erased UICR means LOCKED, which is the
+	// opposite of the older parts. Say so rather than leaving it to be read
+	// off a hex value at 2am on bring-up day.
+	if (hw_approtect_part && approt == 0xFFFFFFFFul) {
+		info("APPROTECT note", "erased on a rev3+ part means LOCKED by default");
+	}
+}
+
 static void fail(const char* what) {
 	Serial.print("      FAIL : ");
 	Serial.println(what);
@@ -760,6 +819,7 @@ void setup() {
 	Serial.println(" RAK4631 (nRF52840 + SX1262), 915 MHz US");
 	Serial.println("=========================================================");
 	info_u32("RNS heap pool (B)", (uint32_t)RNS_HEAP_POOL_BUFFER_SIZE);
+	report_silicon_and_approtect();
 #ifdef THICKET_NO_BLE
 	info("build", "no-BLE (SoftDevice dropped, 966,656 B app region)");
 #else
