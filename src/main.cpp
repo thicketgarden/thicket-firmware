@@ -49,6 +49,13 @@
 
 #include <microStore/FileSystem.h>
 #include <microStore/Adapters/FlashFSFileSystem.h>
+#ifdef THICKET_NO_PERSISTENCE
+#ifdef THICKET_INTERNAL_FS
+#include <microStore/Adapters/InternalFSFileSystem.h>
+#else
+#include <microStore/Adapters/NoopFileSystem.h>
+#endif
+#endif
 
 #include <microReticulum.h>
 
@@ -226,6 +233,13 @@ static void step(int n, const char* what) {
 
 static void ok(const char* what) {
 	Serial.print("      ok   : ");
+	Serial.println(what);
+}
+
+// Loud on purpose. Everything this prints is a reason not to trust the run
+// that follows it.
+static void warn(const char* what) {
+	Serial.print("      WARN : ");
 	Serial.println(what);
 }
 
@@ -522,6 +536,57 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 // announce rebroadcast would break the radio, not just storage.
 static bool bringup_storage() {
 	step(1, "External SPI flash + microStore");
+
+#ifdef THICKET_NO_PERSISTENCE
+	// Bring-up crutch. No external flash is mounted, so nothing survives a
+	// reboot: the identity is regenerated every boot and the device's address
+	// changes with it. This exists to reach the radio on a board with no
+	// RAK15001 in the IO slot, and for nothing else.
+	//
+	// It cannot prove the half of the done-condition that matters, which is
+	// that the hash a peer sees is the same after a power cycle. A green run
+	// under this flag is evidence about the radio and evidence about nothing
+	// else.
+	warn("PERSISTENCE DISABLED at build time (THICKET_NO_PERSISTENCE)");
+	info("effect", "identity is regenerated every boot; address changes");
+	info("proves", "radio only, never persistence");
+
+	// Reticulum needs somewhere to put its path table, known destinations and
+	// packet hashlist. Registering nothing threw std::runtime_error out of
+	// Reticulum(); registering a no-op filesystem got past that but made
+	// Identity::remember() fail, because remember writes and then reads back.
+	// A store that forgets produces the same symptom as a store that was never
+	// initialised: the node announces, looks healthy, and can never reach a peer.
+#ifdef THICKET_INTERNAL_FS
+	// ⚠ The internal filesystem is the thing every other comment in this file
+	// says not to use. An erase holds interrupts for about 85 ms, which is long
+	// enough for RadioLib's SPI transaction to the SX1262 to time out. We have
+	// never measured that ourselves; it is inherited. This env exists to reach a
+	// round trip without a RAK15001, and to find out whether the hazard bites at
+	// this write volume. Watch for radio errors that arrive alongside a write.
+	g_filesystem = microStore::FileSystem{ microStore::Adapters::InternalFSFileSystem() };
+	if (!g_filesystem) {
+		fail("could not construct InternalFSFileSystem");
+		return false;
+	}
+	if (!g_filesystem.init()) {
+		fail("internal filesystem init failed");
+		return false;
+	}
+	warn("using INTERNAL flash (~28 KB) - erases can stall the radio");
+	info("filesystem", "internal (small, and on the interrupt-blocking path)");
+#else
+	g_filesystem = microStore::FileSystem{ microStore::Adapters::NoopFileSystem() };
+	if (!g_filesystem) {
+		fail("could not construct NoopFileSystem");
+		return false;
+	}
+	warn("no-op filesystem: remember() will fail and no path will be stored");
+	info("filesystem", "no-op (writes accepted and discarded)");
+#endif
+	RNS::Utilities::OS::register_filesystem(g_filesystem);
+	return true;
+#else
 	info("device", "RAK15001 (GD25Q16C, 2 MiB) on SPI / IO slot");
 	info_u32("cs pin", SS);
 
@@ -546,6 +611,7 @@ static bool bringup_storage() {
 	info_u32("storage free (B)", (uint32_t)g_filesystem.storageAvailable());
 	ok("external flash mounted, registered with RNS");
 	return true;
+#endif
 }
 
 // Step 2 — identity, created once and loaded forever after.
@@ -556,6 +622,18 @@ static bool bringup_storage() {
 static bool bringup_identity() {
 	step(2, "Identity (create or load)");
 
+#ifdef THICKET_NO_PERSISTENCE
+	// No filesystem is registered, so file_exists would be answering about a
+	// store that is not there. Generate and keep it in RAM.
+	g_identity = RNS::Identity();
+	if (!g_identity) {
+		fail("key generation failed");
+		return false;
+	}
+	warn("identity is EPHEMERAL - this address dies at the next reset");
+	info("identity hash", g_identity.hash().toHex().c_str());
+	return true;
+#else
 	if (RNS::Utilities::OS::file_exists(IDENTITY_PATH)) {
 		g_identity = RNS::Identity::from_file(IDENTITY_PATH);
 		if (g_identity) {
@@ -586,6 +664,7 @@ static bool bringup_identity() {
 
 	info("identity hash", g_identity.hash().toHex().c_str());
 	return true;
+#endif
 }
 
 // Step 3 — SX1262 through the vendored LoRaInterface, 915 MHz US.
@@ -627,7 +706,7 @@ static bool bringup_reticulum() {
 
 	g_reticulum = RNS::Reticulum();
 
-	// A handheld is a leaf, not a router: it must not rebroadcast other
+	// A handheld runs with transport disabled: it must not rebroadcast other
 	// people's traffic on battery. Relay (a separate product) is what carries
 	// transport_enabled(true).
 	//
