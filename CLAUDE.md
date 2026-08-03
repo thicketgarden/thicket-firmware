@@ -17,9 +17,9 @@ the device).
 ## Architecture conventions
 
 - Stack: microReticulum (Apache-2.0, C++ RNS) + an LXMF messenger layer +
-  hand-rolled 1-bit UI. Multi-stack friendly: hardware should later accept
-  Meshtastic firmware; Sharp LCD driver + board variant get contributed
-  upstream.
+  hand-rolled 1-bit UI. Multi-stack friendly: the hardware is intended to accept
+  Meshtastic firmware later, and we intend to offer the Sharp LCD driver and
+  board variant upstream. Both are intentions, not commitments made to anyone.
 - Persistence: NEVER the nRF internal filesystem (~28 KB limit). All durable
   state — identity, keys, message store — goes to external SPI flash.
   **There is a second, sharper reason than capacity:** an nRF52840 flash erase
@@ -41,27 +41,34 @@ the device).
   entire Reticulum stack whenever a BLE client is connected, to avoid SoftDevice
   supervision timeouts. Assume this constrains any BLE-based feature.
 - Adafruit nRF52 BSP: the SoftDevice owns flash regions and IRQ priorities.
-- **"RAK4631 won't transmit" — read this before debugging RF.** The root cause
-  reported upstream was **interference avoidance**, inherited from
-  RNode_Firmware, which the maintainer says "seems to completely hose nRF52
-  boards". Build with `-DDISABLE_IA` (on microReticulum_Firmware master since
-  2026-07-09; **not** in the 1.86.4 tag — flashing that release means running
-  `rnodeconf --ia-disable` by hand).
-- The `rak4631` branch is **contested, unmerged, and disowned by its author**
-  ("I felt like I was barking up the wrong tree"); the reporter who
-  cherry-picked it later retracted. Do not cite it as the fix. The live,
-  better-sourced work is **open PR #91** (RadioLib/Meshtastic backport): TCXO
-  3.3 V → 1.8 V for RAK4631 — master sets 1.8 V for every *other* SX1262 board,
-  so this looks like an oversight — plus Semtech erratum 15.3 RTC-stop and OCP
-  140 mA. Note the OCP register is 2.5 mA/LSB, so `0x28` is 100 mA and `0x38`
-  is 140 mA; the branch's own commit message miscounts this.
-- **OCP is a power ceiling, not just a safety setting.** RAK's datasheet rates
-  the module at **22 dBm in PA Boost mode**, drawing **125 mA at 20 dBm**
-  (92 mA at 17 dBm). Semtech's setting for high-power PA operation is ~140 mA.
-  microReticulum master ships OCP at `0x28` = **100 mA**, which is below what
-  +22 dBm draws — so **the stock firmware caps output below the hardware's
-  capability**, and over-current foldback is a plausible contributor to the
-  "RAK4631 won't transmit" reports. PR #91's 140 mA is what unlocks full power.
+- **"RAK4631 won't transmit" — read this before debugging RF.** The cause
+  identified upstream is **interference avoidance**, inherited from
+  RNode_Firmware. The maintainer's own assessment, in
+  [issue #55](https://github.com/attermann/microReticulum_Firmware/issues/55):
+  it "seems to completely hose nRF52 boards", and "simply disabling that is the
+  right solution for TX". Build with `-DDISABLE_IA`.
+  **It is on master but not in a release.** `platformio.ini:205` on master sets
+  it; the `1.86.4` tag does not **[verified — grepped both trees 2026-08-03]**,
+  so flashing a released build still needs `rnodeconf --ia-disable` by hand.
+- **The `rak4631` branch is unmerged, and it is the maintainer's own branch.**
+  He did not merge it because he "felt like I was barking up the wrong tree",
+  and said in the same breath that "if there are gains to be added I'll
+  definitely reconsider" ([#55](https://github.com/attermann/microReticulum_Firmware/issues/55)).
+  Treat it as open, not abandoned, and do not cite it as a settled fix.
+  The active work is
+  [PR #91](https://github.com/attermann/microReticulum_Firmware/pull/91), a
+  RadioLib/Meshtastic backport: TCXO 3.3 V → 1.8 V for the RAK4631, Semtech
+  erratum 15.3 RTC-stop, and OCP raised to 140 mA. Master already sets 1.8 V for
+  other SX1262 boards, so the RAK4631 case looks like it was simply missed.
+- **OCP is a power ceiling, not only a safety setting**, and the arithmetic is
+  easy to get wrong: the register is **2.5 mA/LSB**, so `0x28` is 100 mA and
+  `0x38` is 140 mA. RAK's datasheet rates the module at **22 dBm in PA Boost**,
+  drawing **125 mA at 20 dBm** and 92 mA at 17 dBm. Semtech's value for
+  high-power PA operation is ~140 mA. Master ships `0x28`, so the configured
+  ceiling sits below what +22 dBm draws, and over-current foldback is a
+  plausible contributor to the TX reports above. **This is our reading of the
+  numbers, not a conclusion anyone upstream has stated** — verify it on a bench
+  before relying on it.
   Do not conclude the module is limited to 15.8 dBm: that figure is the *FCC
   grant's* tested level, not a hardware limit.
 - Determinism: scripts build/flash; changes are judged by build + on-target
