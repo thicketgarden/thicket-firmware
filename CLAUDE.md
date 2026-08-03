@@ -22,11 +22,10 @@ the device).
   board variant upstream. Both are intentions, not commitments made to anyone.
 - Persistence: NEVER the nRF internal filesystem (~28 KB limit). All durable
   state — identity, keys, message store — goes to external SPI flash.
-  **There is a second, sharper reason than capacity:** an nRF52840 flash erase
-  takes ~85 ms with interrupts disabled, which makes RadioLib's SPI commands to
-  the SX1262 time out (-5). Persisting paths during the announce rebroadcast
-  chain therefore breaks the *radio*, not just storage. Measured and fixed
-  upstream in the only shipping nRF52840 Reticulum firmware.
+  **Capacity settles this on its own.** A second argument circulates upstream
+  that an internal-flash erase masks interrupts long enough to time out
+  RadioLib's SPI to the SX1262. It comes from another project's commit message,
+  we have not reproduced it, and it must not be repeated as our finding.
 - **Heap pool sizing is a hard-fault landmine.** A pool above ~75% of SRAM
   faults silently *before USB enumerates*, so it looks like a dead board.
   Working reference uses `RNS_HEAP_POOL_BUFFER_SIZE=98304` (96 KiB), or 80 KiB

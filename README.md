@@ -68,7 +68,7 @@ claimed, and none will be until a board and a profiler produce one.
 store, initiating a conversation with a peer that has not written first,
 display, input, and sleep.
 
-### Two findings from first boot
+### One finding from first boot
 
 **This part cannot be locked.** The silicon reports `variant=AAD0`, a
 Dxx-class part, and `UICR.APPROTECT` reads `0xFFFFFFFF`, erased. The debug port
@@ -77,12 +77,6 @@ a property of the part, not of this firmware, and no firmware change can alter
 it. Anything that depends on a secret in internal flash needs Fxx+ silicon.
 `scripts/check_approtect.py` refuses to build firmware that writes
 `APPROTECT.DISABLE`, which remains correct and is not sufficient on its own.
-
-**The 85 ms erase hazard did not appear.** An internal-flash erase holds
-interrupts long enough, in principle, to time out RadioLib's SPI transaction to
-the SX1262. The round trip above ran on internal flash and logged no radio
-errors at all. That is one run at low write volume, so it is evidence and not a
-clearance.
 
 ## Hardware
 

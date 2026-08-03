@@ -530,10 +530,13 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 //
 // FlashFSFileSystem, never UniversalFileSystem: on nRF52 microStore aliases
 // UniversalFileSystem to InternalFSFileSystem, which is the ~28 KB internal
-// filesystem. That is too small for a message store, and worse, an nRF52840
-// internal-flash erase takes ~85 ms with interrupts disabled, which times out
-// RadioLib's SPI transactions to the SX1262. Persisting a path during an
-// announce rebroadcast would break the radio, not just storage.
+// filesystem. That is far too small for a message store, and capacity alone
+// settles the choice.
+//
+// A second argument has been made upstream that an internal-flash erase masks
+// interrupts long enough to time out RadioLib's SPI to the SX1262. We have not
+// measured that and it is not our figure. Treat it as unverified; the capacity
+// argument does not depend on it.
 static bool bringup_storage() {
 	step(1, "External SPI flash + microStore");
 
@@ -558,12 +561,10 @@ static bool bringup_storage() {
 	// A store that forgets produces the same symptom as a store that was never
 	// initialised: the node announces, looks healthy, and can never reach a peer.
 #ifdef THICKET_INTERNAL_FS
-	// ⚠ The internal filesystem is the thing every other comment in this file
-	// says not to use. An erase holds interrupts for about 85 ms, which is long
-	// enough for RadioLib's SPI transaction to the SX1262 to time out. We have
-	// never measured that ourselves; it is inherited. This env exists to reach a
-	// round trip without a RAK15001, and to find out whether the hazard bites at
-	// this write volume. Watch for radio errors that arrive alongside a write.
+	// ⚠ The internal filesystem is far too small for a message store, which is
+	// why nothing ships on it. There is also an unverified claim that its erases
+	// stall the radio; see the interrupt-hazard note in hq. This env exists only
+	// to reach a round trip without a RAK15001.
 	g_filesystem = microStore::FileSystem{ microStore::Adapters::InternalFSFileSystem() };
 	if (!g_filesystem) {
 		fail("could not construct InternalFSFileSystem");
