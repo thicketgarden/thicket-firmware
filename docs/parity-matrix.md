@@ -25,7 +25,7 @@ Deliberately narrow, so that a claim cannot be made by accident.
 | Token | Means |
 |---|---|
 | `interop` | Exercised by one of the four microReticulum interop scenarios against **Python RNS 1.4.2**, in CI, on every push. |
-| `thicket-interop` | Exercised by a scenario in **`test_interop/`** in this repo, against Python RNS 1.4.2 (and LXMF 1.1.1), built on the microReticulum SHA we actually pin. The Evidence column names the scenario. Every one of these has been shown to fail when the behaviour it tests is broken; see `test_interop/README.md`. |
+| `thicket-interop` | Exercised by a scenario in **`test_interop/`** in this repo, against the official reference at pinned versions — **`rns==1.4.2` and `markqvist/lxmf==1.1.1`** — built on the microReticulum SHA we actually pin. Runs in CI on every push as the `thicket-interop` job. The Evidence column names the scenario. Every one of these has been shown to fail when the behaviour it tests is broken; see `test_interop/README.md`. |
 | `lxmf-conformance` | Exercised by microLXMF's cross-implementation suite against the Python LXMF reference: **84 passed, 2 skipped**, run at both stock and our pool sizes. ⚠ **That suite builds microLXMF against `torlando-tech/microReticulum @ 6054f6ba`, not the fork we pin** (`conformance-bridge/CMakeLists.txt:57-64`, verified 2026-08-03). It is evidence about the LXMF layer; it is not evidence about the LXMF layer on our RNS layer. `thicket-interop` is. |
 | `unit` | Covered by a native unit test in this repo. |
 | `none` | **Code exists; we have not verified it against the reference.** Not a claim of absence, a claim of ignorance. |

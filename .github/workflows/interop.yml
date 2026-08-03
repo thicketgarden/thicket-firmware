@@ -182,6 +182,55 @@ jobs:
           path: interop-logs
           if-no-files-found: ignore
 
+  # ---------------------------------------------------------------------------
+  # Thicket's own suite, in test_interop/ in THIS repo. Distinct from the jobs
+  # above, which run microReticulum's suite inside the microReticulum checkout.
+  #
+  # These are the Python-originated scenarios: the reference speaks first and we
+  # have to receive, which is the case a handheld actually lives in. They build
+  # against the microReticulum SHA in platformio.ini, so they cannot drift from
+  # the firmware.
+  # ---------------------------------------------------------------------------
+  thicket-interop:
+    name: thicket interop (Python originates)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO and the pinned Python reference
+        env:
+          # Pinned for the same reason every dependency here is pinned: an
+          # unpinned reference makes a green run mean nothing in a month, and
+          # turns an upstream release into a mystery failure of ours.
+          RNS_VERSION: '1.4.2'
+          LXMF_VERSION: '1.1.1'
+        run: |
+          set -euo pipefail
+          pip install --upgrade platformio
+          pip install "rns==${RNS_VERSION}" "lxmf==${LXMF_VERSION}"
+          python -c "import RNS, LXMF; print('RNS', RNS.__version__, '| LXMF', LXMF.__version__)"
+
+      - name: Run the Thicket interop suite
+        run: bash test_interop/run_all.sh
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p thicket-interop-logs
+          cp -r /tmp/thicket_interop_* thicket-interop-logs/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: thicket-interop-logs
+          path: thicket-interop-logs
+          if-no-files-found: ignore
+
   verify-upstream-bug:
     # Manual only. Runs UNPATCHED upstream attermann/microReticulum and expects
     # the interop scenarios to FAIL.

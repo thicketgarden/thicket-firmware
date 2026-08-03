@@ -29,7 +29,7 @@ Use a venv built from `/opt/homebrew/bin/python3`:
 
 ```
 /opt/homebrew/bin/python3 -m venv /tmp/rnsvenv
-/tmp/rnsvenv/bin/pip install "rns==1.4.2" lxmf
+/tmp/rnsvenv/bin/pip install "rns==1.4.2" "lxmf==1.1.1"
 ```
 
 ## Scenarios
