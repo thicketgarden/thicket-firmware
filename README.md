@@ -48,6 +48,31 @@ Not yet wired, and marked with a TODO at each site in the source: a message
 store, initiating a conversation with a peer that has not written first,
 display, input, sleep, and conformance testing against Python RNS.
 
+## Hardware
+
+The target is a custom carrier board around a **socketed RAK4631**, which stays
+a module rather than a redesign because it carries the FCC modular grant. A
+915 MHz antenna leaves through a bulkhead SMA. On SPI: a Sharp 400×240 1-bit
+memory LCD, which is write-only, so its 13.5 KB framebuffer has to live in MCU
+RAM, and external flash for identity and the message store. On I2C: a keypad
+scanner, a haptic driver and LRA, a magnetic encoder reading the thumbwheel
+through a sealed wall, a fuel gauge, and an LED driver for the bargraph. Hall
+sensors, the piezo and the backlight sit on GPIO and PWM. Power is a single
+18650 behind a charger with two inputs, a sealed IP67 USB-C service port and a
+pogo dock for daily charging. NFC coil pads are reserved and unpopulated.
+
+**Nothing here has been fabricated.** No schematic exists, no board has been
+laid out, and most part choices are unvalidated against datasheets. The full
+block diagram and its caveats live in the mechanical and electrical repo, at
+`thicket-hardware/docs/architecture.md`.
+
+> That repository is **not published yet**, so the path above is not a link.
+> This section will point at it once it is.
+
+The board definition and variant vendored in `boards/` and `variants/` describe
+the **development rig**, not that carrier board. Where the two disagree, the
+vendored variant is what the current firmware actually builds against.
+
 ## Building
 
 ```
