@@ -231,6 +231,53 @@ jobs:
           path: thicket-interop-logs
           if-no-files-found: ignore
 
+  thicket-interop-latest:
+    name: thicket interop (RNS + LXMF latest — early warning)
+    # Same contract as interop-latest above, one layer up. That job watches
+    # current RNS against microReticulum's suite, which never touches LXMF.
+    # Ours is the only suite that drives the LXMF reference, so it is the only
+    # place a new markqvist/lxmf release can be caught.
+    #
+    # A failure here does NOT mean we are broken today. Our pinned build is
+    # green or the pinned job above would be red. It means the current
+    # reference and our pinned stack have diverged and someone should look.
+    # Read the resolved versions in the log before assuming it is our fault.
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO and the CURRENT reference, unpinned on purpose
+        run: |
+          set -euo pipefail
+          pip install --upgrade platformio
+          pip install --upgrade rns lxmf
+          # Deliberately not a heredoc: a nested one here depends on YAML
+          # block-scalar indent stripping to put the terminator at column 0,
+          # which a future re-indent would silently break.
+          python -c "import RNS, LXMF; print(f'::notice::early warning ran against RNS {RNS.__version__} / LXMF {LXMF.__version__}'); print(f'RNS {RNS.__version__} | LXMF {LXMF.__version__}')"
+
+      - name: Run the Thicket interop suite against current upstream
+        run: bash test_interop/run_all.sh
+
+      - name: Collect logs on failure
+        if: failure()
+        run: |
+          mkdir -p thicket-interop-latest-logs
+          cp -r /tmp/thicket_interop_* thicket-interop-latest-logs/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: thicket-interop-latest-logs
+          path: thicket-interop-latest-logs
+          if-no-files-found: ignore
+
   verify-upstream-bug:
     # Manual only. Runs UNPATCHED upstream attermann/microReticulum and expects
     # the interop scenarios to FAIL.
