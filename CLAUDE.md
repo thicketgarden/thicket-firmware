@@ -36,7 +36,7 @@ the device).
 - **Flash, not RAM, is the binding constraint.** A transport-only build — no
   display, no font, no UI, no message store, no LXMF receive — measures
   **86.1% of the 815 KB app region**, leaving ~110 KiB for everything Thicket
-  adds. Budget flash first; see `docs/nrf-prior-art.md` in hq.
+  adds. Budget flash first.
 - **BLE and LoRa do not coexist** in the only working reference: it suspends the
   entire Reticulum stack whenever a BLE client is connected, to avoid SoftDevice
   supervision timeouts. Assume this constrains any BLE-based feature.
