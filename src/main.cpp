@@ -806,6 +806,18 @@ static bool bringup_lxmf() {
 			return;
 		}
 
+		// Someone we are actually corresponding with. Pin their path so an
+		// announce flood from strangers cannot evict it: the path table is
+		// bounded, and eviction is by age, which on a leaf node is a poor
+		// proxy for importance - a correspondent that announces rarely is
+		// more evictable than a stranger that announces constantly.
+		//
+		// Pinning is soft: the table still holds at its cap exactly, so this
+		// cannot grow memory and needs no failure path here. When the device
+		// grows a real contact list this call moves there; until then an
+		// inbound message is the only evidence of a conversation we have.
+		RNS::Transport::pin_destination(message.source_hash());
+
 		g_reply.armed        = true;
 		g_reply.due_ms       = millis() + REPLY_DELAY_MS;
 		g_reply.to           = message.source_hash();
