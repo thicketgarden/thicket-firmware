@@ -816,7 +816,9 @@ static bool bringup_lxmf() {
 		// cannot grow memory and needs no failure path here. When the device
 		// grows a real contact list this call moves there; until then an
 		// inbound message is the only evidence of a conversation we have.
+#if RNS_PINNED_DESTINATIONS
 		RNS::Transport::pin_destination(message.source_hash());
+#endif
 
 		g_reply.armed        = true;
 		g_reply.due_ms       = millis() + REPLY_DELAY_MS;
