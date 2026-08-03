@@ -72,9 +72,24 @@
 static const char* IDENTITY_PATH = "/thicket_identity";
 
 // microLXMF's storage root. The router takes it now; it is only used once a
-// MessageStore is attached. TODO(bring-up): attach one, retuned — upstream's
-// MAX_CONVERSATIONS=32 x MAX_MESSAGES_PER_CONVERSATION=256 is a 266,896-byte
-// object and will not link on this part. 8x32 costs 9,488 B and does.
+// MessageStore is attached.
+//
+// ⚠ The old note here said upstream's 32 x 256 pool "will not link on this
+// part" and that was the stated reason for having no store. That reason is
+// gone: MessageStore.h now takes LXMF_MAX_CONVERSATIONS and
+// LXMF_MAX_MESSAGES_PER_CONVERSATION from -D, and platformio.ini sets 8 x 32.
+//
+// Measured, by instantiating one and building:
+//   8 x 32   RAM 36,304 B, flash 448,660 B   links
+//   32 x 256                                 ld returns 1
+// So attaching a store costs +10,656 B of RAM and +12,400 B of flash.
+//
+// It is still not attached, and now for a different and better reason: the
+// first boot on real hardware should have as few moving parts as possible, so
+// that when something fails the failure is unambiguous. Attach it once the
+// board has come up clean once. Doing so also turns the storage questions
+// (retention, flash cost per message, LittleFS block granularity) from things
+// to research into things to measure.
 static const char* LXMF_STORAGE_PATH = "/lxmf";
 
 // Announce app_data. What a peer running Sideband shows in its contact list.
