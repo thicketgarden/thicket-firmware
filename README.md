@@ -110,7 +110,14 @@ the radio its own SPI instance so it cannot steal the external-flash bus).
 - [microStore](https://github.com/attermann/microStore) — embedded key-value persistence (Apache-2.0)
 - [RadioLib](https://github.com/jgromes/RadioLib) — SX1262 driver (MIT)
 - [microReticulum_Firmware](https://github.com/attermann/microReticulum_Firmware) — RNode-style firmware w/ RAK4631 target (GPL-3.0)
-- [Reticulum](https://github.com/markqvist/Reticulum) — the protocol (public domain) and reference implementation
+- [Reticulum](https://github.com/markqvist/Reticulum) — the protocol and its reference
+  implementation, under the custom
+  [Reticulum License](https://github.com/markqvist/Reticulum/blob/master/LICENSE):
+  MIT terms plus two restrictions, no use in systems able to purposefully harm
+  people, and no use contributing to AI or machine-learning training. Not an
+  OSI-approved licence, and GitHub does not classify it. We ship none of this
+  code: it is the specification we conform to, and CI installs it to run as the
+  peer our interop tests are checked against.
 
 `lib/LoRaInterface/` is vendored from microReticulum's
 `examples/common/lora_interface/` (Apache-2.0) because PlatformIO cannot depend
