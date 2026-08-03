@@ -48,6 +48,10 @@
 #include <Adafruit_TinyUSB.h>
 
 #include <microStore/FileSystem.h>
+#ifdef THICKET_PATH_INDEX_PROBE
+#include <unordered_map>
+#include <vector>
+#endif
 #include <microStore/Adapters/FlashFSFileSystem.h>
 #ifdef THICKET_NO_PERSISTENCE
 #ifdef THICKET_INTERNAL_FS
@@ -945,6 +949,117 @@ static void print_addresses() {
 	Serial.println();
 }
 
+#ifdef THICKET_PATH_INDEX_PROBE
+// Diagnostic, not product code. Compiled out unless THICKET_PATH_INDEX_PROBE is
+// defined, and it drives a private store in its own directory so Transport's
+// real path table is never touched.
+//
+// It answers two things a source read could only estimate:
+//
+//   A. What one path record actually costs in the RNS container pool. Computed
+//      from ARM sizeof values plus TLSF overhead this came to ~64 B; that is
+//      arithmetic and wants confirming against a real allocator on silicon.
+//   B. Whether microStore's record cap bounds the index at all. The cap only
+//      applies if something calls set_max_recs(). Left at its default of 0 it
+//      disables both count eviction and the threshold compaction that reclaims
+//      expired records — so max_recs=0 and max_recs=100 should differ visibly.
+// Mirrors microStore BasicFileStore's IndexMap exactly: same key type, same
+// value, same allocator, and a hash that is not noexcept - which is what makes
+// libstdc++ pick the hash-caching node. Reproducing the type rather than
+// driving a real store keeps the measurement independent of storage hardware,
+// which matters on a board with no external flash fitted.
+struct ProbeIndexValue {
+	uint32_t segment;
+	uint32_t offset;
+	uint32_t timestamp;
+	uint32_t ttl;
+};
+
+struct ProbeVectorHash {
+	template <typename T>
+	size_t operator()(const T& v) const {
+		uint32_t h = 2166136261u;
+		for (uint8_t b : v) { h ^= b; h *= 16777619u; }
+		return h;
+	}
+};
+
+using ProbeKey  = std::vector<uint8_t, RNS::Utilities::Memory::ContainerAllocator<uint8_t>>;
+using ProbePair = std::pair<const ProbeKey, ProbeIndexValue>;
+using ProbeIndex = std::unordered_map<
+	ProbeKey, ProbeIndexValue, ProbeVectorHash, std::equal_to<ProbeKey>,
+	RNS::Utilities::Memory::ContainerAllocator<ProbePair>>;
+
+static uint32_t probe_pool_used() {
+	return (uint32_t)RNS::Utilities::Memory::container_allocator_info.alloc_size;
+}
+
+// Keys are spread rather than sequential so bucket distribution resembles real
+// destination hashes; a dense counter would flatter the hash map.
+// Keys are spread rather than sequential so bucket distribution resembles real
+// 16-byte destination hashes; a dense counter would flatter the hash map.
+static void probe_fill(ProbeIndex& index, uint32_t from, uint32_t to) {
+	for (uint32_t i = from; i < to; i++) {
+		const uint32_t h = i * 2654435761u;
+		ProbeKey key;
+		key.reserve(16);
+		for (uint8_t b = 0; b < 16; b++) {
+			key.push_back((uint8_t)(h >> ((b % 4) * 8)) ^ (uint8_t)(b * 31u + i));
+		}
+		ProbeIndexValue v{ 0, i, i, 0 };
+		index.emplace(std::move(key), v);
+	}
+}
+
+static void probe_path_index() {
+	Serial.println();
+	Serial.println("--- path index probe (diagnostic) ---");
+
+	// Deliberately touches no filesystem, so it still reports on a board with
+	// no external flash fitted and after a failed storage bring-up.
+	//
+	// Marginal cost per record, measured against the real TLSF pool.
+	//
+	// Only the index is measured. The record payload lives in a flash segment
+	// and costs no SRAM, so this is the figure that decides how many paths fit
+	// on this part. The cap-enforcement half of the experiment needs a working
+	// store and therefore a filesystem; it belongs on the host target, where it
+	// runs without hardware at all.
+	{
+		ProbeIndex index;
+		const uint32_t base = probe_pool_used();
+		uint32_t last_n = 0;
+		uint32_t last_used = base;
+		const uint32_t steps[] = { 50, 100, 150, 200, 250 };
+		for (uint32_t s = 0; s < sizeof(steps) / sizeof(steps[0]); s++) {
+			const uint32_t n = steps[s];
+			probe_fill(index, last_n, n);
+			const uint32_t used = probe_pool_used();
+			Serial.print("      records=");
+			Serial.print((uint32_t)index.size());
+			Serial.print("  buckets=");
+			Serial.print((uint32_t)index.bucket_count());
+			Serial.print("  pool_delta=");
+			Serial.print(used - base);
+			Serial.print(" B  marginal=");
+			Serial.print((double)(used - last_used) / (double)(n - last_n), 1);
+			Serial.println(" B/record");
+			last_n = n;
+			last_used = used;
+		}
+		Serial.print("      mean over ");
+		Serial.print(last_n);
+		Serial.print(" records: ");
+		Serial.print((double)(last_used - base) / (double)last_n, 1);
+		Serial.println(" B/record");
+	}
+	// index destroyed here; report the pool to confirm it all came back.
+	info_u32("pool in use after teardown (B)", probe_pool_used());
+	ok("probe complete");
+	Serial.println();
+}
+#endif
+
 void setup() {
 	Serial.begin(115200);
 
@@ -953,6 +1068,7 @@ void setup() {
 	// banner when a laptop is plugged in.
 	uint32_t waited = 0;
 	while (!Serial && waited < 5000) { delay(50); waited += 50; }
+
 
 	pinMode(LED_GREEN, OUTPUT);
 	digitalWrite(LED_GREEN, LOW);
@@ -998,6 +1114,21 @@ void setup() {
 }
 
 void loop() {
+#ifdef THICKET_PATH_INDEX_PROBE
+	// Repeat the probe a few times after boot rather than once. A host that has
+	// just flashed the board cannot re-attach before bring-up finishes, so a
+	// single boot-time run is unobservable in practice. Bounded at three runs
+	// because each one erases and rewrites the ring.
+	// On demand, from any serial input. A host that has just flashed the board
+	// cannot attach before bring-up finishes, and USB CDC discards writes made
+	// while no host is listening - so a boot-time or timer-driven run prints
+	// into a void and is never seen. Triggering on input is the only scheme
+	// that reliably produces output on an attached terminal.
+	if (Serial.available()) {
+		while (Serial.available()) { (void)Serial.read(); }
+		probe_path_index();
+	}
+#endif
 	if (!g_stack_up) {
 		// Bring-up failed. Blink fast and keep the serial port alive so the
 		// failure above stays readable instead of scrolling past a reboot loop.
