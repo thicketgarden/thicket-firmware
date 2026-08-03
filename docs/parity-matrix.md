@@ -30,10 +30,21 @@ Deliberately narrow, so that a claim cannot be made by accident.
 | `none` | **Code exists; we have not verified it against the reference.** Not a claim of absence, a claim of ignorance. |
 | `absent` | No counterpart in the C++ stack at the pins we ship. |
 
-⚠ **The single largest caveat: direction.** All four interop scenarios are
-**C++ sending, Python receiving**. The reverse path — Python sending, our stack
-receiving and decoding — **is not covered by any scenario**. For a handheld whose
-entire purpose is to receive messages, that is the gap that matters most.
+⚠ **The largest caveat: direction — and it is narrower than first stated.**
+**Corrected 2026-08-03** after reading the receivers rather than the driver
+names. What is actually covered:
+
+| scenario | direction |
+|---|---|
+| packet | **round trip.** C++ sends, Python replies, C++ receives and asserts payload match |
+| request | C++ receives a **response** from a Python-side `/echo` handler |
+| link | C++ → Python only |
+| resource | C++ → Python only |
+
+So inbound decoding is not wholly untested. **The real gap is that no scenario
+has Python originate cold.** In every case the C++ side speaks first and Python
+answers. Nothing tests a Python peer initiating to a device that has not just
+transmitted — which is precisely what a handheld does all day.
 
 ## Reticulum — Python `RNS` 1.4.2 → microReticulum
 

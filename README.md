@@ -84,9 +84,9 @@ page exists: the manual defines Reticulum as full interoperability and
 sufficient functional parity with the reference, so a coverage map that admits
 its gaps is worth more than a claim that cannot be checked.
 
-The largest gap is stated there plainly: all four interop scenarios are C++
-sending and Python receiving. The reverse path is untested, and this is a device
-whose purpose is to receive.
+The largest gap is stated there plainly: in every scenario the C++ side speaks
+first and the Python peer answers. Nothing tests a Python peer initiating to a
+device that has not just transmitted, which is what a handheld does all day.
 
 ## Building
 
