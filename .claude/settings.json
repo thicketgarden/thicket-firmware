@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "input=$(cat); path=$(echo \"$input\" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"file_path\",\"\"))'); case \"$path\" in *.cpp|*.h|*.c|*.ino|*platformio.ini) cd \"$CLAUDE_PROJECT_DIR\" && pio run -e wiscore_rak4631 -e wiscore_rak4631-noble >/dev/null 2>&1 || { echo 'build FAILED \u2014 both envs must pass. The no-BLE env is the flash fallback (A25); if it rots it is not a fallback.' >&2; exit 2; } ;; esac"
+            "command": "input=$(cat); path=$(echo \"$input\" | /usr/bin/python3 -c 'import json,sys; print(json.load(sys.stdin).get(\"tool_input\",{}).get(\"file_path\",\"\"))'); case \"$path\" in *.cpp|*.h|*.c|*.ino|*platformio.ini) cd \"$CLAUDE_PROJECT_DIR\" && pio run -e wiscore_rak4631 -e wiscore_rak4631-noble >/dev/null 2>&1 || { echo 'build FAILED \u2014 both envs must pass. The no-BLE env is the flash fallback; if it rots it is not a fallback.' >&2; exit 2; } ;; esac"
           }
         ]
       }

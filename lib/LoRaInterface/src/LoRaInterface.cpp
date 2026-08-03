@@ -172,7 +172,7 @@ bool LoRaInterface::start() {
 	// value here shows up as XOSC_START_ERR / -20 at begin(), i.e. "the radio
 	// is dead", so it is worth being able to flip it without editing vendored
 	// code. Default 1.8; override with -DTHICKET_SX1262_TCXO_VOLTAGE=1.6.
-	// TODO(M1): settle this on the bench and record the answer.
+	// TODO(bring-up): settle this on the bench and record the answer.
 	int state = chip->begin(frequency, bandwidth, spreading, coding,
 	                        RADIOLIB_SX126X_SYNC_WORD_PRIVATE, power, 20,
 	                        THICKET_SX1262_TCXO_VOLTAGE, false);

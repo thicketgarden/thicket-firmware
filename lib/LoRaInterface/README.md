@@ -49,7 +49,7 @@ Apache-2.0 §4(b) requires modified files to say so. Changes 1–3 are in
    that microReticulum_Firmware master already uses 1.8 V for every other
    SX1262 board. A wrong value here presents as `XOSC_START_ERR` at `begin()`,
    i.e. as a dead radio, so it needs to be flippable without editing vendored
-   code. **TODO(M1): settle on the bench.**
+   code. **TODO(bring-up): settle on the bench.**
 
 3. **Over-current protection raised to 140 mA,** `THICKET_SX1262_OCP_MA`.
    RadioLib leaves OCP at the SX1262 reset default of 60 mA. RAK's datasheet

@@ -81,7 +81,7 @@ the radio its own SPI instance so it cannot steal the external-flash bus).
 ## Standing on
 
 - [microReticulum](https://github.com/attermann/microReticulum) — C++ RNS (Apache-2.0)
-- [microLXMF](https://github.com/attermann/microLXMF) — C++ LXMF messenger layer (GPL-3.0)
+- [microLXMF](https://github.com/torlando-tech/microLXMF) — C++ LXMF messenger layer (GPL-3.0)
 - [microStore](https://github.com/attermann/microStore) — embedded key-value persistence (Apache-2.0)
 - [RadioLib](https://github.com/jgromes/RadioLib) — SX1262 driver (MIT)
 - [microReticulum_Firmware](https://github.com/attermann/microReticulum_Firmware) — RNode-style firmware w/ RAK4631 target (GPL-3.0)

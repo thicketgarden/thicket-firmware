@@ -54,8 +54,8 @@ Recorded because they are the reason this file exists, not as trivia.
 - **Unknown commands are consumed**, so a stray backtick does not leak.
 - **Colour is reported, never resolved.** The parser hands the renderer what
   the page asked for. Deciding what `` `F00f `` means on a two-ink panel is the
-  renderer's problem and an open design question (`thicket-hq`
-  `docs/nomadnet-services.md`).
+  renderer's problem, and on a two-ink panel it is still an open design
+  question here.
 
 ## Not implemented
 

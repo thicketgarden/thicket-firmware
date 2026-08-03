@@ -21,9 +21,9 @@
 # bump to MDK >= 8.45.0 (whose startup code performs the write by default so
 # developers can attach a debugger), or a differently-vendored system file all
 # remove the protection with no error and no diff anyone would notice. If
-# anything is ever held in internal flash on the strength of this - see
-# thicket-hq docs/open-questions.md Q9, the encryption "pepper" - then this
-# check is what makes that safe rather than hopeful.
+# anything is ever held in internal flash on the strength of this - a key
+# derivation "pepper" for message encryption is the case we have in mind - then
+# this check is what makes that safe rather than hopeful.
 #
 # Run as a PlatformIO pre: script. Fails the build.
 
@@ -123,7 +123,7 @@ if failures:
         "***\n"
         "*** If this is deliberate, understand what it costs first: on Fxx+\n"
         "*** silicon it opens SWD on every boot, and anything held in internal\n"
-        "*** flash (see thicket-hq Q9, the pepper) stops being protected.\n"
+        "*** flash - a key-derivation pepper, say - stops being protected.\n"
         "*** Do not silence this to make a debug build work - use a separate\n"
         "*** env and decide knowingly.\n\n")
     env.Exit(1)  # noqa: F821

@@ -11,7 +11,7 @@
 // GNU General Public License for more details.
 //
 // ---------------------------------------------------------------------------
-// Thicket — M1 skeleton.
+// Thicket — bring-up skeleton.
 //
 // The Reticulum stack runs ON this device: on-device identity, on-device
 // encryption, messages composed and delivered over LoRa with nothing tethered.
@@ -110,7 +110,7 @@ static const double ANNOUNCE_INTERVAL_S = 120.0;
 // Auto-reply. The device answers anything delivered to it, addressed to the
 // source hash carried by the inbound message — nothing about the peer is
 // compiled in, so no reflash is needed when the far end's address changes or a
-// second peer appears. This is the M1 proof: it needs no screen here and no
+// second peer appears. This is the bring-up proof: it needs no screen here and no
 // host, because the reply lands on the sender's screen.
 //
 // The pause exists because LoRaInterface::send_outgoing() blocks for the whole
@@ -261,7 +261,7 @@ static void info_u32(const char* key, uint32_t value) {
 // framework-arduinoadafruitnrf52, never in system_nrf52840.c. So whatever
 // state the module arrives in is the state it stays in.
 //
-// Why we care: docs/open-questions.md Q9 considers holding an encryption
+// Why we care: we are considering holding an encryption
 // "pepper" in the MCU's internal flash so that dumping the external SPI flash
 // yields ciphertext and no key. That is only worth anything if the debug port
 // cannot simply be used to read internal flash back out.
@@ -270,7 +270,7 @@ static void info_u32(const char* key, uint32_t value) {
 // or open-by-default, on this particular chip.
 //
 // This exists to be GATED ON, not merely printed. Anything that stores a secret
-// in internal flash (docs/open-questions.md Q9, the "pepper") must refuse when
+// in internal flash (the "pepper" described above) must refuse when
 // this is false: a secret on a chip whose SWD is open is worse than no secret,
 // because it looks protected and is not.
 static bool g_debug_port_protected = false;
@@ -340,7 +340,7 @@ static void report_silicon_and_approtect() {
 
 	// A STABLE, MACHINE-READABLE line. A flasher can reconnect after DFU, read
 	// this, and tell the user in the browser what their particular chip is —
-	// which matters because tasks/T16 invites anyone with a RAK4631 to flash
+	// which matters because we intend to invite anyone with a RAK4631 to flash
 	// this, and their silicon is not ours. Serial prose warns only whoever is
 	// already staring at a terminal.
 	//
@@ -550,8 +550,8 @@ static bool bringup_storage() {
 
 // Step 2 — identity, created once and loaded forever after.
 //
-// This is the half of M1's done-condition that a demo cannot fake: the hash the
-// founder's T-Deck sees must be the same hash after a power cycle. First boot
+// This is the half of the bring-up done-condition that a demo cannot fake: the
+// hash the paired T-Deck sees must be the same after a power cycle. First boot
 // generates and writes; every later boot reads.
 static bool bringup_identity() {
 	step(2, "Identity (create or load)");
@@ -606,7 +606,7 @@ static bool bringup_radio() {
 
 	// MODE_GATEWAY, matching upstream's own example: this interface is a
 	// full participant, not a leaf or an access point.
-	// TODO(bring-up): revisit against A26's always-listening idle contract once
+	// TODO(bring-up): revisit against the always-listening idle contract once
 	// there is a power measurement to argue with.
 	g_lora_interface.mode(RNS::Type::Interface::MODE_GATEWAY);
 	RNS::Transport::register_interface(g_lora_interface);
@@ -643,7 +643,7 @@ static bool bringup_reticulum() {
 	// initialisations out of the gate. Do NOT re-point lib_deps at upstream
 	// without carrying that fix, and do not "simplify" this to
 	// transport_enabled(true) to make symptoms go away — that would turn a
-	// battery-powered handheld into a router. See tasks/T19.
+	// battery-powered handheld into a router.
 	g_reticulum.transport_enabled(false);
 	g_reticulum.probe_destination_enabled(true);
 	g_reticulum.start();
@@ -737,7 +737,7 @@ static bool bringup_lxmf() {
 
 		// TODO(bring-up): this is still the receive path's only consumer beyond the
 		// reply. Nothing is retained. It needs a MessageStore (retuned to 8x32)
-		// behind it and, later, the UI and the A9 alert ladder.
+		// behind it and, later, the UI and the alert ladder.
 	});
 
 	g_router->register_sent_callback([](LXMF::LXMessage& message) {
@@ -777,7 +777,7 @@ static bool bringup_lxmf() {
 	// announces a nil inbound stamp cost, Python LXMF skips the whole stamp
 	// block when the cost is None, and microLXMF hard-codes packNil() for its
 	// own announced cost, so nothing on either side allocates LXStamper's
-	// 750 KiB workblock at M1's done-condition. If a peer ever demands a stamp
+	// 750 KiB workblock at the bring-up done-condition. If a peer ever demands a stamp
 	// this device cannot pay it; the fix is the streaming SHA-256 rewrite, not
 	// more heap.
 
@@ -879,7 +879,7 @@ void setup() {
 
 	Serial.println();
 	Serial.println("=========================================================");
-	Serial.println(" Thicket firmware - M1 skeleton");
+	Serial.println(" Thicket firmware - bring-up skeleton");
 	Serial.println(" RAK4631 (nRF52840 + SX1262), 915 MHz US");
 	Serial.println("=========================================================");
 	info_u32("RNS heap pool (B)", (uint32_t)RNS_HEAP_POOL_BUFFER_SIZE);
@@ -951,7 +951,7 @@ void loop() {
 	// destinations - upstream is mid-migration to a microStore-backed path
 	// table with no enumeration API, so path_table() returns empty. Answering
 	// is possible because the source hash arrives with the message. Initiating
-	// remains M2's first wall.
+	// remains the next substantial piece of work.
 	if (g_reply.armed && (int32_t)(millis() - g_reply.due_ms) >= 0) {
 		g_reply.armed = false;
 
@@ -981,7 +981,7 @@ void loop() {
 	}
 #endif
 
-	// TODO(bring-up): no sleep. A26's always-listening contract does not mean a busy
+	// TODO(bring-up): no sleep. The always-listening contract does not mean a busy
 	// loop; it means the receiver stays powered while the CPU idles. This spins
 	// the M4 at 64 MHz and will not meet any battery target.
 }

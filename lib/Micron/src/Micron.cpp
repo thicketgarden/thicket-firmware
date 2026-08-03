@@ -113,7 +113,7 @@ void Parser::parseLine(const char* line, size_t len, Renderer& out) {
         // Tables and partials are not implemented. Skip the whole line rather
         // than emit its raw markup as text --- a visible "`t" would be worse
         // than a missing table, and silently dropping keeps the page readable.
-        // TODO(M2): `t tables, `{ partials.
+        // TODO(not yet implemented): `t tables, `{ partials.
         if (len >= 2 && line[0] == '`' && (line[1] == 't' || line[1] == '{')) return;
 
         if (first == '<') {

@@ -13,8 +13,9 @@
 // This is a SAX-style parser: you feed it a line, it calls back with styled
 // spans. It builds no document tree and allocates nothing per element.
 //
-// That is not a stylistic preference, it is the constraint. tasks/T13 budgets
-// roughly 113-146 KB of SRAM for everything M2 adds. The nearest comparable
+// That is not a stylistic preference, it is the constraint. Our own estimate
+// budgets roughly 113-146 KB of SRAM for everything the display and page
+// browsing layer adds, against 256 KB total. The nearest comparable
 // renderer (reticulous/nomad's Micron->LVGL) caps itself at 600 retained LVGL
 // objects and still requires 8 MB of PSRAM, because it holds an object tree
 // per page. We cannot, so we do not: parse and draw straight into the
