@@ -1,0 +1,3 @@
+# Materialised by scripts/fetch_deps.sh from the SHA pinned in the top-level
+# platformio.ini. Never edited by hand, never committed.
+.deps/
