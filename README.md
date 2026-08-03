@@ -73,6 +73,21 @@ The board definition and variant vendored in `boards/` and `variants/` describe
 the **development rig**, not that carrier board. Where the two disagree, the
 vendored variant is what the current firmware actually builds against.
 
+## Conformance
+
+`docs/parity-matrix.md` maps the stack we ship — microReticulum and microLXMF at
+the pins in `platformio.ini` — against the Python reference, module by module,
+with an evidence column.
+
+Most rows say we have no evidence. That is the accurate state and the reason the
+page exists: the manual defines Reticulum as full interoperability and
+sufficient functional parity with the reference, so a coverage map that admits
+its gaps is worth more than a claim that cannot be checked.
+
+The largest gap is stated there plainly: all four interop scenarios are C++
+sending and Python receiving. The reverse path is untested, and this is a device
+whose purpose is to receive.
+
 ## Building
 
 ```
