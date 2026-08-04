@@ -91,23 +91,34 @@ static bool bytes_equal(const RNS::Bytes& a, const RNS::Bytes& b) {
 // subsequent announce. An announce is something a pure receiver legitimately
 // emits, so this keeps the scenario cold while giving the reference
 // implementation something checkable.
-static RNS::Bytes build_ack_app_data(const RNS::Bytes& plaintext) {
+// The 17th byte is the hop count the packet carried when it reached us, and
+// it is what lets one binary serve both the direct and the relayed topology.
+// Transport::inbound increments hops before dispatch (Transport.cpp), so a
+// directly-received packet reports 1 and each transport node adds one more.
+// The Python side pins the exact value it expects for its topology, so a
+// packet that silently took the wrong path fails the scenario instead of
+// passing it -- without that byte, a broken relay that somehow delivered
+// direct would look identical to success.
+static RNS::Bytes build_ack_app_data(const RNS::Bytes& plaintext, uint8_t hops) {
 	RNS::Bytes material(plaintext);
 	material.append("thicket-cold-ack");
-	return RNS::Identity::full_hash(material).left(16);
+	RNS::Bytes out = RNS::Identity::full_hash(material).left(16);
+	out.append(hops);
+	return out;
 }
 
 static void on_local_packet(const RNS::Bytes& data, const RNS::Packet& packet) {
-	(void)packet;
+	const uint8_t hops = packet.hops();
 	const RNS::Bytes expected = build_expected_payload();
 	const bool ok = bytes_equal(data, expected);
-	printf("[cpp] inbound packet decrypted: %lu bytes (expected %lu), match=%s\n",
+	printf("[cpp] inbound packet decrypted: %lu bytes (expected %lu), match=%s, "
+	       "hops=%u\n",
 	       (unsigned long)data.size(), (unsigned long)expected.size(),
-	       ok ? "yes" : "no");
+	       ok ? "yes" : "no", (unsigned)hops);
 	if (ok) {
 		received_ok = true;
-		ack_app_data = build_ack_app_data(data);
-		printf("[cpp] ack app_data (sha256(plaintext||tag)[:16]) = %s\n",
+		ack_app_data = build_ack_app_data(data, hops);
+		printf("[cpp] ack app_data (sha256(plaintext||tag)[:16] || hops) = %s\n",
 		       ack_app_data.toHex().c_str());
 	}
 	else {

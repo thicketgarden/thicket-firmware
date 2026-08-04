@@ -1,6 +1,6 @@
 name: interop
 
-# Runs the four microReticulum interop scenarios (packet, link, request,
+# Runs the microReticulum interop scenarios (packet, link, request,
 # resource) against a real Python RNS peer.
 #
 # WHY THIS EXISTS
@@ -100,7 +100,7 @@ jobs:
           pip install "rns==${RNS_VERSION}"
           python -c "import RNS; print('RNS', RNS.__version__)"
 
-      - name: Run all four interop scenarios
+      - name: Run all interop scenarios
         working-directory: microReticulum
         run: bash test_interop/run_all.sh
 
@@ -165,7 +165,7 @@ jobs:
         run: |
           echo "### Ran against RNS $(python -c 'import RNS; print(RNS.__version__)')" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Run all four interop scenarios
+      - name: Run all interop scenarios
         working-directory: microReticulum
         run: bash test_interop/run_all.sh
 

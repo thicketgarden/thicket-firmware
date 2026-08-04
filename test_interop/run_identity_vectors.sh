@@ -14,7 +14,7 @@
 # To prove the test can fail, without editing anything:
 #   ... bash test_interop/run_identity_vectors.sh --self-test-break ciphertext
 #
-# To regenerate the vectors after an RNS or microReticulum bump (A28'):
+# To regenerate the vectors after an RNS or microReticulum bump:
 #   PATH="/tmp/rnsvenv/bin:$PATH" python3 test_interop/python/identity_vectors.py \
 #       --emit > test_interop/identity_vectors/src/vectors.h
 

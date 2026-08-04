@@ -15,6 +15,9 @@ HERE="$(cd "$(dirname "$0")" && pwd)"
 
 SCENARIOS=(
   "cold-inbound|cold_inbound_receiver|run_cold_inbound.sh"
+  # Reuses cold_inbound_receiver's binary deliberately -- same leaf, different
+  # topology -- so the second build here is a no-op.
+  "multihop-inbound|cold_inbound_receiver|run_multihop_inbound.sh"
   "lxmf-inbound|lxmf_inbound_receiver|run_lxmf_inbound.sh"
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
   "link-inbound|link_inbound_responder|run_link_inbound.sh"

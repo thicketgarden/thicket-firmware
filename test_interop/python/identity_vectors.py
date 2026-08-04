@@ -5,7 +5,7 @@
 Reference vectors for RNS Identity, generated from and verified against the
 Python RNS reference.
 
-Why this scenario exists (T28 priority 3): every interop scenario uses Identity
+Why this scenario exists: every interop scenario uses Identity
 and none asserts it. A scenario can pass while key derivation is subtly wrong,
 as long as both sides are wrong in the same way -- which is exactly what
 happens when the C++ side is only ever tested against itself.
@@ -13,7 +13,7 @@ happens when the C++ side is only ever tested against itself.
 Two modes:
 
   --emit     print the C++ header of vectors to stdout. Run this to regenerate
-             identity_vectors/src/vectors.h when the RNS pin moves (A28').
+             identity_vectors/src/vectors.h when the RNS pin moves.
 
   --verify   the Python half of the scenario. Re-derives every deterministic
              vector from the committed private key and compares it to the

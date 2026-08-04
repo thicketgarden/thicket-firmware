@@ -2,7 +2,15 @@
 # Copyright (C) 2026 Thicket contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Python originator for the COLD INBOUND interop scenario.
+Python originator for the COLD INBOUND and MULTI-HOP INBOUND interop scenarios.
+
+One script serves both because the difference between them is topology, not
+behaviour: with --relay it spawns a transport-enabled RNS node (multihop_relay)
+and binds the socket one segment further out, so the C++ leaf's own config is
+untouched and it cannot tell it is no longer being addressed directly. The leaf
+then has to handle a path learned through a relay and a packet that arrived
+with a non-zero hop count. See run_multihop_inbound.sh for the topology
+diagram.
 
 This is the half of the scenario that makes it cold. It:
 
@@ -20,9 +28,11 @@ This is the half of the scenario that makes it cold. It:
         decryption: both implementations emit a proof from Transport after
         handing the packet to the destination, decrypted or not.
      b. A later C++ announce carries app_data equal to
-        sha256(payload || b"thicket-cold-ack")[:16]. Only a peer that
-        actually recovered the plaintext can produce that, so this is the
-        assertion that the cold decrypt really happened.
+        sha256(payload || b"thicket-cold-ack")[:16] || hops. Only a peer that
+        actually recovered the plaintext can produce the digest, so that is
+        the assertion that the cold decrypt really happened; the trailing hop
+        byte is what pins the topology, so a run that was supposed to be
+        relayed cannot pass by arriving directly.
 
 Exit codes:
   0  packet sent AND proof validated AND plaintext digest confirmed
@@ -32,11 +42,45 @@ Exit codes:
 """
 
 import argparse
+import atexit
 import hashlib
 import os
+import signal
+import subprocess
 import sys
 import tempfile
 import time
+
+
+def _kill_relay(proc):
+    """Never leave a transport node bound to a port a later run will want."""
+    if proc is None or proc.poll() is not None:
+        return
+    proc.terminate()
+    try:
+        proc.wait(timeout=5)
+    except Exception:
+        proc.kill()
+
+
+def _install_relay_reaper(proc):
+    """atexit alone is not enough here.
+
+    The driver ends every scenario by SIGTERM-ing this process, and Python's
+    default SIGTERM disposition exits without running atexit handlers. That
+    would orphan the relay still bound to the loopback ports, and the next
+    scenario in run_all.sh would fail for a reason that has nothing to do with
+    what it is testing. Convert the signal into a normal exit so the handler
+    registered above actually runs.
+    """
+    atexit.register(_kill_relay, proc)
+
+    def _handler(signum, _frame):
+        _kill_relay(proc)
+        sys.exit(128 + signum)
+
+    for sig in (signal.SIGTERM, signal.SIGINT):
+        signal.signal(sig, _handler)
 
 try:
     import RNS
@@ -63,8 +107,15 @@ def build_payload(n: int = PAYLOAD_LEN) -> bytes:
 ACK_TAG = b"thicket-cold-ack"
 
 
-def expected_ack(payload: bytes) -> bytes:
-    return hashlib.sha256(payload + ACK_TAG).digest()[:16]
+def expected_ack(payload: bytes, hops: int) -> bytes:
+    """Digest of the plaintext, then the hop count the C++ side observed.
+
+    The hop byte is what makes this scenario's topology assertion real. RNS
+    increments hops on ingress, so a directly-delivered packet reports 1 and
+    each transport node in the path adds one more. Pinning the exact value
+    means a relayed run that somehow arrived direct fails rather than passes.
+    """
+    return hashlib.sha256(payload + ACK_TAG).digest()[:16] + bytes([hops])
 
 
 state = {
@@ -77,6 +128,8 @@ state = {
     "expected_ack": b"",
     "app_data_seen": set(),
     "ignore_dest": None,
+    "relay_proc": None,
+    "hops_wrong": None,
 }
 
 
@@ -105,6 +158,20 @@ class _AnnounceHandler:
         print(f"[python] announce app_data={app_data.hex()} "
               f"expected={state['expected_ack'].hex()} match={match}",
               flush=True)
+        # Separate the two failure modes, because they mean opposite things:
+        # a wrong digest is a crypto/parity bug, a wrong hop count means the
+        # packet did not travel the path this scenario claims to be testing.
+        if not match and len(app_data) == len(state["expected_ack"]) == 17:
+            if app_data[:16] == state["expected_ack"][:16]:
+                state["hops_wrong"] = (app_data[16], state["expected_ack"][16])
+                print(f"[python] plaintext digest is CORRECT but hop count is "
+                      f"{app_data[16]}, expected {state['expected_ack'][16]} "
+                      f"-- the packet did not take the expected path",
+                      flush=True)
+            elif app_data[16] == state["expected_ack"][16]:
+                print("[python] hop count is correct but the plaintext digest "
+                      "does not match -- the peer recovered different bytes",
+                      flush=True)
         if match:
             state["ack_ok"] = True
 
@@ -152,7 +219,19 @@ def main():
     ap.add_argument("--port", type=int, default=14262)
     ap.add_argument("--forward-port", type=int, default=14263)
     ap.add_argument("--timeout", type=float, default=40.0)
-    # A test that has never been seen to fail is not evidence (T28). These
+    # MULTI-HOP mode. The C++ leaf's own config is untouched: the relay simply
+    # takes over the socket this script would otherwise have bound, so the leaf
+    # cannot tell it is no longer talking to the originator directly -- which
+    # is the property being tested.
+    ap.add_argument("--relay", action="store_true",
+                    help="insert a transport-enabled Python relay between this "
+                         "script and the C++ leaf")
+    ap.add_argument("--origin-port", type=int, default=14264)
+    ap.add_argument("--origin-forward-port", type=int, default=14265)
+    ap.add_argument("--expect-hops", type=int, default=None,
+                    help="hop count the C++ side must report (default: 1 "
+                         "direct, 2 relayed)")
+    # A test that has never been seen to fail is not evidence. These
     # switches make the failure re-runnable by anyone, at any time, instead of
     # living in a report someone has to trust. They are opt-in and default off.
     #   payload   -- flip one byte of the payload on the wire; the C++ side
@@ -160,7 +239,10 @@ def main():
     #   coldness  -- announce from this side, which is exactly the condition
     #                that would silently turn this back into the already-covered
     #                warm case; the C++ coldness guard must catch it.
-    ap.add_argument("--self-test-break", choices=("none", "payload", "coldness"),
+    #   hops      -- expect the hop count for the OTHER topology, proving the
+    #                hop byte is genuinely compared rather than carried along.
+    ap.add_argument("--self-test-break",
+                    choices=("none", "payload", "coldness", "hops"),
                     default="none",
                     help="deliberately break one assertion, to prove it is live")
     args = ap.parse_args()
@@ -173,9 +255,38 @@ def main():
               f"{RNS.Packet.ENCRYPTED_MDU}, scenario pins {PAYLOAD_LEN}",
               flush=True)
 
+    # Start the relay BEFORE this side's Reticulum comes up, so the leaf-facing
+    # socket is already bound when the C++ leaf starts announcing into it.
+    if args.relay:
+        my_port, my_forward = args.origin_forward_port, args.origin_port
+        relay_cmd = [
+            sys.executable,
+            os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                         "multihop_relay.py"),
+            "--leaf-port", str(args.port),
+            "--leaf-forward-port", str(args.forward_port),
+            "--origin-port", str(args.origin_port),
+            "--origin-forward-port", str(args.origin_forward_port),
+            "--timeout", str(args.timeout + 10),
+        ]
+        print(f"[python] spawning relay: {' '.join(relay_cmd)}", flush=True)
+        relay_proc = subprocess.Popen(relay_cmd)
+        # The relay must outlive nothing and precede everything; if it dies the
+        # scenario must not quietly degrade into the direct case, so its exit is
+        # checked in the loop below rather than only at the end.
+        _install_relay_reaper(relay_proc)
+        time.sleep(3.0)
+        if relay_proc.poll() is not None:
+            print(f"[python] FAIL: relay exited immediately with "
+                  f"{relay_proc.returncode}", file=sys.stderr, flush=True)
+            sys.exit(3)
+        state["relay_proc"] = relay_proc
+    else:
+        my_port, my_forward = args.port, args.forward_port
+
     config_dir = tempfile.mkdtemp(prefix="thicket_interop_cold_")
     os.makedirs(os.path.join(config_dir, "storage", "resources"), exist_ok=True)
-    write_config(config_dir, args.port, args.forward_port)
+    write_config(config_dir, my_port, my_forward)
     print(f"[python] config dir: {config_dir}", flush=True)
 
     try:
@@ -191,9 +302,23 @@ def main():
           "(this is what makes the test cold)", flush=True)
 
     payload = build_payload()
+    # RNS increments hops on ingress, so the direct case is 1, not 0; the relay
+    # adds exactly one more. Both are observable in the C++ log line, so a
+    # change in either implementation shows up here as a mismatch with a stated
+    # expected value rather than as a silently-adjusted constant.
+    want_hops = args.expect_hops
+    if want_hops is None:
+        want_hops = 2 if args.relay else 1
+    if args.self_test_break == "hops":
+        want_hops = 1 if args.relay else 2
+        print(f"[python] SELF-TEST BREAK: expecting hops={want_hops}, which is "
+              "the count for the other topology; the digest will match and the "
+              "hop byte must not", flush=True)
     # The expected ack is always computed over the CORRECT payload, so the
     # payload break shows up as a mismatch rather than as two matching wrongs.
-    state["expected_ack"] = expected_ack(payload)
+    state["expected_ack"] = expected_ack(payload, want_hops)
+    print(f"[python] topology: {'RELAYED (1 transport node)' if args.relay else 'DIRECT'}, "
+          f"expecting the C++ side to report hops={want_hops}", flush=True)
 
     if args.self_test_break == "payload":
         payload = bytes([payload[0] ^ 0x01]) + payload[1:]
@@ -224,6 +349,15 @@ def main():
             breaker.announce()
             last_breaker_announce = time.time()
             print("[python] SELF-TEST BREAK: announced", flush=True)
+
+        # A relay that dies mid-run would leave the two ends unable to reach
+        # each other at all. Fail on it explicitly: a timeout here would read
+        # as "the C++ side never answered", which would be the wrong diagnosis.
+        rp = state["relay_proc"]
+        if rp is not None and rp.poll() is not None:
+            print(f"[python] FAILURE the relay exited mid-scenario with "
+                  f"{rp.returncode}", flush=True)
+            sys.exit(1)
 
         if state["remote_identity"] is not None and not state["sent"]:
             remote_dest = RNS.Destination(state["remote_identity"],
@@ -265,9 +399,19 @@ def main():
           f"sent={state['sent']} proven={state['proven']} "
           f"ack_ok={state['ack_ok']}", flush=True)
     if state["sent"] and state["proven"] and not state["ack_ok"]:
-        print("[python] FAILURE the C++ peer proved the packet but never "
-              "echoed the digest of the plaintext we sent -- it either could "
-              "not decrypt it, or recovered different bytes", flush=True)
+        if state["hops_wrong"] is not None:
+            got, want = state["hops_wrong"]
+            # Decryption demonstrably worked here, so blaming the crypto would
+            # send the next reader down the wrong path entirely.
+            print(f"[python] FAILURE the C++ peer decrypted the plaintext "
+                  f"correctly, but the packet reached it over {got} hops and "
+                  f"this scenario requires {want} -- the topology under test "
+                  f"was not the topology exercised", flush=True)
+        else:
+            print("[python] FAILURE the C++ peer proved the packet but never "
+                  "echoed the digest of the plaintext we sent -- it either "
+                  "could not decrypt it, or recovered different bytes",
+                  flush=True)
         sys.exit(1)
     sys.exit(2)
 

@@ -10,7 +10,7 @@ Closes two gaps at once.
   Python reference establishes the Link TO a C++ destination, which is the
   direction a handheld is actually on the receiving end of.
 
-  Keepalive and teardown under loss (T28 priority 4). All traffic runs through
+  Keepalive and teardown under loss. All traffic runs through
   an in-process UDP relay this script controls, so the test can cut the wire at
   a chosen moment rather than waiting for a real outage.
 
