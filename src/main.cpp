@@ -1177,6 +1177,36 @@ static void probe_low_ram(void) {
 }
 #endif
 
+
+#ifdef THICKET_RAM_PROBE
+// Feasibility check for the LOOP_STACK_SZ recommendation.
+//
+// The core hard-codes the loop task at 256*4 WORDS = 4,096 B in its own
+// main.cpp, with no #ifndef, so no -D can raise it. The route that does not
+// involve patching the core is to run our work in a task we create ourselves.
+// This proves the mechanism and prices it: FreeRTOS here is heap_3, so
+// pvPortMalloc is plain malloc and a task stack comes out of the system heap
+// -- the abundant budget, not the TLSF pool.
+static void stack_probe_task(void* arg) {
+	(void)arg;
+	vTaskDelay(pdMS_TO_TICKS(200));
+	info_u32("probe task stack free low-water (B)",
+	         (uint32_t)uxTaskGetStackHighWaterMark(NULL) * 4);
+	vTaskDelete(NULL);
+}
+
+static void probe_task_stack(void) {
+	const uint32_t before = (uint32_t)mallinfo().uordblks;
+	TaskHandle_t h = NULL;
+	// 2048 words = 8,192 bytes, the size upstream code assumes.
+	const BaseType_t rc = xTaskCreate(stack_probe_task, "stkprobe", 2048,
+	                                  NULL, TASK_PRIO_LOW, &h);
+	info_u32("xTaskCreate(8192 B stack) ok", (uint32_t)(rc == pdPASS));
+	const uint32_t after = (uint32_t)mallinfo().uordblks;
+	info_u32("heap cost of an 8 KB task (B)", after - before);
+}
+#endif
+
 void setup() {
 	Serial.begin(115200);
 
@@ -1230,6 +1260,7 @@ void setup() {
 	digitalWrite(LED_GREEN, HIGH);
 #ifdef THICKET_RAM_PROBE
 	report_ram("after bring-up");
+	probe_task_stack();
 #endif
 #ifdef THICKET_LOWRAM_PROBE
 	probe_low_ram();
