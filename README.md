@@ -114,9 +114,20 @@ page exists: the manual defines Reticulum as full interoperability and
 sufficient functional parity with the reference, so a coverage map that admits
 its gaps is worth more than a claim that cannot be checked.
 
-The largest gap is stated there plainly: in every scenario the C++ side speaks
-first and the Python peer answers. Nothing tests a Python peer initiating to a
-device that has not just transmitted, which is what a handheld does all day.
+`test_interop/` holds four scenarios in which the **Python side originates** and
+this stack has to receive: a cold inbound packet, an LXMF delivery, identity
+vectors, and a Python-initiated link. That direction is the one that matters for
+a handheld, which spends its day being reached rather than transmitting. They
+run in CI against pinned `rns==1.4.2` and `lxmf==1.1.1`, and each has been shown
+to fail when the behaviour it tests is broken.
+
+```
+PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
+```
+
+These run on hosts. No conformance scenario has yet executed on a RAK4631 —
+the device evidence above and the parity evidence here are still separate
+claims.
 
 ## Building
 
@@ -166,22 +177,6 @@ Board definition and variant for the RAK4631 are vendored in `boards/` and
 [microReticulum_Firmware](https://github.com/attermann/microReticulum_Firmware);
 `variants/rak4630/variant.h` carries one local change, marked in place, giving
 the radio its own SPI instance so it cannot steal the external-flash bus).
-
-## Conformance
-
-`docs/parity-matrix.md` maps this stack against the Python reference, module by
-module, with an evidence column. Most rows say we have no evidence, which is the
-accurate state and the reason the page exists.
-
-`test_interop/` holds four scenarios in which the Python side originates and
-this stack has to receive: a cold inbound packet, an LXMF delivery, identity
-vectors, and a Python-initiated link. They run in CI against pinned
-`rns==1.4.2` and `lxmf==1.1.1`, and each has been shown to fail when the
-behaviour it tests is broken.
-
-```
-PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
-```
 
 ## Standing on
 

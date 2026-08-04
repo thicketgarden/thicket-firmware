@@ -188,18 +188,25 @@ This is the strongest evidence the project has that the device half of M1
 works, and it is stronger than a canned response would be, because composition
 happens on the device.
 
-**Unknown, and deliberately not guessed:**
+**Established, from the log reproduced in `README.md` "Status":**
 
-- **When, and on which build.** It predates the 2026-08-03 pin bumps, so it is
-  evidence about an earlier microReticulum/microStore pin, not the current one.
-- **Battery or USB.** M1's done-condition includes "board on battery, nothing
-  tethered"; this run may or may not satisfy that.
-- **Whether identity survived a power cycle during it.** If the build was
-  `-internalfs`, this would partially bear on A6 even without external flash.
+- **2026-08-03**, on `wiscore_rak4631-internalfs` — the round trip needed a
+  filesystem `Identity::remember()` could actually write to, which `-noflash`
+  does not provide.
+- **Untethered.** The README records "Nothing was tethered", which speaks to
+  M1's "board on battery, nothing tethered" clause.
+- **The reply was delivered, not merely sent**: `LXMF: DELIVERED (proof
+  received)`. A delivery proof is cryptographic, so this is a stronger result
+  than an unacknowledged transmit.
 
-Fill these in from the founder's own account rather than inference; the three
-questions are cheap to answer and each one closes or fails to close a specific
-M1 clause.
+**Still unknown:**
+
+- **Whether identity survived a power cycle.** Both bring-up environments
+  regenerate the identity every boot, so this run cannot have shown it. A6 is
+  untouched by it and still needs external flash.
+- **Which pins.** The run predates the 2026-08-03 path-table pin bumps, so it
+  is evidence about the earlier microReticulum and microStore pins rather than
+  what is shipping now.
 
 ### What this does not show
 
