@@ -1344,6 +1344,13 @@ static void thicket_work() {
 		build_diag_body(body, sizeof(body),
 		                g_reply.signal_valid, g_reply.rssi, g_reply.snr);
 		send_lxmf(g_reply.to, body, "auto-reply");
+#ifdef THICKET_RAM_PROBE
+		// Report here rather than on demand. This is the one moment the deep
+		// path has just run -- inbound decrypt, proof, compose, sign, pack --
+		// so it is the only stack figure worth having, and waiting for a serial
+		// poke to ask for it has proved unreliable on this build.
+		report_ram("after inbound + auto-reply");
+#endif
 	}
 
 #ifdef THICKET_AUTOSEND_INTERVAL_S

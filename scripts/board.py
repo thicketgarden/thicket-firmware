@@ -13,9 +13,11 @@
 #
 #   1. A PlatformIO upload can print SUCCESS without programming anything.
 #      A real upload takes roughly 35-45 s and prints "Device programmed".
-#      A failed one takes about six minutes, warns that the target is not in
-#      DFU mode, and still exits zero. `flash` times the upload and calls that
-#      out instead of trusting the exit code.
+#      A failed one warns that the target is not in DFU mode and still exits
+#      zero. `flash` keys on "Device programmed" rather than the exit code.
+#      Do NOT use elapsed time as the failure signal: this times the whole
+#      `pio run -t upload`, so a fresh env compiling from scratch takes minutes
+#      and an earlier version of this script failed a good upload because of it.
 #
 #   2. The boot banner is gone before you can read it. USB-CDC buffers nothing
 #      before a host opens the port, and the firmware prints once at startup
@@ -170,9 +172,6 @@ def cmd_flash(args):
         verdict_bad = "nrfutil reported the target was not in DFU mode"
     elif not programmed:
         verdict_bad = "no 'Device programmed' in the upload output"
-    elif elapsed > 120:
-        verdict_bad = (f"upload took {elapsed:.0f}s; a real one is 35-45s, so "
-                       f"this almost certainly did not program")
 
     if verdict_bad:
         cap.stop()
@@ -182,6 +181,13 @@ def cmd_flash(args):
 
     print(f"[board] flash verified (took {elapsed:.0f}s, 'Device programmed')",
           flush=True)
+    if elapsed > 120:
+        # Not a failure. This times the whole `pio run -t upload`, so a fresh
+        # env that has to compile from scratch legitimately takes minutes. An
+        # earlier version treated it as a failed flash and cried wolf on a
+        # perfectly good upload. "Device programmed" above is the real signal.
+        print(f"[board] (slow: {elapsed:.0f}s -- almost certainly a full "
+              f"rebuild, not an upload problem)", flush=True)
     print(f"[board] listening {args.seconds}s for boot output", flush=True)
     time.sleep(args.seconds)
     cap.stop()
