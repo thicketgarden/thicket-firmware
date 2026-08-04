@@ -53,6 +53,30 @@ in-process UDP forwarder that can be told to drop everything. Neither RNS nor
 microReticulum has a lossy interface mode, and faking loss inside one of them
 would be testing the fake.
 
+## Measuring the RNS allocator pool
+
+The scenarios run a real stack under real traffic, which makes them the only
+place we can watch the TLSF pool fill without a board. Off by default so the
+scenario's behaviour is untouched; build the receiver with the probe and the
+device's own pool settings, then run any scenario that uses it:
+
+```
+cd test_interop/cold_inbound_receiver
+PLATFORMIO_BUILD_FLAGS="-DTHICKET_POOL_PROBE \
+  -DRNS_DEFAULT_ALLOCATOR=RNS_HEAP_POOL_ALLOCATOR \
+  -DRNS_CONTAINER_ALLOCATOR=RNS_HEAP_POOL_ALLOCATOR \
+  -DRNS_HEAP_POOL_BUFFER_SIZE=65536" pio run -e native17
+cd ../.. && BUILD=0 PATH="/tmp/rnsvenv/bin:$PATH" \
+  bash test_interop/run_multihop_inbound.sh 2>&1 | grep POOL
+```
+
+**Read the number in the safe direction only.** This is a 64-bit host: every
+pointer and `size_t` is twice its width on the nRF52840, so the figure is an
+upper bound on what the same workload costs there. It can prove a pool size is
+*sufficient*; it cannot prove one is *necessary*, and it is not a substitute
+for measuring on the board. Rebuild without the flags afterwards — `run_all.sh`
+does that for you.
+
 ## Proving a scenario can fail
 
 A test never seen to fail is not evidence. Every scenario ships with

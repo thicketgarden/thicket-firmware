@@ -249,6 +249,23 @@ int main() {
 	if (foreign_announces > 0)    { printf("[cpp] FAIL: %d foreign announce(s) seen; not a cold test\n", foreign_announces); rc = 1; }
 
 	if (rc == 0) printf("[cpp] SUCCESS cold inbound packet received and validated\n");
+#ifdef THICKET_POOL_PROBE
+	// Off by default so the scenario's own behaviour is untouched. Built with
+	// the pool allocator and the device's own pool size, this answers "is
+	// 65536 the right number" from the wrong word size but in the safe
+	// direction: every pointer and size_t here is twice its width on the
+	// nRF52840, so a peak that fits at 64-bit cannot fail to fit at 32-bit.
+	// It is an upper bound, not the figure -- the real one needs the board.
+	{
+		const size_t pool = RNS::Utilities::Memory::heap_pool_size();
+		const size_t freen = RNS::Utilities::Memory::heap_pool_free();
+		printf("[cpp] POOL size=%lu free=%lu peak_used=%lu frag=%u%%\n",
+		       (unsigned long)pool, (unsigned long)freen,
+		       (unsigned long)(pool - freen),
+		       (unsigned)RNS::Utilities::Memory::heap_pool_fragmented());
+		RNS::Utilities::Memory::dump_basic_pool_stats();
+	}
+#endif
 	printf("[cpp] exit code %d\n", rc);
 	return rc;
 }
