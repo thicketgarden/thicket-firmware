@@ -114,25 +114,25 @@ void test_capped_store_evicts_oldest_first(void) {
 
 // Timestamps have one-second granularity, so a burst of inserts inside the same
 // second ties, and eviction order among ties is whatever the hash map iteration
-// yields. The cap still holds - that part is guaranteed - but which records
-// survive is not recency ordered at all.
+// yields. Which records survive is therefore *unspecified* - and demonstrably
+// so: an earlier version of this test asserted that the first-inserted key
+// survives, which held under libc++ and failed under libstdc++. Two standard
+// libraries, two different survivors, same source.
 //
-// This is why a burst of announces cannot be relied on to evict sensibly, and
-// why the first record inserted can outlive the last. Asserted here as observed
-// behaviour so a future change to timestamp resolution shows up as a failure.
-void test_same_second_inserts_do_not_evict_by_recency(void) {
+// So the only thing assertable here is the guarantee: the cap holds exactly.
+// The absence of any assertion about *which* records remain is the point of
+// the test, not an omission - do not add one.
+//
+// The consequence for callers is the reason this matters: under an announce
+// burst nothing keeps a wanted path in the table. That is what pinning is for.
+void test_same_second_inserts_hold_the_cap_but_order_is_unspecified(void) {
 	Store store(65536, 4);
 	TEST_ASSERT_TRUE(open_store(store, "./.pio/test_store_ties/"));
 	store.set_max_recs(CAP);
 
 	fill(store, 0, INSERTS);
 
-	uint8_t oldest[16];
-	make_key(0, oldest);
-
 	TEST_ASSERT_EQUAL_UINT32(CAP, (uint32_t)store.size());
-	// The very first key survives 300 inserts at a cap of 100.
-	TEST_ASSERT_TRUE(store.exists(oldest, sizeof(oldest)));
 }
 
 int main(int, char**) {
@@ -140,6 +140,6 @@ int main(int, char**) {
 	RUN_TEST(test_uncapped_store_keeps_every_record);
 	RUN_TEST(test_capped_store_holds_at_cap);
 	RUN_TEST(test_capped_store_evicts_oldest_first);
-	RUN_TEST(test_same_second_inserts_do_not_evict_by_recency);
+	RUN_TEST(test_same_second_inserts_hold_the_cap_but_order_is_unspecified);
 	return UNITY_END();
 }
