@@ -20,6 +20,17 @@
           }
         ]
       }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -c 's=\"${CLAUDE_PROJECT_DIR:-}/scripts/hooks/pre-push-gate.sh\"; [ -x \"$s\" ] || s=\"$PWD/scripts/hooks/pre-push-gate.sh\"; if [ -x \"$s\" ]; then exec \"$s\"; fi; echo \"push gate: cannot locate scripts/hooks/pre-push-gate.sh (CLAUDE_PROJECT_DIR=${CLAUDE_PROJECT_DIR:-<unset>}, PWD=$PWD). The gate did NOT run.\" >&2; exit 2'"
+          }
+        ]
+      }
     ]
   }
 }

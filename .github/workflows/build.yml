@@ -16,6 +16,30 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Cheap and first. A pin that disagrees across build paths makes every job
+  # below it test a stack nobody ships, and the symptom is a compile error deep
+  # in a dependency rather than anything that names the cause. Seconds here
+  # against ten minutes of misleading red.
+  pins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      # Rule 3 checks the pins *inside* the pinned dependency, which is the one
+      # that has actually bitten. It needs the dependency on disk to see them.
+      - name: Fetch pinned dependencies
+        run: pio pkg install -e wiscore_rak4631
+
+      - name: Every build path resolves the same commit
+        run: python3 scripts/check_pins.py
+
   build:
     runs-on: ubuntu-latest
     strategy:
