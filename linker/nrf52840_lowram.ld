@@ -5,7 +5,7 @@ GROUP(-lgcc -lc -lnosys)
 
 MEMORY
 {
-  FLASH (rx)     : ORIGIN = 0x1000, LENGTH = 0xED000 - 0x1000
+  FLASH (rx)     : ORIGIN = 0x26000, LENGTH = 0xED000 - 0x26000
 
   /* SRAM required by Softdevice depend on
    * - Attribute Table Size (Number of Services and Characteristics)
@@ -15,9 +15,16 @@ MEMORY
    * - Event Len, HVN queue, Write CMD queue
    */ 
   RAM (rwx) :  ORIGIN = 0x20000008, LENGTH = 0x20040000 - 0x20000008
-  /* THICKET: origin was 0x20006000. This build has no SoftDevice on the part
-   * at all (FLASH starts at 0x1000), so the reservation was pure waste.
-   * Same change as linker/nrf52840_lowram.ld -- keep the two in step. */
+  /* THICKET: origin was 0x20006000. The 24,576 B below it is reserved for
+   * a SoftDevice's RAM. This firmware never calls sd_softdevice_enable and
+   * links no BLE at all (zero sd_ble/bluefruit symbols in the image), so
+   * that window is dormant. Verified on the board: the whole range was
+   * written with an address-derived pattern and read back with zero
+   * mismatches, then re-checked after 64 s of radio receive, USB traffic
+   * and LXMF announces -- still zero. Recovers 24,568 B to .heap.
+   * FLASH is deliberately untouched at 0x26000 so the bootloader still
+   * finds the application exactly where it expects it. The bottom 8 B are
+   * left to the MBR's parameter page. */
 }
 
 SECTIONS

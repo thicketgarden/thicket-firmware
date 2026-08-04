@@ -47,6 +47,9 @@
 // without it on the Adafruit nRF52 core under PlatformIO.
 #include <Adafruit_TinyUSB.h>
 
+#ifdef THICKET_RAM_PROBE
+#include <malloc.h>
+#endif
 #include <microStore/FileSystem.h>
 #ifdef THICKET_PATH_INDEX_PROBE
 #include <unordered_map>
@@ -66,6 +69,9 @@
 #include <LoRaInterface.h>
 #include <LXMF/LXMRouter.h>
 #include <LXMF/LXMessage.h>
+#ifdef THICKET_RAM_PROBE
+#include <LXMF/MessageStore.h>
+#endif
 
 #include <memory>
 #include <string>
@@ -749,6 +755,14 @@ static bool bringup_reticulum() {
 // reach the delivery callback below. Outbound composition is not wired.
 static bool bringup_lxmf() {
 	step(5, "LXMF router (microLXMF)");
+#ifdef THICKET_RAM_PROBE
+	// Straddle the router allocation. Whether its 34 KB lands in the TLSF pool
+	// or in the system heap decides which budget the message store competes
+	// with later, and the two have very different amounts left.
+	info_u32("pool free BEFORE router (B)",
+	         (uint32_t)RNS::Utilities::Memory::heap_pool_free());
+	info_u32("heap in use BEFORE router (B)", (uint32_t)mallinfo().uordblks);
+#endif
 
 	g_router.reset(new LXMF::LXMRouter(g_identity, LXMF_STORAGE_PATH, false));
 	if (!g_router) {
@@ -1074,6 +1088,95 @@ static void probe_path_index() {
 }
 #endif
 
+#ifdef THICKET_RAM_PROBE
+// Turns the RAM budget from link-time arithmetic into measured fact.
+//
+// Three things here cannot be obtained any other way than on silicon:
+//   - newlib's mallinfo, which is the only honest answer to "how much of the
+//     .heap section is actually spent" once the TLSF pool and the LXMF router
+//     have been allocated out of it;
+//   - uxTaskGetStackHighWaterMark, which reports the deepest the loop task's
+//     stack has ever been. A stack overflow here presents as a random hard
+//     fault, never as a budget line, so the margin is worth knowing exactly;
+//   - sizeof on this compiler for this ABI. Host builds are 64-bit and every
+//     pointer in these structures is twice the width there.
+static void report_ram(const char* when) {
+	Serial.println();
+	Serial.print("--- RAM probe (");
+	Serial.print(when);
+	Serial.println(") ---");
+
+	struct mallinfo mi = mallinfo();
+	info_u32("heap arena (B)", (uint32_t)mi.arena);
+	info_u32("heap in use (B)", (uint32_t)mi.uordblks);
+	info_u32("heap free in arena (B)", (uint32_t)mi.fordblks);
+
+	info_u32("RNS pool size (B)",
+	         (uint32_t)RNS::Utilities::Memory::heap_pool_size());
+	info_u32("RNS pool free (B)",
+	         (uint32_t)RNS::Utilities::Memory::heap_pool_free());
+	info_u32("RNS pool frag (%)",
+	         (uint32_t)RNS::Utilities::Memory::heap_pool_fragmented());
+
+	// Free words remaining at the shallowest point this task has ever reached.
+	// Multiply by 4 for bytes on this core.
+	const uint32_t free_words = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
+	info_u32("loop stack free low-water (B)", free_words * 4);
+
+	info_u32("sizeof LXMRouter", (uint32_t)sizeof(LXMF::LXMRouter));
+	info_u32("sizeof LXMessage", (uint32_t)sizeof(LXMF::LXMessage));
+	info_u32("sizeof MessageStore", (uint32_t)sizeof(LXMF::MessageStore));
+	info_u32("sizeof RNS::Packet", (uint32_t)sizeof(RNS::Packet));
+	info_u32("sizeof RNS::Bytes", (uint32_t)sizeof(RNS::Bytes));
+	info_u32("sizeof RNS::Identity", (uint32_t)sizeof(RNS::Identity));
+	info_u32("sizeof RNS::Destination", (uint32_t)sizeof(RNS::Destination));
+	Serial.println();
+}
+#endif
+
+#ifdef THICKET_LOWRAM_PROBE
+// Is the 24,576 B below RAM ORIGIN actually free?
+//
+// The linker reserves 0x20000000-0x20006000 for a SoftDevice on every build,
+// including the no-BLE one that has no SoftDevice on the part at all. Moving
+// RAM ORIGIN down recovers 24,568 B -- twice the framebuffer -- but relocating
+// the image is a brick-class risk on a board nobody can press RESET on.
+//
+// This asks the question without moving anything: write a pattern across the
+// window, read it back, and check it again later. If it survives, nothing else
+// owns that memory. It runs AFTER bring-up on purpose, so that if writing there
+// does upset something, the useful output has already been printed and USB is
+// already up -- which is what keeps the board reflashable.
+//
+// The bottom 256 B are left alone: the MBR keeps its parameter page at
+// 0x20000000, which is why the relocation target is 0x20000008 and not 0.
+#define LOWRAM_START 0x20000100UL
+#define LOWRAM_END   0x20006000UL
+
+static uint32_t lowram_check(void) {
+	uint32_t bad = 0;
+	for (uint32_t a = LOWRAM_START; a < LOWRAM_END; a += 4) {
+		if (*(volatile uint32_t*)a != (a ^ 0xA5A5A5A5UL)) bad++;
+	}
+	return bad;
+}
+
+static void probe_low_ram(void) {
+	Serial.println();
+	Serial.println("--- low-RAM probe (SoftDevice window) ---");
+	info_u32("window start", LOWRAM_START);
+	info_u32("window end", LOWRAM_END);
+	info_u32("window size (B)", LOWRAM_END - LOWRAM_START);
+
+	for (uint32_t a = LOWRAM_START; a < LOWRAM_END; a += 4) {
+		*(volatile uint32_t*)a = (a ^ 0xA5A5A5A5UL);
+	}
+	info_u32("mismatches immediately after write", lowram_check());
+	Serial.println("      (0 = the window is writable and reads back)");
+	Serial.println();
+}
+#endif
+
 void setup() {
 	Serial.begin(115200);
 
@@ -1125,6 +1228,12 @@ void setup() {
 	print_addresses();
 	g_stack_up = true;
 	digitalWrite(LED_GREEN, HIGH);
+#ifdef THICKET_RAM_PROBE
+	report_ram("after bring-up");
+#endif
+#ifdef THICKET_LOWRAM_PROBE
+	probe_low_ram();
+#endif
 }
 
 void loop() {
@@ -1141,6 +1250,26 @@ void loop() {
 	if (Serial.available()) {
 		while (Serial.available()) { (void)Serial.read(); }
 		probe_path_index();
+	}
+#endif
+#ifdef THICKET_RAM_PROBE
+	// The stack low-water mark only means something once the device has done
+	// the deep work -- receiving, decrypting, composing. Re-reading it on
+	// demand after the board has been running is the measurement that matters;
+	// the one taken at the end of setup() is only a floor.
+	if (Serial.available()) {
+		while (Serial.available()) { (void)Serial.read(); }
+		report_ram("on demand");
+	}
+#endif
+#ifdef THICKET_LOWRAM_PROBE
+	// Writable is necessary but not sufficient: the question is whether
+	// anything ELSE writes there while the radio, USB and filesystem are all
+	// running. Re-check on demand, after the device has been up a while.
+	if (Serial.available()) {
+		while (Serial.available()) { (void)Serial.read(); }
+		info_u32("low-RAM mismatches now", lowram_check());
+		info_u32("uptime (ms)", (uint32_t)millis());
 	}
 #endif
 	if (!g_stack_up) {
