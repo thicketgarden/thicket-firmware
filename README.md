@@ -150,6 +150,28 @@ nowhere to write, so no path is ever stored and a reply can be composed and
 never sent. `-internalfs` gives it somewhere real to write, which is what the
 round trip above needed. Both regenerate the identity every boot.
 
+### Flashing
+
+Use `scripts/board.py`, not `pio run -t upload` directly:
+
+```
+python3 scripts/board.py flash wiscore_rak4631-internalfs
+python3 scripts/board.py capture --seconds 20
+```
+
+It exists because two failure modes here look like something else. **A
+PlatformIO upload can print SUCCESS without programming anything** — it keys on
+`Device programmed` instead of the exit code, so a board still running the
+previous image cannot be mistaken for a firmware bug. And **the boot banner is
+gone before a terminal can attach**: USB-CDC discards writes with no host
+listening and the firmware prints once, so it polls for the port every 20 ms to
+win that race. Attaching a second later captures nothing, which reads exactly
+like a dead board.
+
+Do not hold the serial port open across an upload. The DFU tool needs it, and a
+second reader makes it fail with a message about multiple access that reads like
+a bootloader version mismatch and is not.
+
 Dependencies are pinned to explicit commits in
 `platformio.ini`; `scripts/patch_deps.py` applies portability patches to the
 fetched sources at build time and fails loudly if a pin moves under it.
@@ -159,18 +181,43 @@ Flash figure omits `.ARM.extab`, which is not small on a stack that throws):
 
 | env | image | app region | used | free |
 |---|---|---|---|---|
-| `wiscore_rak4631` | 452,180 B | 815,104 B | 55.48% | 362,924 B |
-| `wiscore_rak4631-noble` | 452,324 B | 966,656 B | 46.79% | 514,332 B |
+| `wiscore_rak4631` | 434,688 B | 815,104 B | 53.33% | 380,416 B |
+| `wiscore_rak4631-noble` | 434,832 B | 966,656 B | 44.98% | 531,824 B |
 
-Static RAM is 25,648 B (`.data` + `.bss`) in both envs, against a linker RAM
-region of 237,568 B. The Reticulum heap pool is a further
-65,536 B allocated at runtime, so it appears in no static size report;
-`scripts/mapsize.py` prints that reminder along with per-origin attribution.
+Static RAM is 19,156 B (`.data` + `.bss`) in both envs, against a linker RAM
+region of 262,136 B.
 
-**Measured on the board**, once the stack was up: 210,104 B total SRAM,
-131,984 B free. The 64 KiB pool is a bring-up value, chosen because a pool
-above roughly 75% of SRAM hard-faults before USB enumerates and the board then
-looks dead. It did not fault.
+Two notes on reading those numbers, both of which have caused wrong conclusions
+here:
+
+- **`arm-none-eabi-size` is misleading on this target.** It reports the
+  linker's `.heap` section inside `bss`, so this firmware reads as roughly
+  232 KB of static RAM and looks about to overflow. It is not. Read the ELF
+  section table — `scripts/ramreport.py` does, and attributes `.data`/`.bss`
+  per origin the way `scripts/mapsize.py` does for flash.
+- **`.heap` is a budget, not consumption.** The linker sizes it to fill
+  whatever is left, so it grows when static RAM shrinks. It is 240,932 B here.
+
+The Reticulum allocator pool is a further 98,304 B taken from that heap at
+runtime, so it appears in no static size report. It was 65,536 B during
+bring-up; it was raised once there was a board to measure on, because
+fragmentation tracks message traffic rather than uptime — at 64 KiB the pool
+went from 2% fragmented at boot to 16% after a single inbound message and
+reply, and at 96 KiB the same load produces 8%.
+
+**Measured on the board** after full bring-up, with the radio in continuous
+receive and the messaging layer live: 120,964 B of heap in use, 48,360 B of
+allocator pool free, and 116,040 B of system heap still spare. Do not raise the
+pool further without a board on the bench — a pool above roughly 75% of SRAM
+hard-faults before USB enumerates, and the board then simply looks dead.
+
+The application's work runs in a task the firmware creates with an 8,192 B
+stack rather than in `loop()`, whose stack the Arduino core fixes at 4,096 B
+and does not expose to a build flag. That is not a precaution: receiving a
+message and composing a reply has been measured on the board at up to 4,704 B
+of stack, which the 4,096 B ceiling could not have survived. `scripts/stackusage.py`
+reports worst-case frames from the compiler and cross-checks them against the
+linked image, so garbage-collected code is not mistaken for a live hazard.
 
 Board definition and variant for the RAK4631 are vendored in `boards/` and
 `variants/` (mirrored from
