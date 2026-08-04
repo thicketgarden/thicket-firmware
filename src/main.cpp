@@ -1120,8 +1120,12 @@ static void report_ram(const char* when) {
 
 	// Free words remaining at the shallowest point this task has ever reached.
 	// Multiply by 4 for bytes on this core.
+	// Name the task explicitly. Since the work moved off loop(), a stack figure
+	// with no task attached to it is ambiguous and easy to misread as the other
+	// one -- they differ by 4 KB of ceiling.
 	const uint32_t free_words = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
-	info_u32("loop stack free low-water (B)", free_words * 4);
+	info("stack reported for task", pcTaskGetName(NULL));
+	info_u32("task stack free low-water (B)", free_words * 4);
 
 	info_u32("sizeof LXMRouter", (uint32_t)sizeof(LXMF::LXMRouter));
 	info_u32("sizeof LXMessage", (uint32_t)sizeof(LXMF::LXMessage));
@@ -1178,34 +1182,12 @@ static void probe_low_ram(void) {
 #endif
 
 
-#ifdef THICKET_RAM_PROBE
-// Feasibility check for the LOOP_STACK_SZ recommendation.
-//
-// The core hard-codes the loop task at 256*4 WORDS = 4,096 B in its own
-// main.cpp, with no #ifndef, so no -D can raise it. The route that does not
-// involve patching the core is to run our work in a task we create ourselves.
-// This proves the mechanism and prices it: FreeRTOS here is heap_3, so
-// pvPortMalloc is plain malloc and a task stack comes out of the system heap
-// -- the abundant budget, not the TLSF pool.
-static void stack_probe_task(void* arg) {
-	(void)arg;
-	vTaskDelay(pdMS_TO_TICKS(200));
-	info_u32("probe task stack free low-water (B)",
-	         (uint32_t)uxTaskGetStackHighWaterMark(NULL) * 4);
-	vTaskDelete(NULL);
-}
 
-static void probe_task_stack(void) {
-	const uint32_t before = (uint32_t)mallinfo().uordblks;
-	TaskHandle_t h = NULL;
-	// 2048 words = 8,192 bytes, the size upstream code assumes.
-	const BaseType_t rc = xTaskCreate(stack_probe_task, "stkprobe", 2048,
-	                                  NULL, TASK_PRIO_LOW, &h);
-	info_u32("xTaskCreate(8192 B stack) ok", (uint32_t)(rc == pdPASS));
-	const uint32_t after = (uint32_t)mallinfo().uordblks;
-	info_u32("heap cost of an 8 KB task (B)", after - before);
-}
-#endif
+// Stack for the work task, in FreeRTOS words. 2048 words = 8,192 bytes.
+// Defined here because setup() creates the task; the reasoning is at
+// thicket_task() below.
+#define THICKET_TASK_STACK_WORDS 2048
+static void thicket_task(void* arg);
 
 void setup() {
 	Serial.begin(115200);
@@ -1258,16 +1240,34 @@ void setup() {
 	print_addresses();
 	g_stack_up = true;
 	digitalWrite(LED_GREEN, HIGH);
+
+	// Hand the work to a task with a stack that fits it. See thicket_task().
+	{
+		TaskHandle_t h = NULL;
+		const BaseType_t rc = xTaskCreate(thicket_task, "thicket",
+		                                  THICKET_TASK_STACK_WORDS, NULL,
+		                                  TASK_PRIO_LOW, &h);
+		if (rc != pdPASS) {
+			// Nothing runs if this fails, so say so rather than idling silently
+			// with a green LED claiming success.
+			g_stack_up = false;
+			fail("could not create the work task (out of heap?)");
+		}
+		else {
+			ok("work task started, 8192 B stack");
+		}
+	}
 #ifdef THICKET_RAM_PROBE
 	report_ram("after bring-up");
-	probe_task_stack();
 #endif
 #ifdef THICKET_LOWRAM_PROBE
 	probe_low_ram();
 #endif
 }
 
-void loop() {
+// The body that used to be loop(). It now runs in a task we create ourselves,
+// for the stack -- see thicket_task() below.
+static void thicket_work() {
 #ifdef THICKET_PATH_INDEX_PROBE
 	// Repeat the probe a few times after boot rather than once. A host that has
 	// just flashed the board cannot re-attach before bring-up finishes, so a
@@ -1369,6 +1369,50 @@ void loop() {
 	// TODO(bring-up): no sleep. The always-listening contract does not mean a busy
 	// loop; it means the receiver stays powered while the CPU idles. This spins
 	// the M4 at 64 MHz and will not meet any battery target.
+}
+
+// Why this work does not run in loop().
+//
+// The Adafruit core runs loop() in a FreeRTOS task whose stack it fixes at
+// LOOP_STACK_SZ = 256*4 -- FreeRTOS counts words, so 4,096 bytes -- defined
+// unconditionally in the core's own main.cpp with no #ifndef. No build flag can
+// reach it.
+//
+// 4 KB is not enough for what this loop does. Measured on the board, the loop
+// task had been 2,280 B deep with 1,816 B spare, but that only covers paths that
+// had actually run, and the device had done nothing but announce and idle.
+// -fstack-usage on the linked image shows single frames on the INBOUND MESSAGE
+// path that nothing had exercised: LXMRouter::on_packet 1,056 B,
+// RNS::doLog(va_list) 1,032 B, handle_direct_proof 1,040 B,
+// static_proof_callback 1,088 B. on_packet plus doLog alone is 2,088 B of 4,096,
+// before any Transport, Fernet or msgpack frame in between. Receiving a message,
+// proving it and logging about it is the ordinary job of this device.
+//
+// A stack overflow here is a hard fault at a random address with no diagnostic.
+// It would present as "the board locks up when people message it", which is the
+// most expensive kind of bug to attribute. Upstream's own compression code says
+// it assumes "nRF52 task stacks (8 KB+)".
+//
+// So: our own task at 8,192 B. Priced on the board at 8,288 B including the TCB.
+// FreeRTOS here is heap_3, so pvPortMalloc is plain malloc and this comes from
+// the system heap -- the budget with ~130 KB spare -- never from the RNS pool.
+static void thicket_task(void* arg) {
+	(void)arg;
+	for (;;) {
+		thicket_work();
+		// Yield to anything of equal or lower priority. Nothing here may block:
+		// there is no RX ISR, so receive latency is bounded by how often
+		// Transport::loop() is called.
+		taskYIELD();
+	}
+}
+
+void loop() {
+	// Deliberately empty of work. The core's loop task keeps its 4 KB stack and
+	// this must stay shallow. Sleeping here yields the CPU to the task above
+	// rather than spinning; it is not a power strategy, and the TODO about
+	// actually idling the M4 still stands in thicket_work().
+	delay(1000);
 }
 
 // No _write() retarget here on purpose. microReticulum's log macros go through
