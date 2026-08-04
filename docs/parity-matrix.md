@@ -175,7 +175,7 @@ fitted. **[V]**
   on a 64 KB RNS pool.
 - Path-table index cost, measured with a gated probe: 52.0 B/record steady
   state, ~65 B including allocator overhead. See
-  `thicket-hq docs/path-table-bounding.md` §2.1.
+  recorded with the design notes for that work.
 
 ### Reported by the founder — a round trip, not independently observed
 
@@ -184,8 +184,8 @@ pyxis**, using the auto-reply path: an inbound message is received, decrypted,
 and a reply is composed, signed and encrypted **on the nRF** before going back
 over LoRa.
 
-This is the strongest evidence the project has that the device half of M1
-works, and it is stronger than a canned response would be, because composition
+This is the strongest evidence the project has that the on-device half of the
+bring-up goal works, and it is stronger than a canned response would be, because composition
 happens on the device.
 
 **Established, from the log reproduced in `README.md` "Status":**
@@ -194,7 +194,7 @@ happens on the device.
   filesystem `Identity::remember()` could actually write to, which `-noflash`
   does not provide.
 - **Untethered.** The README records "Nothing was tethered", which speaks to
-  M1's "board on battery, nothing tethered" clause.
+  our own requirement that the board run on battery with nothing tethered.
 - **The reply was delivered, not merely sent**: `LXMF: DELIVERED (proof
   received)`. A delivery proof is cryptographic, so this is a stronger result
   than an unacknowledged transmit.
@@ -202,8 +202,8 @@ happens on the device.
 **Still unknown:**
 
 - **Whether identity survived a power cycle.** Both bring-up environments
-  regenerate the identity every boot, so this run cannot have shown it. A6 is
-  untouched by it and still needs external flash.
+  regenerate the identity every boot, so this run cannot have shown it. Persistence across a
+  power cycle is untouched by it and still needs external flash.
 - **Which pins.** The run predates the 2026-08-03 path-table pin bumps, so it
   is evidence about the earlier microReticulum and microStore pins rather than
   what is shipping now.
@@ -211,9 +211,10 @@ happens on the device.
 ### What this does not show
 
 Pyxis is built on microReticulum. A successful exchange therefore shows our
-stack interoperating with **the same lineage**, not with the reference. A27
-asks the cross-lineage question, which is why Sideband is named specifically in
-M1's done-condition, and it is what `test_interop/` and T28 exist to answer.
+stack interoperating with **the same lineage**, not with the reference. Interoperating with the reference
+implementation is a different question, which is why a Python-lineage client is
+named specifically in our own done-condition, and it is what `test_interop/`
+exists to answer.
 
 ## What would most improve this page
 
