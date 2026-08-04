@@ -63,7 +63,23 @@ PAYLOAD_LEN = 200
 KEEPALIVE_S = 3.0
 STALE_TIME_S = 12.0
 IDLE_OBSERVE_S = 15.0    # > 4 keepalive intervals and > stale_time
-CUT_OBSERVE_S = 25.0     # > stale_time + STALE_GRACE + rtt slack
+# How long to allow for the reference's watchdog to close the link after the
+# wire is cut. Expected close is stale_time + STALE_GRACE ~= 14s.
+#
+# This was 25.0 and it flaked in CI on 2026-08-04: the run took longer than 25s
+# on a loaded shared runner and the scenario failed with nothing broken. Locally
+# the same check closes in 14.9-20.0s, so 25s was only ~1.7x the typical figure
+# on a test whose entire subject is HOW LONG A TIMEOUT TAKES -- the one property
+# a busy machine stretches.
+#
+# The assertion being made is "the reference closes the link rather than hanging
+# on it forever", in contrast to our C++ side which has no Link watchdog at all
+# (the XFAIL below). The exact latency is NOT the property under test, so a
+# generous window costs the scenario nothing and a tight one costs it
+# credibility -- a suite that goes red without a defect teaches people to ignore
+# red. The observed close time is printed either way, so a real latency
+# regression is still visible in the log.
+CUT_OBSERVE_S = 50.0
 
 
 def build_payload(n: int = PAYLOAD_LEN) -> bytes:
@@ -275,6 +291,14 @@ def main():
           f"(TIMEOUT={RNS.Link.TIMEOUT})" if closed else
           f"still {link.status} after {elapsed:.1f}s")
     if closed:
+        # Widening the window (above) must not hide a latency regression, so
+        # say so loudly when the close is far slower than the protocol implies
+        # without failing the run for it.
+        expected = STALE_TIME_S + 3.0
+        if elapsed > expected * 2:
+            print(f"[python] NOTE: watchdog took {elapsed:.1f}s to close; "
+                  f"stale_time+grace implies ~{expected:.0f}s. Within the "
+                  f"allowance, but worth a look if it persists.", flush=True)
         check(state["close_reason"] == RNS.Link.TIMEOUT,
               "teardown reason is TIMEOUT",
               f"got {state['close_reason']}, want {RNS.Link.TIMEOUT}")
