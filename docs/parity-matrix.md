@@ -15,8 +15,16 @@ where the stack we ship stands against that bar.
 here is the stack we pin and ship: **microReticulum** (C++ RNS) and
 **microLXMF** (C++ LXMF). Pins are in `platformio.ini`.
 
-**Nothing here has been run on hardware.** Every result below comes from CI on
-x86 Linux hosts. A RAK4631 has not yet executed any of it.
+**No row in the matrix below has been run on hardware.** Every result in the
+table comes from CI on x86 Linux hosts.
+
+⚠ **Corrected 2026-08-03.** This section previously read "A RAK4631 has not yet
+executed any of it", which is no longer true and was understating the project.
+The stack has run on a RAK4631, and a message composed on the device has
+reached a peer over LoRa. That does not populate any row below — those rows are
+about parity against the *reference* implementation, which is a different
+claim — but the blanket statement was wrong and is corrected here rather than
+quietly deleted. See "Hardware evidence" below.
 
 ## Evidence vocabulary
 
@@ -145,6 +153,61 @@ including decryption of a reference ciphertext, while `run_cold_inbound.sh`
 still passes, because a *generated* key is clamped by `Curve25519::dh1()` and
 only an *imported* one (i.e. an identity reloaded from flash on boot) is not.
 
+## Hardware evidence
+
+What has actually executed on a RAK4631, separated by how well we know it.
+None of this populates a matrix row: those rows are parity against the Python
+reference, and everything here is either our stack alone or our stack talking
+to another microReticulum-family peer.
+
+### Verified — read off the board on 2026-08-03
+
+Boot log captured over USB serial, `wiscore_rak4631-noflash`, no RAK15001
+fitted. **[V]**
+
+- Radio: `LoRa init succeeded`, SX1262 online, continuous receive.
+  914.875 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm.
+- Reticulum: `Transport starting...`, then `Transport mode is disabled` —
+  running as a leaf, which is the shipped configuration.
+- LXMF: router initialised, delivery destination registered, display name set.
+- Announce: `Announce sent successfully`.
+- Memory with the full stack up: `Total SRAM 210104 B, Free SRAM 131984 B`,
+  on a 64 KB RNS pool.
+- Path-table index cost, measured with a gated probe: 52.0 B/record steady
+  state, ~65 B including allocator overhead. See
+  `thicket-hq docs/path-table-bounding.md` §2.1.
+
+### Reported by the founder — a round trip, not independently observed
+
+**[R]** The firmware has exchanged LXMF messages with a **T-Deck running
+pyxis**, using the auto-reply path: an inbound message is received, decrypted,
+and a reply is composed, signed and encrypted **on the nRF** before going back
+over LoRa.
+
+This is the strongest evidence the project has that the device half of M1
+works, and it is stronger than a canned response would be, because composition
+happens on the device.
+
+**Unknown, and deliberately not guessed:**
+
+- **When, and on which build.** It predates the 2026-08-03 pin bumps, so it is
+  evidence about an earlier microReticulum/microStore pin, not the current one.
+- **Battery or USB.** M1's done-condition includes "board on battery, nothing
+  tethered"; this run may or may not satisfy that.
+- **Whether identity survived a power cycle during it.** If the build was
+  `-internalfs`, this would partially bear on A6 even without external flash.
+
+Fill these in from the founder's own account rather than inference; the three
+questions are cheap to answer and each one closes or fails to close a specific
+M1 clause.
+
+### What this does not show
+
+Pyxis is built on microReticulum. A successful exchange therefore shows our
+stack interoperating with **the same lineage**, not with the reference. A27
+asks the cross-lineage question, which is why Sideband is named specifically in
+M1's done-condition, and it is what `test_interop/` and T28 exist to answer.
+
 ## What would most improve this page
 
 In rough order of value per effort:
@@ -153,7 +216,9 @@ In rough order of value per effort:
    `run_cold_inbound.sh`, `run_lxmf_inbound.sh`, `run_link_inbound.sh`.
 2. ~~**Identity vectors.**~~ Done 2026-08-03: `run_identity_vectors.sh`.
 3. **Multi-hop transport.** Currently unexercised in any form.
-4. **Anything at all on real hardware.** Every row above is a host result.
+4. **Any *matrix row* on real hardware.** Every row above is a host result.
+   The stack itself has run on a RAK4631 — see "Hardware evidence" — but no
+   parity scenario has, and that is the gap.
 5. **A scenario for DIRECT (over-Link) LXMF delivery**, which is where
    divergence 6 bites and which our LXMF scenario does not reach.
 
