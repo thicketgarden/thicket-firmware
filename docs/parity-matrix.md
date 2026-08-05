@@ -255,8 +255,15 @@ evidence. The board was still carrying the diagnostic build
 image; no power figure is claimed or implied by this.
 
 ⚠ **What this does not close.** The environment regenerates its identity every
-boot, so it says nothing about state surviving a power cycle. And the peer was a
-Pi, not a phone: a phone client over this same path is still untested.
+boot, so it says nothing about state surviving a power cycle.
+
+*(A phone client on the far end is deliberately **not** listed as a gap. The
+peer was a Pi, but Sideband and the other phone clients bundle the same Python
+RNS and LXMF this exchange already ran against, so a phone would test the
+transport chain rather than this stack. The one genuine client-side risk —
+a peer configured to require message stamps, which drops unstamped messages
+silently — is independent of form factor and is tracked in the LXStamper row
+above.)*
 
 **A false lead worth recording, because it cost an afternoon.** For twenty
 minutes the reference established links to us and abandoned each one after ~14
