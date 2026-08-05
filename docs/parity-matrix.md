@@ -219,6 +219,14 @@ fitted. **[V]**
   state, ~65 B including allocator overhead. Recorded in full with the design
   notes for that work, privately.
 
+**Encrypted message storage, 2026-08-05.** `store round trip verified on this
+filesystem (encrypt, write, read, decrypt)` at bring-up, then a real exchange:
+`conversations=1 saved_in=1 saved_out=1` with the reply delivered under proof.
+Inbound and outbound both stored encrypted. **[V-hw]** This populates no matrix
+row — there is no Python counterpart to a fixed-pool message store — but it is
+the first hardware evidence the encryption paths execute on this silicon at
+all; everything before it was a host result.
+
 ### Reported by the founder — a round trip, not independently observed
 
 **[R]** The firmware has exchanged LXMF messages with a **T-Deck running

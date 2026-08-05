@@ -64,9 +64,30 @@ tested.
 **Power.** The current firmware busy-loops the CPU. No battery figure is
 claimed, and none will be until a board and a profiler produce one.
 
-**Not yet wired**, and marked with a TODO at each site in the source: a message
-store, initiating a conversation with a peer that has not written first,
-display, input, and sleep.
+**Messages are now stored, and stored encrypted.** On 2026-08-05 a RAK4631
+received a message and kept it: both the inbound message and the reply were
+encrypted with AES-256-CTR and authenticated with HMAC-SHA256, under keys
+derived from the device's own X25519 private key. No passphrase is involved, so
+nothing waits on a user-interface decision. Because the keys derive from the
+identity, destroying the identity makes every stored message unreadable at
+once — no wipe, no overwrite passes.
+
+The guarantee is narrower than "encrypted at rest" usually implies, and the
+difference matters: **the identity itself is still a plaintext file on the same
+flash.** Anyone who images the whole device reads it and derives these keys from
+it. What this defends is a message store that leaks *without* the identity, and
+it buys the erase property above. Closing the rest needs a passphrase-protected
+identity, which this device has no way to enter yet.
+
+Bring-up refuses to report the store attached unless it has just encrypted,
+written, read back and decrypted a file on the actual filesystem. That check
+exists because the device once reported a healthy store while every save
+failed — the internal-flash bring-up filesystem was full, and three messages
+were received, answered correctly, and dropped.
+
+**Not yet wired**, and marked with a TODO at each site in the source:
+initiating a conversation with a peer that has not written first, display,
+input, and sleep.
 
 ### One finding from first boot
 
