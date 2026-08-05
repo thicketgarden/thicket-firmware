@@ -19,18 +19,24 @@ The same code is also proposed upstream as
 (`lib/encrypted_store/`), open since 2026-04-07 and unmerged. We take the
 standalone repository rather than the PR, so nothing here waits on that review.
 
-> ⚠ **The upstream licence is stated twice and the two do not agree.** The
-> repository's `LICENSE` file is MIT and GitHub's API reports `MIT`
-> **[V, `gh api repos/konsumer/arduino-rns-encrypted-store`, 2026-08-05]**, but
-> the same commit's `library.json` carries `"license": "Apache-2.0"` — plausibly
-> a leftover from the PR, where this code sits inside the Apache-2.0
-> microReticulum tree.
+> **The upstream licence is stated twice and the two do not agree — we read it
+> as MIT.** *(2026-08-05, founder ruling)*
 >
-> **This does not block us.** MIT and Apache-2.0 are both inbound-compatible
-> with our GPL-3.0-or-later firmware, so the gate is satisfied under either
-> reading. It is recorded because an ambiguous grant is worth resolving before
-> it matters, and resolving it means asking the author — **founder's voice, not
-> an agent's.**
+> The repository's `LICENSE` file is MIT and GitHub's API reports `MIT`
+> **[V, `gh api repos/konsumer/arduino-rns-encrypted-store`, 2026-08-05]**. The
+> same commit's `library.json` carries `"license": "Apache-2.0"`.
+>
+> MIT is the deliberate statement and Apache-2.0 is the leftover. The `LICENSE`
+> file was added on 2026-08-02, in direct response to the founder asking on the
+> PR thread — the repositories carried no licence at all before that, which is
+> what blocked us in the first place. `library.json` was not touched in that
+> change and still reflects the file's origin inside the Apache-2.0
+> microReticulum tree, where this code was first proposed.
+>
+> Nothing turns on it either way: both are inbound-compatible with our
+> GPL-3.0-or-later firmware, so the gate is satisfied under either reading.
+> Recorded rather than left implicit, because "we assumed" and "we checked and
+> reasoned" are different provenance and only one of them survives review.
 
 ## What it does
 
