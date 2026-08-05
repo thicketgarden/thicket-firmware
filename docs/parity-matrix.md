@@ -46,7 +46,7 @@ recorded it, so every green run was a claim about unnamed code.
 |---|---|
 | microReticulum | `9fb4828acdd24ff1e10ec528c2d24e9cae0e8acb` |
 | microStore | `c5697b85a156e1b18372d7a190136bfd2c379545` |
-| microLXMF | `75df3417ff4f97d2cd823676394a2d59cdc390b8` |
+| microLXMF | `b3d7f6cdd1989d6ad0027afdb31b7d8d0d672b78` |
 | Python `rns` | 1.4.2 |
 | Python `lxmf` | 1.1.1 |
 
@@ -99,10 +99,10 @@ originates:
 | Python module | Our surface | Present | Evidence | Residual gap |
 |---|---|---|---|---|
 | `Packet.py` | `Packet.cpp` | yes | `interop` + `thicket-interop` (`run_cold_inbound.sh`) | Cold inbound now verified: a Python peer originates 383 bytes (`ENCRYPTED_MDU`) to a destination that has only announced, and the C++ side decrypts, validates, and returns a proof the reference accepts. |
-| `Link.py` | `Link.cpp` | yes | `interop` + `thicket-interop` (`run_link_inbound.sh`) | Python-initiated establish, data round trip, and keepalive **response** now verified; the reference's watchdog closes the link with `TIMEOUT` when the wire is cut. **But microReticulum has no Link watchdog of its own** — see divergence 5 below — so it never originates keepalives and never times a link out. Link *proof* validation is also disabled; see divergence 6. |
+| `Link.py` | `Link.cpp` | yes | `interop` + `thicket-interop` (`run_link_inbound.sh`) | Python-initiated establish, data round trip, and keepalive **response** now verified; the reference's watchdog closes the link with `TIMEOUT` when the wire is cut. **But microReticulum has no Link watchdog of its own** — see divergence 6 below — so it never originates keepalives and never times a link out. Link *proof* validation is also disabled; see divergence 7. |
 | `Resource.py` | `Resource.{h,cpp}` | yes | `interop` | Transfer scenario passes host-side. Note microLXMF's own docs report Resource transfer to `lxmd` not concluding. |
 | `Destination.py` | `Destination.cpp` | yes | `interop` (request/response) | GROUP destinations unverified. |
-| `Identity.py` | `Identity.cpp` | yes | `thicket-interop` (`run_identity_vectors.sh`) | Key derivation from an imported private key, identity and destination hashing, `full_hash`/`truncated_hash`, HKDF, deterministic Ed25519 signing, signature validation (including two negative cases) and decryption of a reference-produced ciphertext all match Python RNS 1.4.2. One divergence found: `Cryptography::hkdf()` ignores its `context` argument — see divergence 7. |
+| `Identity.py` | `Identity.cpp` | yes | `thicket-interop` (`run_identity_vectors.sh`) | Key derivation from an imported private key, identity and destination hashing, `full_hash`/`truncated_hash`, HKDF, deterministic Ed25519 signing, signature validation (including two negative cases) and decryption of a reference-produced ciphertext all match Python RNS 1.4.2. One divergence found: `Cryptography::hkdf()` ignores its `context` argument — see divergence 8. |
 | `Transport.py` | `Transport.cpp` | yes | `thicket-interop` (`run_multihop_inbound.sh`, `run_transport_forward.sh`) | Covered in both roles as of 2026-08-04. **As a leaf:** a transport-enabled reference node sits between the originator and us; the path is learned from a relayed announce, the packet arrives with a non-zero hop count, and the proof returns across the relay. **As a router:** two reference peers on segments with no member in common except us reach each other through us, arriving at `hops=2`. They cannot hear each other directly, so delivery is proof of forwarding. This is the only scenario running `transport_enabled(true)`, the mode our four local patches affect. **Residual: the peer is always the reference, never a second microReticulum** — so a divergence both implementations share would not show up here. |
 | `Reticulum.py` | `Reticulum.cpp` | yes | `none` | Config surface differs by construction; not assessed. |
 | `Channel.py` | `Channel.{h,cpp}` | **files only** | `absent` in practice | **Corrected 2026-08-03.** The files exist but there is no implementation: `Channel.cpp` is 26 lines of `#include`, `Link::get_channel()` is commented out (Link.cpp:1136) and the `CHANNEL` packet-context branch of `Link::receive` is commented out (Link.cpp:1489). There is no API to open a channel, so a scenario cannot be written. Previously listed as Present `yes` / `none`, which read as "untested" rather than "not there". |
@@ -121,7 +121,7 @@ into `LXMRouter` and adds a `MessageStore` with no Python counterpart.
 | Python module | Our surface | Present | Evidence | Residual gap |
 |---|---|---|---|---|
 | `LXMessage.py` | `LXMessage.{h,cpp}` | yes | `lxmf-conformance` + `thicket-interop` (`run_lxmf_inbound.sh`) | Covered by payload-format, direct and attachment suites. Our scenario additionally asserts timestamp, title, content, field count, field msgpack wire bytes, source hash and signature validation on an inbound message **at our own microReticulum pin** — see the caveat below. |
-| `LXMRouter.py` | `LXMRouter.{h,cpp}` | yes | `lxmf-conformance` + `thicket-interop` (`run_lxmf_inbound.sh`) | Covered by direct, opportunistic, dedup, combined suites. Our scenario covers the OPPORTUNISTIC inbound path only. DIRECT (over a Link) is **not** covered by us and is affected by divergence 6. |
+| `LXMRouter.py` | `LXMRouter.{h,cpp}` | yes | `lxmf-conformance` + `thicket-interop` (`run_lxmf_inbound.sh`) | Covered by direct, opportunistic, dedup, combined suites. Our scenario covers the OPPORTUNISTIC inbound path only. DIRECT (over a Link) is **not** covered by us and is affected by divergence 7. |
 | `LXStamper.py` | `LXStamper.{h,cpp}` | yes | partial `lxmf-conformance` | **Inbound stamp cost is a known bridge gap — the 2 skipped tests.** |
 | `Handlers.py` | folded into `LXMRouter`, `PropagationNodeManager` | yes | `lxmf-conformance` (announce suites) | No separate handler surface to assess. |
 | `LXMPeer.py` | `PropagationNodeManager`, `LXMRouter` | yes | `none` | Propagation suite is **skipped in upstream CI** (Resource transfer to `lxmd` does not conclude). |
@@ -144,7 +144,16 @@ Stated because an unexplained divergence is indistinguishable from a bug.
 3. **Hot tier below the hard cap is rejected at compile time.** A hot count at or
    above the cap silently disables the archive tier; we now `static_assert`
    against it. Proposed upstream.
-4. **Oversized persisted index truncates rather than wipes.** Reopening a store
+4. **`MessageStore` takes an optional codec.** `set_codec(encode, decode)`,
+   unset by default, applied to every file the store persists. We install
+   AES-256-CTR + HMAC-SHA256 keyed from the device identity. Nothing about the
+   default path changes: with no codec the bytes written are identical. Sizes
+   stay in decoded units so the store's own write-then-verify-readback still
+   compares like with like, and a failed decode is reported as a failed read,
+   because a file that does not authenticate is a corrupt file as far as the
+   store is concerned. Proposed upstream — it is configurability with defaults
+   unchanged, which is the shape that belongs there rather than here.
+5. **Oversized persisted index truncates rather than wipes.** Reopening a store
    written by a build with larger limits drops the least recently active
    conversations and the oldest messages instead of clearing everything.
    Proposed upstream.
@@ -152,7 +161,7 @@ Stated because an unexplained divergence is indistinguishable from a bug.
 **Added 2026-08-03, found while building `test_interop/`. Numbers 5-7 are
 places the stack diverges from the reference that nobody had written down.**
 
-5. **No Link watchdog.** `Link::start_watchdog()` (Link.cpp:884) has an empty
+6. **No Link watchdog.** `Link::start_watchdog()` (Link.cpp:884) has an empty
    body; `Link::__watchdog_job()` is inside a `/*p TODO */` comment block and is
    not compiled. `Link::send_keepalive()` is compiled but has no caller. So a
    C++ link initiator never sends keepalives, a PENDING link never times out,
@@ -160,13 +169,13 @@ places the stack diverges from the reference that nobody had written down.**
    as long as the process runs. Answering an inbound keepalive *does* work
    (Link.cpp:1455-1460). Demonstrated by `run_link_inbound.sh`, which pins it as
    a strict expected failure so implementing the watchdog turns the scenario red.
-6. **Link proof validation is disabled.** `PacketReceipt::validate_link_proof`
+7. **Link proof validation is disabled.** `PacketReceipt::validate_link_proof`
    (Packet.cpp:907) is `//z if (link.validate(...))` followed by `if (false) {`,
    so a receipt for a packet sent over a Link never reaches DELIVERED and its
    delivery callback never fires. This is the same bug microLXMF's conformance
    work fixed in torlando-tech's microReticulum; our fork descends from
    attermann's and does not carry the fix. Not yet covered by a scenario.
-7. **`Cryptography::hkdf()` ignores its `context` argument.**
+8. **`Cryptography::hkdf()` ignores its `context` argument.**
    `Cryptography/HKDF.cpp` calls `HKDFCommon::extract(out, len)` and never
    passes `context`, though the underlying API accepts
    `extract(out, outLen, info, infoLen)`. No packet is affected today —
@@ -266,7 +275,7 @@ In rough order of value per effort:
    The stack itself has run on a RAK4631 — see "Hardware evidence" — but no
    parity scenario has, and that is the gap.
 5. **A scenario for DIRECT (over-Link) LXMF delivery**, which is where
-   divergence 6 bites and which our LXMF scenario does not reach.
+   divergence 7 bites and which our LXMF scenario does not reach.
 
 ## A note on stale assessments
 
@@ -294,7 +303,7 @@ longer describes this stack.
 >
 > Three of the five are still open. The assessment describes this stack more
 > accurately than we did. Two of the three now have scenarios or expected-failure
-> pins against them (divergences 5 and 7 above); the IFAC one does not.
+> pins against them (divergences 6 and 8 above); the IFAC one does not.
 >
 > How the earlier check went wrong is worth naming, because it is repeatable:
 > `grep` for the *symbol* finds `start_watchdog`, `send_keepalive` and an `ifac`

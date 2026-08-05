@@ -36,6 +36,23 @@
 #define ENCSTORE_FILE_VERSION  0x01
 #define ENCSTORE_FILE_OVERHEAD 49   // 1 (version) + 16 (IV) + 32 (HMAC)
 
+// THICKET: added. The buffer-level half of the two functions below, with no
+// filesystem involved. Needed because a caller that already owns the storage
+// -- LXMF::MessageStore, via its codec hook -- needs the transform without the
+// file handling, and duplicating the crypto to get it would be the wrong way
+// round. encstore_write/encstore_read are now written in terms of these, so
+// there is exactly one implementation of the format.
+//
+// `out` receives version(1) + IV(16) + ciphertext(len) + HMAC(32).
+bool encstore_encrypt(const RNS::Identity& identity,
+                      const uint8_t* data, size_t len, RNS::Bytes& out);
+
+// Authenticate and decrypt an encstore blob. Returns false on a wrong
+// identity, tampering, or a blob too short to be valid; `out` is untouched in
+// that case, so a failed call never yields partial plaintext.
+bool encstore_decrypt(const RNS::Identity& identity,
+                      const uint8_t* blob, size_t len, RNS::Bytes& out);
+
 // Write `len` bytes from `data` to `path` encrypted and authenticated with
 // `identity`'s key. Returns true on success.
 bool encstore_write(const char* path, const RNS::Identity& identity,

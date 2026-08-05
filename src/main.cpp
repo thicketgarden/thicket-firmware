@@ -75,6 +75,10 @@
 #if !defined(THICKET_NO_PERSISTENCE) || defined(THICKET_INTERNAL_FS)
 #define THICKET_HAVE_STORE 1
 #include <LXMF/MessageStore.h>
+// Encryption at rest for everything the store persists. Included with the
+// store, not separately: there is no build in which we want one without the
+// other.
+#include <encrypted_store.h>
 #endif
 #ifdef THICKET_RAM_PROBE
 #include <LXMF/MessageStore.h>
@@ -864,6 +868,40 @@ static bool bringup_lxmf() {
 		fail("could not construct MessageStore");
 		return false;
 	}
+
+	// Encrypt everything the store persists, keyed from this device's own
+	// identity. The store holds no key and knows no cipher: it calls these two
+	// and reports decoded sizes, so its write-then-verify-readback checks still
+	// compare like with like.
+	//
+	// Captured by value on purpose. g_identity is reassigned during bring-up
+	// and a reference would be left pointing at a stale object; the codec must
+	// hold the identity these messages are actually keyed to.
+	{
+		const RNS::Identity id = g_identity;
+		g_store->set_codec(
+			[id](const RNS::Bytes& in, RNS::Bytes& out) {
+				return encstore_encrypt(id, in.data(), in.size(), out);
+			},
+			[id](const RNS::Bytes& in, RNS::Bytes& out) {
+				return encstore_decrypt(id, in.data(), in.size(), out);
+			});
+	}
+	if (!g_store->has_codec()) {
+		fail("message store is not encrypted - refusing to store in the clear");
+		return false;
+	}
+	// Worth stating plainly, because the guarantee is narrower than
+	// "encrypted at rest" sounds. The identity itself is a plaintext file on
+	// the same flash, so whoever images the whole device reads it and derives
+	// these keys from it. What this buys is a message store that is useless on
+	// its own, and crypto-erase: destroying the identity makes every stored
+	// message unreadable at once, with no wipe.
+	ok("message store encrypted (AES-256-CTR + HMAC, keyed from identity)");
+	info("store at-rest limit", "identity is stored in the clear; erasing it "
+	                            "renders all stored messages unreadable");
+	info_u32("store per-message overhead (B)", (uint32_t)ENCSTORE_FILE_OVERHEAD);
+
 	info_u32("store capacity (conversations)",
 	         (uint32_t)LXMF::MAX_CONVERSATIONS);
 	info_u32("store capacity (msgs/conversation)",
