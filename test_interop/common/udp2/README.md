@@ -25,8 +25,8 @@ makes two UDP interfaces on different ports impossible in one process.**
 
 A forwarding node needs exactly that — one interface facing each neighbour — so
 the transport-forwarding interop scenario cannot be written against the upstream
-class. `tasks/T28` forbids modifying the microReticulum fork, and rightly: a
-patch there is a tax on every dependency bump, for a change only a test needs.
+class. Modifying our microReticulum fork was rejected for it: a patch there is a
+tax on every dependency bump, paid forever, for a change only a test needs.
 
 ## The modification, in full
 

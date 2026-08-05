@@ -835,10 +835,11 @@ static bool bringup_lxmf() {
 	// Constructed here rather than earlier so a failure reports against the
 	// messaging step, which is what it belongs to.
 #ifdef THICKET_RAM_PROBE
-	// Straddle the allocation. A57 asserted the store draws on the system heap
-	// rather than the RNS pool, reasoning from its index being a fixed array
-	// member. That reasoning was about the INDEX; the OBJECT is new'd, and
-	// RNS_DEFAULT_ALLOCATOR redirects global operator new into the pool.
+	// Straddle the allocation, because the obvious reasoning about it is wrong.
+	// The store's index is a fixed array member rather than a heap container,
+	// which suggests it costs system heap and not the RNS pool. That is true of
+	// the INDEX. It is not true of the OBJECT: anything new'd goes wherever
+	// RNS_DEFAULT_ALLOCATOR points, which is the pool.
 	const uint32_t pool_before = (uint32_t)RNS::Utilities::Memory::heap_pool_free();
 	const uint32_t heap_before = (uint32_t)mallinfo().uordblks;
 #endif
@@ -849,8 +850,8 @@ static bool bringup_lxmf() {
 	// comes out of the same SRAM but NOT out of the pool, leaving the pool for
 	// the per-packet working memory it exists to serve.
 	//
-	// This is what A57 assumed was happening and it was not. Static storage is
-	// what makes the assumption true.
+	// Static storage is what makes "the store does not cost pool" true. It was
+	// assumed to be true before it was measured, and it was not.
 	static LXMF::MessageStore store_storage(LXMF_STORAGE_PATH);
 	g_store = &store_storage;
 #ifdef THICKET_RAM_PROBE
@@ -869,10 +870,10 @@ static bool bringup_lxmf() {
 	         (uint32_t)LXMF::MAX_MESSAGES_PER_CONVERSATION);
 	info_u32("store hot tier (msgs/conversation)",
 	         (uint32_t)LXMF::HOT_MESSAGES_PER_CONVERSATION);
-	// No archive filesystem is set. Without one the cull deletes rather than
-	// moves, which is exactly the behaviour A61 ruled: the device forgets
-	// silently and we carry no patch for it. An archive tier needs a second
-	// filesystem this board does not have.
+	// No archive filesystem is set, so the cull deletes rather than moves. That
+	// is deliberate: the device is allowed to forget silently rather than carry
+	// a patch to announce it. An archive tier would need a second filesystem
+	// this board does not have.
 	info("store archive", g_store->has_archive() ? "yes" : "none - cull deletes (ruled)");
 	report_store("at startup");
 	ok("message store attached");
