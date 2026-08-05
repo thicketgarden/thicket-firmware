@@ -1,0 +1,9 @@
+{
+	"name": "EncryptedStore",
+	"version": "1.0.0",
+	"description": "Vendored from konsumer/arduino-rns-encrypted-store. AES-256-CTR + HMAC-SHA256 message storage keyed from the Reticulum identity. See README.md for origin, license and local changes.",
+	"license": "MIT",
+	"authors": [{ "name": "David Konsumer", "url": "https://github.com/konsumer" }],
+	"frameworks": "*",
+	"platforms": "*"
+}

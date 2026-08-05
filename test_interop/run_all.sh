@@ -25,6 +25,7 @@ SCENARIOS=(
   # the six: three processes, and a path has to be learned before anything can
   # be sent.
   "transport-forward|transport_forwarder|run_transport_forward.sh"
+  "encstore-vectors|encstore_vectors|run_encstore_vectors.sh"
 )
 
 echo "=== fetching pinned dependencies ==="
