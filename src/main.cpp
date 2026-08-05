@@ -1466,7 +1466,15 @@ void setup() {
 	// INFO is the right default here: TRACE is what upstream's examples use and
 	// it is both enormous and slow enough to change LoRa timing.
 	// TODO(bring-up): make this a build flag once bring-up is done.
+	// Raise with -DTHICKET_LOG_DEBUG when a link establishes and then nothing
+	// happens, which is the shape of an inbound DIRECT/Resource failure: at
+	// INFO the log goes silent after "Incoming link established" and tells you
+	// nothing about why.
+#ifdef THICKET_LOG_DEBUG
+	RNS::loglevel(RNS::LOG_DEBUG);
+#else
 	RNS::loglevel(RNS::LOG_INFO);
+#endif
 
 	// Each step reports its own failure and we stop at the first one. A stack
 	// that is half up is worse than one that is plainly down, because it looks

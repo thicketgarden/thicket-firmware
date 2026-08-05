@@ -227,6 +227,43 @@ row — there is no Python counterpart to a fixed-pool message store — but it 
 the first hardware evidence the encryption paths execute on this silicon at
 all; everything before it was a host result.
 
+### Interoperation with the Python reference over LoRa — 2026-08-05 **[V-hw]**
+
+**The first time this stack and the reference implementation have exchanged
+messages over a radio.** Peer: `rnsd` 1.4.2 with LXMF, running on a Raspberry Pi
+with an RNode as its transport — a full Python node, not another member of our
+own lineage. Versions read on the Pi at run time, not copied from a document.
+
+| | |
+|---|---|
+| Inbound | **DIRECT, over an RNS Link.** 146-byte message unpacked, source identity resolved, signature validated, delivery proof returned over the link |
+| Outbound | **OPPORTUNISTIC.** 143-byte auto-reply composed, signed and encrypted on the nRF; `DELIVERED (proof received)` |
+| Storage | both messages stored **encrypted** — `conversations=1 saved_in=1 saved_out=1` |
+| Link | RSSI −73 dBm, SNR 12.75 dB, 914.875 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm |
+| Board | RAK4631, internal-flash bring-up environment, USB power **(not battery)** |
+
+Both LXMF delivery methods therefore work against the reference, in the
+direction that matters for a handheld — being reached.
+
+⚠ **What this does not close.** The environment regenerates its identity every
+boot, so it says nothing about state surviving a power cycle. And the peer was a
+Pi, not a phone: a phone client over this same path is still untested.
+
+**A false lead worth recording, because it cost an afternoon.** For twenty
+minutes the reference established links to us and abandoned each one after ~14
+seconds without sending anything. It looked exactly like a broken inbound Link
+path — and this page already warned that DIRECT was the one delivery method we
+had never exercised, which made the wrong explanation the attractive one. It was
+not that. The sending side had **loaded a path entry for our destination from
+storage** and kept answering its own client's path requests from that cache while
+the radio path was not usable; it recovered only when a fresh announce arrived
+directly over LoRa and replaced the entry. Its own log named it:
+*"Trying to rediscover path … since an attempted local client link was never
+established."*
+Two lessons, both cheap next time: **a stale cached path presents as a protocol
+incompatibility**, and the peer's log settles in one line what ours cannot settle
+at all.
+
 ### Reported by the founder — a round trip, not independently observed
 
 **[R]** The firmware has exchanged LXMF messages with a **T-Deck running

@@ -53,6 +53,28 @@ A timed send exists as a fallback and is **off by default**. It requires both
 at build time. A stock build transmits announces and replies, never unsolicited
 traffic.
 
+### It interoperates with the reference implementation
+
+On 2026-08-05 this firmware exchanged messages with **Python RNS 1.4.2 and
+LXMF** — `rnsd` on a Raspberry Pi with an RNode as its radio — over LoRa at
+914.875 MHz. That matters more than the earlier round trip, which was with a
+client built on the same C++ stack we are: a successful exchange there shows
+agreement with our own lineage, not with the specification.
+
+Inbound arrived **DIRECT, over an RNS Link**: unpacked, source identity
+resolved, signature validated, delivery proof returned over the link. The reply
+went back **OPPORTUNISTIC** and was confirmed with `DELIVERED (proof received)`.
+Both messages were stored encrypted on the device. Link quality was −73 dBm at
+SNR 12.75 dB.
+
+Since the reference implementation is the specification, this is the strongest
+compatibility claim available, and it is the direction that matters for a
+handheld — being reached rather than transmitting.
+
+**Still unproven by that run:** the bring-up environment regenerates its identity
+every boot, so nothing is shown about state surviving a power cycle; the peer was
+a Pi rather than a phone; and the board was on USB, not battery.
+
 ### What that run did not prove
 
 **Persistence.** The round trip above ran under `wiscore_rak4631-internalfs`,
