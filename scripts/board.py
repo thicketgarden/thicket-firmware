@@ -64,8 +64,11 @@ class Capture(threading.Thread):
     port disappears while the board resets and comes back a moment later.
     """
 
-    def __init__(self, port, baud=DEFAULT_BAUD):
+    def __init__(self, port, baud=DEFAULT_BAUD, echo=False):
+        """echo=True streams each line as it arrives; echo=False keeps the
+        collect-then-return behaviour that `flash` relies on for its summary."""
         super().__init__(daemon=True)
+        self.echo = echo
         self.port = port
         self.baud = baud
         self.lines = []
@@ -103,7 +106,18 @@ class Capture(threading.Thread):
                 buf += chunk
                 while b"\n" in buf:
                     line, buf = buf.split(b"\n", 1)
-                    self.lines.append(line.decode("utf-8", "replace").rstrip())
+                    text = line.decode("utf-8", "replace").rstrip()
+                    self.lines.append(text)
+                    # Emit immediately. `capture` used to collect silently and
+                    # print everything only when the timer expired, which meant
+                    # a long capture showed nothing at all until it ended --
+                    # indistinguishable from a dead board, and it cost a real
+                    # test on 2026-08-05: a message arrived, the log looked
+                    # empty, the capture was restarted to "fix" it, and the
+                    # exchange went with it. Watching a board is the whole job
+                    # of this command.
+                    if self.echo:
+                        print(text, flush=True)
         if ser:
             try:
                 ser.close()
@@ -127,13 +141,14 @@ def cmd_capture(args):
     port = find_port(args.port)
     if not port:
         sys.exit("no usbmodem port found")
-    cap = Capture(port)
+    cap = Capture(port, echo=True)
     cap.start()
     print(f"[board] capturing {port} for {args.seconds}s", flush=True)
-    time.sleep(args.seconds)
+    try:
+        time.sleep(args.seconds)
+    except KeyboardInterrupt:
+        print("[board] interrupted", flush=True)
     cap.stop()
-    for line in cap.lines:
-        print(line)
     print(f"[board] {len(cap.lines)} lines")
 
 
