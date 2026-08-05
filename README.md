@@ -172,9 +172,12 @@ broken.
 PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
 ```
 
-These run on hosts. No conformance scenario has yet executed on a RAK4631 —
-the device evidence above and the parity evidence here are still separate
-claims.
+These run on hosts. **No conformance scenario has yet executed on a RAK4631**,
+and that is still true after the reference interoperation described above: that
+run was a real exchange with a live Python node, not this suite executing on the
+device. The two are separate claims and are kept separate deliberately — the
+suite asserts specific behaviours against fixed expectations, which a
+conversation between two nodes does not.
 
 ## Building
 

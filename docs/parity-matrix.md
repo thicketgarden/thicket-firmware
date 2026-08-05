@@ -298,10 +298,14 @@ happens on the device.
 ### What this does not show
 
 Pyxis is built on microReticulum. A successful exchange therefore shows our
-stack interoperating with **the same lineage**, not with the reference. Interoperating with the reference
-implementation is a different question, which is why a Python-lineage client is
-named specifically in our own done-condition, and it is what `test_interop/`
-exists to answer.
+stack interoperating with **the same lineage**, not with the reference.
+Interoperating with the reference implementation is a different question, which
+is why a Python-lineage client is named specifically in our own done-condition.
+
+✅ **That question is now answered separately** — see "Interoperation with the
+Python reference over LoRa" above, 2026-08-05. This section is kept because the
+distinction it draws is the reason that run was worth doing, and because a
+same-lineage result should never again be filed as evidence of conformance.
 
 ## What would most improve this page
 
