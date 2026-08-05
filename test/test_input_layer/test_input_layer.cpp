@@ -5,7 +5,7 @@
 //
 // The first group tests one-shot behaviour. The second group is the one that
 // matters to the hardware: the carrier PCB has no per-key diodes, so a
-// three-key chord ghosts, and A49 accepted that on the explicit condition that
+// three-key chord ghosts, and that was accepted on the explicit condition that
 // modifiers are one-shot and chords therefore never occur.
 //
 // **These tests exist so that constraint outlives the person who wrote it.**

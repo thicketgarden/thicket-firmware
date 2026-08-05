@@ -56,9 +56,8 @@ for entry in "${SCENARIOS[@]}"; do
 done
 
 echo
-# The versions the result is about. A28' requires that a pin bump invalidates
-# the interop claim until the suite is re-run AND the version it passed against
-# is recorded -- and until 2026-08-04 nothing recorded it, so a green run was a
+# The versions the result is about. A pin bump invalidates the interop claim
+# until the suite is re-run AND the version it passed against is recorded -- and until 2026-08-04 nothing recorded it, so a green run was a
 # claim about unnamed code. Printing it here means the record cannot be
 # forgotten separately from the run.
 pin_of() { grep -oE "$1\.git#[a-f0-9]{40}" "$HERE/../platformio.ini" | head -1 | cut -d'#' -f2; }

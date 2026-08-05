@@ -28,8 +28,8 @@ quietly deleted. See "Hardware evidence" below.
 
 ## What this result is about — the pins it passed against
 
-**A28′ requires that a pin bump invalidates the interop claim until the suite is
-re-run and the version it passed against is recorded.** Until 2026-08-04 nothing
+**A pin bump invalidates the interop claim until the suite is re-run and the
+version it passed against is recorded.** Until 2026-08-04 nothing
 recorded it, so every green run was a claim about unnamed code.
 
 **Last full pass: 2026-08-04, all 6 scenarios, at:**

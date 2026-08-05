@@ -631,8 +631,8 @@ static bool bringup_storage() {
 #ifdef THICKET_INTERNAL_FS
 	// ⚠ The internal filesystem is far too small for a message store, which is
 	// why nothing ships on it. There is also an unverified claim that its erases
-	// stall the radio; see the interrupt-hazard note in hq. This env exists only
-	// to reach a round trip without a RAK15001.
+	// stall the radio -- an interrupt hazard we have recorded but not measured.
+	// This env exists only to reach a round trip without a RAK15001.
 	g_filesystem = microStore::FileSystem{ microStore::Adapters::InternalFSFileSystem() };
 	if (!g_filesystem) {
 		fail("could not construct InternalFSFileSystem");
@@ -1534,7 +1534,7 @@ void loop() {
 	// Deliberately empty of work. The core's loop task keeps its 4 KB stack and
 	// this must stay shallow. Sleeping here yields the CPU to the task above
 	// rather than spinning; it is not a power strategy, and the TODO about
-	// actually idling the M4 still stands in thicket_work().
+	// actually idling the Cortex-M4 still stands in thicket_work().
 	delay(1000);
 }
 
