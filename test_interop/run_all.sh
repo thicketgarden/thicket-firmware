@@ -21,6 +21,10 @@ SCENARIOS=(
   "lxmf-inbound|lxmf_inbound_receiver|run_lxmf_inbound.sh"
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
   "link-inbound|link_inbound_responder|run_link_inbound.sh"
+  # The only scenario where we are the router rather than the leaf. Slowest of
+  # the six: three processes, and a path has to be learned before anything can
+  # be sent.
+  "transport-forward|transport_forwarder|run_transport_forward.sh"
 )
 
 echo "=== fetching pinned dependencies ==="
