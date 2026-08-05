@@ -71,9 +71,16 @@ Since the reference implementation is the specification, this is the strongest
 compatibility claim available, and it is the direction that matters for a
 handheld — being reached rather than transmitting.
 
-**Still unproven by that run:** the bring-up environment regenerates its identity
-every boot, so nothing is shown about state surviving a power cycle; the peer was
-a Pi rather than a phone; and the board was on USB, not battery.
+The exchange was then repeated with the board **running from its battery, with
+nothing attached** — message delivered, reply returned. That run is
+founder-reported rather than independently captured, because being untethered
+means there is no serial log; it is recorded that way deliberately.
+
+**Still unproven:** the bring-up environment regenerates its identity every
+boot, so nothing is shown about state surviving a power cycle, and the peer was
+a Pi rather than a phone. No battery life figure is claimed — the board was
+carrying a diagnostic build, and a runtime number needs a profiler, not an
+anecdote.
 
 ### What that run did not prove
 

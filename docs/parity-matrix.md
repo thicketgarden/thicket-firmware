@@ -245,6 +245,15 @@ own lineage. Versions read on the Pi at run time, not copied from a document.
 Both LXMF delivery methods therefore work against the reference, in the
 direction that matters for a handheld — being reached.
 
+**Repeated on battery, untethered — 2026-08-05 [R].** The same exchange with
+NomadNet on the Pi, with the board disconnected from USB and running from its
+battery: a message was delivered and the device's reply came back. **Reported by
+the founder, observed in NomadNet, not independently captured** — untethered
+means no serial log, which is the point of the run and the limit of its
+evidence. The board was still carrying the diagnostic build
+(`-DTHICKET_LOG_DEBUG -DRNS_LOG_LEVEL=7`), which is heavier than the shipping
+image; no power figure is claimed or implied by this.
+
 ⚠ **What this does not close.** The environment regenerates its identity every
 boot, so it says nothing about state surviving a power cycle. And the peer was a
 Pi, not a phone: a phone client over this same path is still untested.
