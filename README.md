@@ -109,17 +109,21 @@ vendored variant is what the current firmware actually builds against.
 the pins in `platformio.ini`, against the Python reference, module by module,
 with an evidence column.
 
-Most rows say we have no evidence. That is the accurate state and the reason the
-page exists: the manual defines Reticulum as full interoperability and
-sufficient functional parity with the reference, so a coverage map that admits
-its gaps is worth more than a claim that cannot be checked.
+Of the eleven Reticulum rows, six carry evidence, one is unassessed, and four
+have no counterpart on our side to compare at all. The page exists because the
+manual defines Reticulum as full interoperability and sufficient functional
+parity with the reference — so a coverage map that names its gaps is worth more
+than a claim that cannot be checked. Read the Evidence column, not the Present
+column: a populated row is not a passing row.
 
-`test_interop/` holds four scenarios in which the **Python side originates** and
+`test_interop/` holds six scenarios in which the **Python side originates** and
 this stack has to receive: a cold inbound packet, an LXMF delivery, identity
-vectors, and a Python-initiated link. That direction is the one that matters for
-a handheld, which spends its day being reached rather than transmitting. They
-run in CI against pinned `rns==1.4.2` and `lxmf==1.1.1`, and each has been shown
-to fail when the behaviour it tests is broken.
+vectors, a Python-initiated link, a packet relayed to us through a transport
+node, and two reference peers reaching each other *through* us. That direction
+is the one that matters for a handheld, which spends its day being reached
+rather than transmitting. They run in CI against pinned `rns==1.4.2` and
+`lxmf==1.1.1`, and each has been shown to fail when the behaviour it tests is
+broken.
 
 ```
 PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh

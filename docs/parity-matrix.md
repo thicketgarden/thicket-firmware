@@ -7,9 +7,17 @@ an implementation without full interoperability and sufficient functional parity
 where the stack we ship stands against that bar.
 
 > [!IMPORTANT]
-> **This is a coverage map, not a parity claim.** Most rows below say we have no
-> evidence. That is the accurate state, and it is the reason the page exists.
-> **Do not read a populated row as a passing row** — read the Evidence column.
+> **This is a coverage map, not a parity claim.** A row with evidence means a
+> scenario exercised that surface against the reference — not that the module is
+> at parity. **Read the Evidence and Residual gap columns, not the Present
+> column.**
+>
+> ⚠ **Corrected 2026-08-04.** This said "most rows below say we have no
+> evidence", which was true when written and is not now: of the eleven Reticulum
+> rows, six carry evidence, one says `none`, and four are `absent` — meaning no
+> counterpart exists to compare, which is a different statement from untested.
+> The page understated the project for the second time; the earlier instance is
+> noted above.
 
 **Scope.** Thicket is firmware, not a Reticulum implementation. What is assessed
 here is the stack we pin and ship: **microReticulum** (C++ RNS) and
@@ -95,7 +103,7 @@ originates:
 | `Resource.py` | `Resource.{h,cpp}` | yes | `interop` | Transfer scenario passes host-side. Note microLXMF's own docs report Resource transfer to `lxmd` not concluding. |
 | `Destination.py` | `Destination.cpp` | yes | `interop` (request/response) | GROUP destinations unverified. |
 | `Identity.py` | `Identity.cpp` | yes | `thicket-interop` (`run_identity_vectors.sh`) | Key derivation from an imported private key, identity and destination hashing, `full_hash`/`truncated_hash`, HKDF, deterministic Ed25519 signing, signature validation (including two negative cases) and decryption of a reference-produced ciphertext all match Python RNS 1.4.2. One divergence found: `Cryptography::hkdf()` ignores its `context` argument — see divergence 7. |
-| `Transport.py` | `Transport.cpp` | yes | `thicket-interop` (`run_multihop_inbound.sh`, `run_transport_forward.sh`) | **Both directions now covered, 2026-08-04.** As a *leaf*: a transport-enabled reference node sits between the originator and us, so the path is learned through a router, the packet arrives with a non-zero hop count, and the proof travels back across the relay. As a *router*: two reference peers sit on segments with no member in common except us and reach each other through us — proof of forwarding, since they cannot hear one another — arriving at `hops=2`, which is the signature of having crossed exactly one forwarding node. The forwarding scenario runs with `transport_enabled(true)`, the mode all four of our local patches are about and which nothing exercised until now. **Residual: the reference is always the peer, never a second microReticulum.** Two of our own nodes talking to each other is untested, and would catch a divergence both sides share. |
+| `Transport.py` | `Transport.cpp` | yes | `thicket-interop` (`run_multihop_inbound.sh`, `run_transport_forward.sh`) | Covered in both roles as of 2026-08-04. **As a leaf:** a transport-enabled reference node sits between the originator and us; the path is learned from a relayed announce, the packet arrives with a non-zero hop count, and the proof returns across the relay. **As a router:** two reference peers on segments with no member in common except us reach each other through us, arriving at `hops=2`. They cannot hear each other directly, so delivery is proof of forwarding. This is the only scenario running `transport_enabled(true)`, the mode our four local patches affect. **Residual: the peer is always the reference, never a second microReticulum** — so a divergence both implementations share would not show up here. |
 | `Reticulum.py` | `Reticulum.cpp` | yes | `none` | Config surface differs by construction; not assessed. |
 | `Channel.py` | `Channel.{h,cpp}` | **files only** | `absent` in practice | **Corrected 2026-08-03.** The files exist but there is no implementation: `Channel.cpp` is 26 lines of `#include`, `Link::get_channel()` is commented out (Link.cpp:1136) and the `CHANNEL` packet-context branch of `Link::receive` is commented out (Link.cpp:1489). There is no API to open a channel, so a scenario cannot be written. Previously listed as Present `yes` / `none`, which read as "untested" rather than "not there". |
 | `Buffer.py` | — | **absent** | `absent` | No counterpart at our pin. |
@@ -118,7 +126,7 @@ into `LXMRouter` and adds a `MessageStore` with no Python counterpart.
 | `Handlers.py` | folded into `LXMRouter`, `PropagationNodeManager` | yes | `lxmf-conformance` (announce suites) | No separate handler surface to assess. |
 | `LXMPeer.py` | `PropagationNodeManager`, `LXMRouter` | yes | `none` | Propagation suite is **skipped in upstream CI** (Resource transfer to `lxmd` does not conclude). |
 | `LXMF.py` (constants) | `Type.h` and per-file constants | yes | `lxmf-conformance` | Payload-format suite exercises the wire constants. |
-| — | `MessageStore.{h,cpp}` | C++ only | `unit` | **No Python counterpart**: Python keeps messages on the filesystem with no fixed pool. See the capacity notes below. |
+| — | `MessageStore.{h,cpp}` | C++ only | `none` | **No Python counterpart**, so there is nothing to be at parity *with*: Python keeps messages on the filesystem with no fixed pool. ⚠ **This row said `unit` until 2026-08-04 and there is no MessageStore unit test** — an evidence claim with nothing behind it, in the one document that exists to prevent those. It is exercised on hardware (attached, saving inbound and outbound) but that is device evidence, not parity evidence. See the capacity notes below. |
 
 ## Where we know we diverge
 
@@ -129,8 +137,10 @@ Stated because an unexplained divergence is indistinguishable from a bug.
    splits *having* the structure from *restoring* it; microStore cannot express
    that split. Proposed upstream.
 2. **`MessageStore` fixed pools.** An embedded design with no Python analogue —
-   the reference assumes storage we do not have. We ship 8 conversations × 32
-   messages with a 16-message hot tier.
+   the reference assumes storage we do not have. We ship **16 conversations × 64
+   messages** with a 16-message hot tier — measured at 37,384 B, and held in
+   static storage rather than allocated, because the allocator is redirected
+   into a fixed pool and a `new` would spend the pool instead.
 3. **Hot tier below the hard cap is rejected at compile time.** A hot count at or
    above the cap silently disables the archive tier; we now `static_assert`
    against it. Proposed upstream.
@@ -192,10 +202,13 @@ fitted. **[V]**
 - LXMF: router initialised, delivery destination registered, display name set.
 - Announce: `Announce sent successfully`.
 - Memory with the full stack up: `Total SRAM 210104 B, Free SRAM 131984 B`,
-  on a 64 KB RNS pool.
+  on a 64 KB RNS pool. **Superseded 2026-08-04**: the pool is now 96 KB and the
+  same measurement reads 120,964 B of heap in use, 48,360 B of pool free and
+  116,040 B of system heap spare. The 64 KB figure is kept because it is what
+  was read on the day.
 - Path-table index cost, measured with a gated probe: 52.0 B/record steady
-  state, ~65 B including allocator overhead. See
-  recorded with the design notes for that work.
+  state, ~65 B including allocator overhead. Recorded in full with the design
+  notes for that work, privately.
 
 ### Reported by the founder — a round trip, not independently observed
 
@@ -243,7 +256,12 @@ In rough order of value per effort:
 1. ~~**A Python-sends / C++-receives scenario.**~~ Done 2026-08-03:
    `run_cold_inbound.sh`, `run_lxmf_inbound.sh`, `run_link_inbound.sh`.
 2. ~~**Identity vectors.**~~ Done 2026-08-03: `run_identity_vectors.sh`.
-3. **Multi-hop transport.** Currently unexercised in any form.
+3. ~~**Multi-hop transport.**~~ Done 2026-08-04: `run_multihop_inbound.sh`
+   covers us as a leaf behind a relay, `run_transport_forward.sh` covers us as
+   the router two reference peers reach each other through. **Residual: both
+   scenarios put the reference on the other end.** Two of our own nodes talking
+   to each other is still untested, and is the case that would catch a
+   divergence both implementations share.
 4. **Any *matrix row* on real hardware.** Every row above is a host result.
    The stack itself has run on a RAK4631 — see "Hardware evidence" — but no
    parity scenario has, and that is the gap.
@@ -257,8 +275,8 @@ The community wiki's microReticulum entry cites a conformance assessment dated
 proof validation behind `if (false)`, empty `Resource::cancel()`, request
 handlers commented out, IFAC commented out — are **all closed** in the version we
 pin **[verified 2026-08-03 against `0.5.0-8`]**. Presence of code is not parity,
-which is why those rows above still read `none`. But the assessment no longer
-describes this stack.
+which is why those rows carried no evidence at the time. But the assessment no
+longer describes this stack.
 
 > [!CAUTION]
 > **The paragraph above is wrong, and this correction is the more reliable of
