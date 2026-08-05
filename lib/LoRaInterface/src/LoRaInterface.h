@@ -25,6 +25,22 @@
 
 class LoRaInterface : public RNS::InterfaceImpl {
 
+// THICKET: optional interrupt-driven receive, off unless -DTHICKET_LORA_ISR.
+//
+// Upstream polls checkIrq() every loop() and says so in a comment. That is a
+// choice, not a constraint microReticulum imposes -- so this is a change to our
+// own vendored copy plus a wake, not a negotiation with upstream's cooperative
+// design.
+//
+// ⚠ On the RAK4631 EVERY SX1262 interrupt routes to DIO1, transmit-done
+// included. So the ISR is a *wake*, never a diagnosis: it sets a flag, and
+// loop() still asks the radio what actually happened. Treating the interrupt
+// as "a packet arrived" would read the FIFO after our own transmissions.
+public:
+	// Called from ISR context. Keep it to setting a flag or giving a task
+	// notification -- nothing that allocates, logs, or touches SPI.
+	static void set_wake_hook(void (*hook)());
+
 public:
 	//z def get_address_for_if(name):
 	//z def get_broadcast_for_if(name):
@@ -98,6 +114,12 @@ private:
 #ifdef ARDUINO
 	Module*        _module      = nullptr;
 	PhysicalLayer* _radio       = nullptr;
+
+	// THICKET: set by the DIO1 ISR, consumed by loop(). volatile because it
+	// crosses an interrupt boundary; sig_atomic_t would be equivalent here.
+	static volatile bool _irq_pending;
+	static void (*_wake_hook)();
+	static void _isr();
 	int            _pa_mode_pin = -1;    // V4 FEM PA mode pin; -1 = not present
 #endif
 

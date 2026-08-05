@@ -193,6 +193,17 @@ static const size_t BODY_BUF = 72;
 
 static microStore::FileSystem g_filesystem;
 static RNS::Reticulum g_reticulum({RNS::Type::NONE});
+// THICKET_LORA_ISR only: how long the work task sleeps when the radio is quiet.
+// 250 ms is Transport::_job_interval, the tightest cooperative timer at our
+// pinned microReticulum -- sleeping longer would starve it.
+#ifndef THICKET_TASK_TICK_MS
+#define THICKET_TASK_TICK_MS 250
+#endif
+static TaskHandle_t g_work_task = nullptr;
+#ifdef THICKET_LORA_ISR
+static void thicket_radio_wake();
+#endif
+
 static RNS::Interface g_lora_interface({RNS::Type::NONE});
 static RNS::Identity g_identity({RNS::Type::NONE});
 
@@ -780,6 +791,13 @@ static bool bringup_radio() {
 	g_lora_interface.mode(RNS::Type::Interface::MODE_GATEWAY);
 	RNS::Transport::register_interface(g_lora_interface);
 
+#ifdef THICKET_LORA_ISR
+	// Registered BEFORE start(): start() attaches the DIO1 interrupt, and an
+	// ISR that fires with no hook set would leave the work task asleep until
+	// its next timeout — a packet delayed by up to a full tick, intermittently,
+	// which is precisely the class of bug this feature must not introduce.
+	LoRaInterface::set_wake_hook(thicket_radio_wake);
+#endif
 	if (!g_lora_interface.start()) {
 		fail("radio did not start");
 		info("check", "TCXO voltage (THICKET_SX1262_TCXO_VOLTAGE), SPI1 wiring, antenna");
@@ -1436,6 +1454,7 @@ static void probe_low_ram(void) {
 #define THICKET_TASK_STACK_WORDS 2048
 static void thicket_task(void* arg);
 
+
 void setup() {
 	Serial.begin(115200);
 
@@ -1502,6 +1521,7 @@ void setup() {
 		const BaseType_t rc = xTaskCreate(thicket_task, "thicket",
 		                                  THICKET_TASK_STACK_WORDS, NULL,
 		                                  TASK_PRIO_LOW, &h);
+		g_work_task = h;
 		if (rc != pdPASS) {
 			// Nothing runs if this fails, so say so rather than idling silently
 			// with a green LED claiming success.
@@ -1658,14 +1678,42 @@ static void thicket_work() {
 // So: our own task at 8,192 B. Priced on the board at 8,288 B including the TCB.
 // FreeRTOS here is heap_3, so pvPortMalloc is plain malloc and this comes from
 // the system heap -- the budget with ~130 KB spare -- never from the RNS pool.
+#ifdef THICKET_LORA_ISR
+// Woken from the DIO1 ISR. The only thing that may cross that boundary is a
+// notification -- no logging, no allocation, no SPI.
+static void thicket_radio_wake() {
+	BaseType_t higher = pdFALSE;
+	if (g_work_task) vTaskNotifyGiveFromISR(g_work_task, &higher);
+	portYIELD_FROM_ISR(higher);
+}
+#endif
+
 static void thicket_task(void* arg) {
 	(void)arg;
 	for (;;) {
 		thicket_work();
+#ifdef THICKET_LORA_ISR
+		// BLOCK, rather than yield. This is where the milliamps are: with
+		// taskYIELD() the scheduler comes straight back to us and the CPU never
+		// reaches idle, so an interrupt-driven radio on its own would save
+		// nothing at all.
+		//
+		// Two things wake us. The radio, immediately, via the ISR above -- so
+		// receive latency IMPROVES against polling rather than degrading. And a
+		// timeout, because microReticulum's loop() is cooperative and its
+		// timers still have to run: the tightest is Transport's 250 ms job
+		// interval, audited at our pin, which is what sets the figure below.
+		//
+		// ⚠ If a future upstream needs something tighter than this, the CPU
+		// stops sleeping meaningfully and the saving evaporates. That audit is
+		// a precondition of this feature, not a detail of it.
+		ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(THICKET_TASK_TICK_MS));
+#else
 		// Yield to anything of equal or lower priority. Nothing here may block:
 		// there is no RX ISR, so receive latency is bounded by how often
 		// Transport::loop() is called.
 		taskYIELD();
+#endif
 	}
 }
 

@@ -232,6 +232,13 @@ bool LoRaInterface::start() {
 	TRACEF("LoRa bandwidth is %.2f Kbps", Utilities::OS::round(_bitrate/1000.0, 2));
 #endif
 
+#if defined(ARDUINO) && defined(THICKET_LORA_ISR)
+	// Attached last: once this is live the ISR can fire, and it must not do so
+	// before the members it touches are initialised.
+	_radio->setPacketReceivedAction(_isr);
+	_irq_pending = true;   // drain anything the radio latched during setup
+#endif
+
 	_online = true;
 	return true;
 }
@@ -240,6 +247,9 @@ void LoRaInterface::stop() {
 
 #ifdef ARDUINO
 	if (_radio) {
+#ifdef THICKET_LORA_ISR
+		_radio->clearPacketReceivedAction();
+#endif
 		_radio->standby();
 	}
 #endif
@@ -247,11 +257,32 @@ void LoRaInterface::stop() {
 	_online = false;
 }
 
+// THICKET: ISR plumbing. Definitions live here even when the feature is off, so
+// the class has one shape in every build and a flag flip cannot change layout.
+volatile bool LoRaInterface::_irq_pending = false;
+void (*LoRaInterface::_wake_hook)() = nullptr;
+
+void LoRaInterface::set_wake_hook(void (*hook)()) { _wake_hook = hook; }
+
+void LoRaInterface::_isr() {
+	_irq_pending = true;
+	if (_wake_hook) _wake_hook();
+}
+
 void LoRaInterface::loop() {
 
 	if (_online) {
 #ifdef ARDUINO
-		// checkIrq() polls the hardware IRQ register — no ISR required
+#ifdef THICKET_LORA_ISR
+		// Nothing to do until DIO1 has fired. This is the whole point: without
+		// it the caller spins on an SPI register read and the CPU never idles.
+		if (!_irq_pending) return;
+		_irq_pending = false;
+#endif
+		// checkIrq() reads the hardware IRQ register. Under THICKET_LORA_ISR it
+		// runs once per interrupt rather than continuously, and it is still
+		// required -- DIO1 is raised by transmit-done too, so this is what
+		// distinguishes "a frame arrived" from "we just sent one".
 		if (_radio->checkIrq(RADIOLIB_IRQ_RX_DONE)) {
 			int len = _radio->getPacketLength();
 
