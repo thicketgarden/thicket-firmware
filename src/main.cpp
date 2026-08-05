@@ -642,6 +642,23 @@ static bool bringup_storage() {
 		fail("could not construct InternalFSFileSystem");
 		return false;
 	}
+	// A full-but-valid filesystem never trips init()'s reformat-on-fail, so
+	// there is no way back from one except this. Build with
+	// -DTHICKET_FORMAT_FS once, boot, then build without it.
+	//
+	// Earned the hard way on 2026-08-05: the ~28 KB internal filesystem filled
+	// up, RNS began clearing its own path and known-destination stores at every
+	// boot just to run, and eventually the erase-and-clear during init stopped
+	// completing and the device reset there in a loop. Recovering it needed a
+	// double-tap into the bootloader and a build that mounts nothing.
+#ifdef THICKET_FORMAT_FS
+	warn("FORMATTING the internal filesystem - every stored thing is gone");
+	if (!g_filesystem.format()) {
+		fail("format failed");
+		return false;
+	}
+	ok("internal filesystem formatted");
+#endif
 	if (!g_filesystem.init()) {
 		fail("internal filesystem init failed");
 		return false;
@@ -913,6 +930,82 @@ static bool bringup_lxmf() {
 	// a patch to announce it. An archive tier would need a second filesystem
 	// this board does not have.
 	info("store archive", g_store->has_archive() ? "yes" : "none - cull deletes (ruled)");
+
+	// Prove the store can actually store, here, on this filesystem, before
+	// claiming it is attached.
+	//
+	// This exists because the device spent an afternoon reporting "message
+	// store attached" while every save failed. The internal-flash bring-up
+	// filesystem had 128 bytes free -- RNS was already clearing its own path
+	// and known-destination stores just to keep running -- and nothing on the
+	// happy path looked. Three inbound messages were answered correctly and
+	// none was kept; the only symptom was a FAILURES counter nobody read.
+	//
+	// Deliberately NOT routed through LXMessage. Packing needs a real
+	// destination and can fail for reasons that have nothing to do with
+	// storage, which would make this probe report the wrong thing. What can
+	// fail silently is narrower and is exactly what is checked: the codec on
+	// this silicon, and whether this filesystem can hold one message-sized
+	// file. Static free-space arithmetic would not catch a codec bug, and a
+	// host codec test would not catch a full disk.
+	{
+		// Sized like a real stored message: the JSON carries the packed
+		// message as hex, so a short "hi" still lands in the hundreds of bytes.
+		uint8_t probe[512];
+		for (size_t i = 0; i < sizeof(probe); ++i) {
+			probe[i] = (uint8_t)(i * 31 + 7);
+		}
+		// Filesystem root, not the store's directory. MessageStore derives its
+		// own layout internally -- the real failure earlier named `/m/...`, not
+		// the base path this firmware passes in -- so writing "inside" it means
+		// guessing at a directory that may not exist, and a probe that fails
+		// because it guessed wrong is worse than no probe. Root always exists,
+		// and the two things being tested (can this filesystem hold a
+		// message-sized file, does the codec survive this silicon) do not care
+		// which directory they happen in.
+		const char* probe_path = "/.thicket_selftest";
+		const char* why = nullptr;
+
+		RNS::Bytes sealed;
+		RNS::Bytes read_back;
+		RNS::Bytes opened;
+
+		if (!encstore_encrypt(g_identity, probe, sizeof(probe), sealed)) {
+			why = "codec could not encrypt - out of memory?";
+		}
+		else if (RNS::Utilities::OS::write_file(probe_path, sealed) != sealed.size()) {
+			// Deliberately does NOT say "full". The first version of this
+			// asserted a full disk and printed it next to 26 KB free, because
+			// the probe was writing to a directory that did not exist. Report
+			// what is known -- the write did not complete -- and print the
+			// free space beside it so the reader draws their own conclusion.
+			why = "could not write a message-sized file (see free space below)";
+		}
+		else if (RNS::Utilities::OS::read_file(probe_path, read_back) != sealed.size()) {
+			why = "wrote the file but could not read it back";
+		}
+		else if (!encstore_decrypt(g_identity, read_back.data(),
+		                           read_back.size(), opened)) {
+			// The failure encryption introduces, and it is silent until a
+			// reload: everything looks healthy right up to the first read.
+			why = "stored file failed authentication - decode path is broken";
+		}
+		else if (opened.size() != sizeof(probe) ||
+		         memcmp(opened.data(), probe, sizeof(probe)) != 0) {
+			why = "round trip returned different bytes - codec is not lossless";
+		}
+		RNS::Utilities::OS::remove_file(probe_path);
+
+		if (why != nullptr) {
+			info_u32("filesystem free (B)",
+			         (uint32_t)g_filesystem.storageAvailable());
+			info_u32("one sealed message needs (B)", (uint32_t)(512 + ENCSTORE_FILE_OVERHEAD));
+			fail(why);
+			fail("message store cannot store - refusing to report it attached");
+			return false;
+		}
+		ok("store round trip verified on this filesystem (encrypt, write, read, decrypt)");
+	}
 	report_store("at startup");
 	ok("message store attached");
 #else
