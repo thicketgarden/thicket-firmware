@@ -63,23 +63,66 @@ PAYLOAD_LEN = 200
 KEEPALIVE_S = 3.0
 STALE_TIME_S = 12.0
 IDLE_OBSERVE_S = 15.0    # > 4 keepalive intervals and > stale_time
+
+# WHERE THESE HAVE TO BE SET, AND WHY IT IS NOT OBVIOUS
+#
+# RNS recomputes both timers from the measured RTT when the link goes ACTIVE:
+#
+#   Link.__update_keepalive():
+#       self.keepalive   = clamp(rtt * (KEEPALIVE_MAX / KEEPALIVE_MAX_RTT), 5, 360)
+#       self.stale_time  = self.keepalive * STALE_FACTOR
+#
+# with KEEPALIVE_MAX=360, KEEPALIVE_MAX_RTT=1.75 -- a multiplier of ~205.7 --
+# and it is called from link establishment (Link.py:433 and :530), which happens
+# AFTER the constructor returns. So assigning these on the fresh Link object,
+# as this script did until 2026-08-05, is overwritten before the first phase
+# runs. Measured on a passing local run: the script asked for 3.0/12.0 and the
+# link actually ran at keepalive=5, stale_time=10 -- the KEEPALIVE_MIN floor,
+# not our value.
+#
+# That is why the scenario flaked in CI. On loopback the multiplier lands under
+# the floor and the effective timers are a constant 5/10, so the run looks
+# stable. On a loaded shared runner the RTT rises, the floor stops applying and
+# the timers scale linearly with it: an RTT of 0.25s gives keepalive=51s and
+# stale_time=103s. The 2026-08-05 failure closed nothing in 50s and the relay
+# logged exactly one dropped packet, which is a single keepalive -- both are the
+# signature of that scaling, not of a defect in our C++ side.
+#
+# The earlier response was to widen CUT_OBSERVE_S from 25 to 50. That treated a
+# wrong timer as a slow machine, and it failed again at 50.1s because no fixed
+# window can outrun a value that scales with load. The timers are now pinned
+# after establishment, where nothing overwrites them, and verified rather than
+# assumed -- see assert_timers_pinned().
+
 # How long to allow for the reference's watchdog to close the link after the
-# wire is cut. Expected close is stale_time + STALE_GRACE ~= 14s.
-#
-# This was 25.0 and it flaked in CI on 2026-08-04: the run took longer than 25s
-# on a loaded shared runner and the scenario failed with nothing broken. Locally
-# the same check closes in 14.9-20.0s, so 25s was only ~1.7x the typical figure
-# on a test whose entire subject is HOW LONG A TIMEOUT TAKES -- the one property
-# a busy machine stretches.
-#
-# The assertion being made is "the reference closes the link rather than hanging
-# on it forever", in contrast to our C++ side which has no Link watchdog at all
-# (the XFAIL below). The exact latency is NOT the property under test, so a
-# generous window costs the scenario nothing and a tight one costs it
-# credibility -- a suite that goes red without a defect teaches people to ignore
-# red. The observed close time is printed either way, so a real latency
-# regression is still visible in the log.
-CUT_OBSERVE_S = 50.0
+# wire is cut. With the timers actually pinned the close is stale_time +
+# rtt*KEEPALIVE_TIMEOUT_FACTOR + STALE_GRACE, so about 17s. The window stays
+# generous because the exact latency is not the property under test -- the
+# assertion is that the reference closes the link at all, in contrast to our
+# C++ side, which has no Link watchdog (the XFAIL below). The observed close
+# time is printed either way, so a real latency regression stays visible.
+CUT_OBSERVE_S = 45.0
+
+
+def assert_timers_pinned(link):
+    """Fail loudly if RNS is not running the timers this scenario asked for.
+
+    Every timing assertion below is meaningless if these do not hold, and the
+    failure mode is silent: the run still passes locally, because on loopback
+    the value RNS substitutes happens to be close enough. Checked rather than
+    trusted, so a future RNS that recomputes them somewhere new is caught here
+    with a clear message instead of as an unexplained timeout minutes later.
+    """
+    print(f"[python] effective link timers: rtt={link.rtt * 1000:.1f}ms "
+          f"keepalive={link.keepalive}s stale_time={link.stale_time}s",
+          flush=True)
+    if (link.keepalive, link.stale_time) != (KEEPALIVE_S, STALE_TIME_S):
+        print(f"[python] FAILURE RNS is running keepalive={link.keepalive}s "
+              f"stale_time={link.stale_time}s, not the {KEEPALIVE_S}s/"
+              f"{STALE_TIME_S}s this scenario set. Something recomputed them "
+              f"after establishment; every timing check below would be "
+              f"measuring RNS's own scaling rather than the peer.", flush=True)
+        sys.exit(1)
 
 
 def build_payload(n: int = PAYLOAD_LEN) -> bytes:
@@ -230,10 +273,6 @@ def main():
     link = RNS.Link(dest, established_callback=on_established,
                     closed_callback=on_closed)
     state["link"] = link
-    # Shorten this link's own timers. Per-instance, so the class defaults and
-    # every other link in the process are untouched.
-    link.keepalive = KEEPALIVE_S
-    link.stale_time = STALE_TIME_S
     link.set_packet_callback(on_link_packet)
 
     check(wait_until(lambda: state["established"], 20.0),
@@ -242,6 +281,13 @@ def main():
         relay.stop()
         print("[python] FAILURE could not establish the link", flush=True)
         sys.exit(1)
+
+    # Only now. RNS overwrote these at establishment -- see the note by the
+    # constants. Per-instance, so the class defaults and every other link in
+    # the process are untouched.
+    link.keepalive = KEEPALIVE_S
+    link.stale_time = STALE_TIME_S
+    assert_timers_pinned(link)
 
     print("[python] --- phase 2: data over the link ---", flush=True)
     payload = build_payload()
@@ -264,8 +310,9 @@ def main():
     idle_survived = not wait_until(lambda: state["closed"], IDLE_OBSERVE_S)
     check(idle_survived, "link survived idle",
           f"status={link.status} after {IDLE_OBSERVE_S}s "
-          f"({int(IDLE_OBSERVE_S / KEEPALIVE_S)} keepalive intervals); "
-          "only possible if the peer answered keepalives"
+          f"({IDLE_OBSERVE_S / KEEPALIVE_S:.0f} keepalive intervals, "
+          f"stale_time {STALE_TIME_S}s); only possible if the peer answered "
+          f"keepalives"
           if idle_survived else
           f"closed during idle, reason={state['close_reason']}")
     if not idle_survived:
