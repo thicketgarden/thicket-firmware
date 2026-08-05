@@ -55,6 +55,35 @@ needs the other half of the upstream work — the passphrase-protected identity
 vault — which is not adopted here because it needs a passphrase-entry design
 this device does not have yet.
 
+## Why vendored rather than a `lib_deps` entry
+
+Unlike `lib/LoRaInterface`, the "PlatformIO cannot depend on a subdirectory"
+argument does not apply — upstream publishes this as a whole repository, so a
+`lib_deps` URL would have been structurally fine. Three other things decided it.
+
+**1. The includes are stale, and no fetch method fixes that.** Upstream was
+written against microReticulum at `54c934e`, the base of PR #44, where `src/`
+was flat: `src/Identity.h`, `src/Cryptography/HKDF.h`. Those includes were
+correct on 2026-04-07. microReticulum has since restructured to
+`src/microReticulum/…` — **including attermann's own HEAD [V, 2026-08-05]**, so
+this is not a peculiarity of our fork. The library as published no longer
+compiles against the dependency its own `library.json` declares. Its PR has had
+no maintainer action since 2026-05-05, so nothing ever forced a rebase.
+
+**2. Its dependencies are unpinned.** `library.json` lists `attermann/Crypto`
+and `attermann/microStore` with no commit, and the README instructs adding
+`attermann/microReticulum.git` bare. Every dependency in our `platformio.ini`
+is pinned to an explicit SHA and `scripts/patch_deps.py` fails loudly when one
+moves. Floating a dependency underneath the crypto is the last place to accept
+drift.
+
+**3. It would pull a second microStore.** Upstream declares
+`attermann/microStore`; we pin `wet-bulb/microStore`. One build, two sources for
+the same library.
+
+Not a reason: `attermann/Crypto` was **already** pinned in our build, so the
+AES-256-CTR and HMAC primitives added no new dependency surface.
+
 ## Local changes
 
 Kept to the minimum, each marked in place with `THICKET:`.
