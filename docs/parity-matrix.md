@@ -26,6 +26,26 @@ about parity against the *reference* implementation, which is a different
 claim — but the blanket statement was wrong and is corrected here rather than
 quietly deleted. See "Hardware evidence" below.
 
+## What this result is about — the pins it passed against
+
+**A28′ requires that a pin bump invalidates the interop claim until the suite is
+re-run and the version it passed against is recorded.** Until 2026-08-04 nothing
+recorded it, so every green run was a claim about unnamed code.
+
+**Last full pass: 2026-08-04, all 6 scenarios, at:**
+
+| | |
+|---|---|
+| microReticulum | `9fb4828acdd24ff1e10ec528c2d24e9cae0e8acb` |
+| microStore | `c5697b85a156e1b18372d7a190136bfd2c379545` |
+| microLXMF | `75df3417ff4f97d2cd823676394a2d59cdc390b8` |
+| Python `rns` | 1.4.2 |
+| Python `lxmf` | 1.1.1 |
+
+`run_all.sh` now prints this block itself, resolved from `platformio.ini` and the
+installed reference, so the record cannot be forgotten separately from the run.
+**If the table above disagrees with a fresh run, the table is the stale one.**
+
 ## Evidence vocabulary
 
 Deliberately narrow, so that a claim cannot be made by accident.

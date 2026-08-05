@@ -56,6 +56,23 @@ for entry in "${SCENARIOS[@]}"; do
 done
 
 echo
+# The versions the result is about. A28' requires that a pin bump invalidates
+# the interop claim until the suite is re-run AND the version it passed against
+# is recorded -- and until 2026-08-04 nothing recorded it, so a green run was a
+# claim about unnamed code. Printing it here means the record cannot be
+# forgotten separately from the run.
+pin_of() { grep -oE "$1\.git#[a-f0-9]{40}" "$HERE/../platformio.ini" | head -1 | cut -d'#' -f2; }
+RNS_VER=$(python3 -c 'import RNS; print(RNS.__version__)' 2>/dev/null || echo "unknown")
+LXMF_VER=$(python3 -c 'import LXMF; print(LXMF.__version__)' 2>/dev/null || echo "unknown")
+
+echo
+echo "=== versions under test ==="
+echo "[run_all] microReticulum $(pin_of microReticulum)"
+echo "[run_all] microStore     $(pin_of microStore)"
+echo "[run_all] microLXMF      $(pin_of microLXMF)"
+echo "[run_all] python rns     $RNS_VER"
+echo "[run_all] python lxmf    $LXMF_VER"
+
 echo "=== summary ==="
 if [[ ${#FAILED[@]} -eq 0 ]]; then
   echo "[run_all] all ${#SCENARIOS[@]} scenarios PASS"
