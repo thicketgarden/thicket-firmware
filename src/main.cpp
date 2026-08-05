@@ -69,6 +69,13 @@
 #include <LoRaInterface.h>
 #include <LXMF/LXMRouter.h>
 #include <LXMF/LXMessage.h>
+// Attached only where a filesystem actually exists. The no-flash bring-up env
+// mounts a no-op filesystem whose writes are accepted and discarded, so a store
+// there would fail every save and teach us nothing.
+#if !defined(THICKET_NO_PERSISTENCE) || defined(THICKET_INTERNAL_FS)
+#define THICKET_HAVE_STORE 1
+#include <LXMF/MessageStore.h>
+#endif
 #ifdef THICKET_RAM_PROBE
 #include <LXMF/MessageStore.h>
 #endif
@@ -189,6 +196,50 @@ static RNS::Identity g_identity({RNS::Type::NONE});
 // region and it is not wanted in .bss on top of the TLSF pool, so it is built
 // on the heap once the identity exists.
 static std::unique_ptr<LXMF::LXMRouter> g_router;
+#ifdef THICKET_HAVE_STORE
+// Application-owned: LXMRouter never references a MessageStore, so saving is
+// ours to do at the two points where a message exists.
+static LXMF::MessageStore* g_store = nullptr;  // points at static storage; see bring-up
+static uint32_t g_saved_in = 0;
+static uint32_t g_saved_out = 0;
+static uint32_t g_save_failures = 0;
+
+// Report what the store holds. Counts rather than contents: this is a
+// bring-up console, and the interesting question at this stage is whether
+// persistence is happening at all, not what was said.
+static void report_store(const char* when) {
+	if (!g_store) return;
+	auto convs = g_store->get_conversations();
+	Serial.print("  store  : ");
+	Serial.print(when);
+	Serial.print(" - conversations=");
+	Serial.print((uint32_t)convs.size());
+	Serial.print(" saved_in=");
+	Serial.print(g_saved_in);
+	Serial.print(" saved_out=");
+	Serial.print(g_saved_out);
+	if (g_save_failures) {
+		Serial.print(" FAILURES=");
+		Serial.print(g_save_failures);
+	}
+	Serial.println();
+}
+
+static void store_message(const LXMF::LXMessage& m, bool inbound) {
+	if (!g_store) return;
+	if (g_store->save_message(m)) {
+		if (inbound) g_saved_in++; else g_saved_out++;
+	}
+	else {
+		// Loud, because a store that silently fails to save is
+		// indistinguishable from one that is working until someone looks for
+		// a message that is not there.
+		g_save_failures++;
+		Serial.print("STORE: save FAILED for ");
+		Serial.println(m.hash().toHex().c_str());
+	}
+}
+#endif
 
 // Observer pointer to the same object g_lora_interface owns. RNS::Interface
 // wraps an InterfaceImpl* in a shared_ptr and exposes no way back down to the
@@ -510,6 +561,13 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 		// ask of an unproven radio. One encrypted packet either arrives or does
 		// not, and the answer is legible either way.
 		g_router->handle_outbound(*message);
+#ifdef THICKET_HAVE_STORE
+		// Save after handle_outbound, not before: the router packs the message
+		// and that is when its hash is final. Saving earlier would store a
+		// record keyed on a hash the peer never sees.
+		store_message(*message, false);
+		report_store("after outbound");
+#endif
 		++g_send_counter;
 
 		Serial.println("  queued : yes (process_outbound will send it)");
@@ -772,6 +830,56 @@ static bool bringup_lxmf() {
 
 	g_router->set_display_name(DISPLAY_NAME);
 
+#ifdef THICKET_HAVE_STORE
+	// The store is independent of the router: LXMRouter never references one.
+	// Constructed here rather than earlier so a failure reports against the
+	// messaging step, which is what it belongs to.
+#ifdef THICKET_RAM_PROBE
+	// Straddle the allocation. A57 asserted the store draws on the system heap
+	// rather than the RNS pool, reasoning from its index being a fixed array
+	// member. That reasoning was about the INDEX; the OBJECT is new'd, and
+	// RNS_DEFAULT_ALLOCATOR redirects global operator new into the pool.
+	const uint32_t pool_before = (uint32_t)RNS::Utilities::Memory::heap_pool_free();
+	const uint32_t heap_before = (uint32_t)mallinfo().uordblks;
+#endif
+	// ⚠ NOT `new`. RNS_DEFAULT_ALLOCATOR redirects global operator new into
+	// the RNS pool, so a new'd store costs 37,388 B of the 98,304 B pool --
+	// measured, and it took the pool from 49% to 88% full. A function-local
+	// static is constructed on first use and lives in .bss instead, which
+	// comes out of the same SRAM but NOT out of the pool, leaving the pool for
+	// the per-packet working memory it exists to serve.
+	//
+	// This is what A57 assumed was happening and it was not. Static storage is
+	// what makes the assumption true.
+	static LXMF::MessageStore store_storage(LXMF_STORAGE_PATH);
+	g_store = &store_storage;
+#ifdef THICKET_RAM_PROBE
+	info_u32("store cost from RNS pool (B)",
+	         pool_before - (uint32_t)RNS::Utilities::Memory::heap_pool_free());
+	info_u32("store cost from system heap (B)",
+	         (uint32_t)mallinfo().uordblks - heap_before);
+#endif
+	if (!g_store) {
+		fail("could not construct MessageStore");
+		return false;
+	}
+	info_u32("store capacity (conversations)",
+	         (uint32_t)LXMF::MAX_CONVERSATIONS);
+	info_u32("store capacity (msgs/conversation)",
+	         (uint32_t)LXMF::MAX_MESSAGES_PER_CONVERSATION);
+	info_u32("store hot tier (msgs/conversation)",
+	         (uint32_t)LXMF::HOT_MESSAGES_PER_CONVERSATION);
+	// No archive filesystem is set. Without one the cull deletes rather than
+	// moves, which is exactly the behaviour A61 ruled: the device forgets
+	// silently and we carry no patch for it. An archive tier needs a second
+	// filesystem this board does not have.
+	info("store archive", g_store->has_archive() ? "yes" : "none - cull deletes (ruled)");
+	report_store("at startup");
+	ok("message store attached");
+#else
+	info("store", "not attached - this env has no real filesystem");
+#endif
+
 	g_router->register_delivery_callback([](LXMF::LXMessage& message) {
 		// Link quality of the last LoRa frame the interface saw. This is a
 		// close approximation of "how well did THIS message arrive", not a
@@ -798,6 +906,13 @@ static bool bringup_lxmf() {
 		if (sig) { Serial.print(snr);  Serial.println(" dB");  } else { Serial.println("unavailable"); }
 		Serial.print("  signed : ");
 		Serial.println(message.signature_validated() ? "yes" : "NO - source identity not known yet");
+#ifdef THICKET_HAVE_STORE
+		// Save what arrived. Done here rather than deeper in the router
+		// because the router does not own a store -- this is the only place
+		// an inbound message exists as an object we can persist.
+		store_message(message, true);
+		report_store("after inbound");
+#endif
 		Serial.print("  title  : ");
 		Serial.println(message.title().toString().c_str());
 		Serial.print("  content: ");
