@@ -8,6 +8,9 @@
 
 namespace thicket {
 
+uint8_t SharpLcd::text_w() { return FONT_W; }
+uint8_t SharpLcd::text_h() { return FONT_H; }
+
 uint8_t SharpLcd::reverse_bits(uint8_t v) {
 	v = (uint8_t)(((v & 0xF0) >> 4) | ((v & 0x0F) << 4));
 	v = (uint8_t)(((v & 0xCC) >> 2) | ((v & 0x33) << 2));
@@ -48,17 +51,50 @@ bool SharpLcd::get_pixel(uint16_t x, uint16_t y) const {
 	return (b & (uint8_t)(0x80u >> (x & 7))) == 0;   // 0 = black
 }
 
+// Returns the glyph rows for a codepoint, or nullptr.
+static const uint8_t* glyph_for(uint32_t cp) {
+	if (cp >= FONT_FIRST && cp <= FONT_LAST) return FONT[cp - FONT_FIRST];
+	uint16_t lo = 0, hi = FONT_EXTRA_COUNT;
+	while (lo < hi) {
+		const uint16_t mid = (uint16_t)((lo + hi) / 2);
+		if (FONT_EXTRA[mid].cp == cp) return FONT_EXTRA[mid].rows;
+		if (FONT_EXTRA[mid].cp < cp) lo = (uint16_t)(mid + 1);
+		else hi = mid;
+	}
+	return nullptr;
+}
+
+// Minimal UTF-8: advances `s` past one codepoint.
+static uint32_t next_cp(const char*& s) {
+	const uint8_t c = (uint8_t)*s++;
+	if (c < 0x80) return c;
+	uint32_t cp; int extra;
+	if ((c & 0xE0) == 0xC0) { cp = c & 0x1Fu; extra = 1; }
+	else if ((c & 0xF0) == 0xE0) { cp = c & 0x0Fu; extra = 2; }
+	else if ((c & 0xF8) == 0xF0) { cp = c & 0x07u; extra = 3; }
+	else return 0xFFFD;
+	while (extra-- > 0) {
+		if ((*s & 0xC0) != 0x80) return 0xFFFD;
+		cp = (cp << 6) | (uint32_t)(*s++ & 0x3F);
+	}
+	return cp;
+}
+
 uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) {
 	// Cozette is monospaced and its 6px advance already includes side bearing,
 	// so glyphs butt up with no extra column.
-	for (; *s; ++s) {
-		const unsigned char c = (unsigned char)*s;
-		if (c >= FONT_FIRST && c <= FONT_LAST) {
-			const uint8_t* g = FONT[c - FONT_FIRST];
+	while (*s) {
+		const uint32_t cp = next_cp(s);
+		const uint8_t* g = glyph_for(cp);
+		if (g) {
 			for (uint8_t row = 0; row < FONT_H; ++row) {
 				const uint8_t bits = g[row];
 				if (!bits) continue;
-				for (uint8_t col = 0; col < FONT_W; ++col) {
+				// FONT_INK_W, not FONT_W: box and block glyphs are 7 wide
+				// against a 6 advance so neighbouring cells touch and rules
+				// join. Drawing only the advance clips that column and every
+				// frame comes out dashed.
+				for (uint8_t col = 0; col < FONT_INK_W; ++col) {
 					if (bits & (uint8_t)(0x80u >> col))
 						set_pixel((uint16_t)(x + col), (uint16_t)(y + row), black);
 				}

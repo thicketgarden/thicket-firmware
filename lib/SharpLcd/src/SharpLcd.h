@@ -76,6 +76,11 @@ public:
 	bool vcom() const { return _vcom; }
 	uint16_t dirty_lines() const;
 
+	// Text cell, so callers can lay out in character units without pulling in
+	// the font table.
+	static uint8_t text_w();
+	static uint8_t text_h();
+
 	static uint8_t reverse_bits(uint8_t v);
 	static uint8_t line_address(uint16_t line_1based) {
 		return reverse_bits((uint8_t)line_1based);
