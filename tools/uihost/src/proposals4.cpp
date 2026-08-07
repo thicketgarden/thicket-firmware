@@ -378,26 +378,65 @@ static void gauge(SharpLcd& l, int x, int y, int w, int h, int filled, int cells
 		            (uint16_t)(cw - 2), (uint16_t)(h - 6), true);
 }
 
-static void d_rest(VirtualPanel& p, SharpLcd& l) {
+// The shell, hoisted so the breathing frames can repaint over it exactly.
+static const Ball SHELL[4] = {
+	{78.0f,  74.0f, 40.0f},
+	{108.0f, 120.0f, 52.0f},
+	{76.0f,  164.0f, 40.0f},
+	{140.0f, 112.0f, 34.0f},
+};
+
+// The breathing element and the box it is confined to. Keeping it small is the
+// whole point: flush sends dirty lines only, so the cost of a frame is set by
+// how many rows the motion touches.
+static const int PULSE_CX = 95, PULSE_CY = 188, PULSE_MAX = 16;
+static const int PBX0 = PULSE_CX - PULSE_MAX, PBX1 = PULSE_CX + PULSE_MAX;
+static const int PBY0 = PULSE_CY - PULSE_MAX, PBY1 = PULSE_CY + PULSE_MAX;
+
+static void dot_field(SharpLcd& l, int step);
+
+// Repaint the pulse box from scratch: shell where the field says so, ground
+// dots elsewhere. Exact, so the box may sit across the shell edge.
+static void rest_restore(SharpLcd& l) {
+	for (int y = PBY0; y <= PBY1; ++y)
+		for (int x = PBX0; x <= PBX1; ++x)
+			l.set_pixel((uint16_t)x, (uint16_t)y,
+			            field(SHELL, 4, (float)x, (float)y) >= 1.0f);
+	for (int y = PBY0; y <= PBY1; ++y)
+		for (int x = PBX0; x <= PBX1; ++x)
+			if ((x - 6) % 16 == 0 && (y - 6) % 16 == 0 &&
+			    field(SHELL, 4, (float)x, (float)y) < 1.0f)
+				l.set_pixel((uint16_t)x, (uint16_t)y, true);
+}
+
+// Six radii that return to where they started, so the loop has no seam.
+static void rest_pulse(SharpLcd& l, int frame) {
+	static const int R[6] = {4, 6, 8, 10, 8, 6};
+	const int r = R[frame % 6];
+	for (int dy = -r; dy <= r; ++dy)
+		for (int dx = -r; dx <= r; ++dx)
+			if (dx * dx + dy * dy <= r * r)
+				l.set_pixel((uint16_t)(PULSE_CX + dx), (uint16_t)(PULSE_CY + dy), false);
+	const int ring = r + 5;
+	for (int a = 0; a < 360; a += 12) {
+		const float t = (float)a * 3.14159265f / 180.0f;
+		l.set_pixel((uint16_t)(PULSE_CX + (int)(ring * __builtin_cosf(t))),
+		            (uint16_t)(PULSE_CY + (int)(ring * __builtin_sinf(t))), false);
+	}
+}
+
+static void rest_static(SharpLcd& l) {
 	l.fill_white();
 	dot_field(l, 16);
 
-	// the shell: one grown mass carrying the time
-	const Ball shell[] = {
-		{78.0f,  74.0f, 40.0f},
-		{108.0f, 120.0f, 52.0f},
-		{76.0f,  164.0f, 40.0f},
-		{140.0f, 112.0f, 34.0f},
-	};
-	blob(l, shell, 4, 6, 18, 200, 214, true, true);
-	blob_inner_ring(l, shell, 4, 6, 18, 200, 214, 8);
+	blob(l, SHELL, 4, 6, 18, 200, 214, true, true);
+	blob_inner_ring(l, SHELL, 4, 6, 18, 200, 214, 8);
 
 	l.draw_text(58, 60, "thicket", false);
 	l.draw_text_scaled(58, 92, "9:22", false, 3);
 	l.draw_text(58, 146, "tue 5 aug", false);
 	for (int i = 0; i < 64; i += 3) l.set_pixel((uint16_t)(58 + i), 168, false);
 
-	// two counts, each in its own shell
 	const Ball tile1[] = {
 		{252.0f, 64.0f, 30.0f}, {302.0f, 64.0f, 32.0f}, {352.0f, 64.0f, 30.0f},
 	};
@@ -417,8 +456,27 @@ static void d_rest(VirtualPanel& p, SharpLcd& l) {
 	gauge(l, 8, 220, 96, 14, 3, 4);
 	field_text(l, 112, 221, "3 days", 1);
 	field_text(l, 392 - tw("listening"), 221, "listening", 1);
+}
 
-	l.flush(); save(p, "d5-rest");
+static void d_rest(VirtualPanel& p, SharpLcd& l) {
+	rest_static(l);
+	rest_pulse(l, 0);
+	p.reset_counters();
+	l.flush();
+	printf("    frame 1 (full): %u lines\n", (unsigned)p.lines_written());
+	save(p, "d5-rest");
+
+	for (int f = 1; f < 6; ++f) {
+		rest_restore(l);
+		rest_pulse(l, f);
+		p.reset_counters();
+		l.flush();
+		char name[32];
+		snprintf(name, sizeof(name), "d5-rest-f%d", f + 1);
+		save(p, name);
+		printf("    frame %d: %u lines, %u bytes on the wire\n", f + 1,
+		       (unsigned)p.lines_written(), (unsigned)(2 + 52 * p.lines_written()));
+	}
 }
 
 static void d_first_run(VirtualPanel& p, SharpLcd& l) {

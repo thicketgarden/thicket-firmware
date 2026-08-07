@@ -115,14 +115,26 @@ const tabs = document.getElementById('tabs');
 const keys = document.getElementById('keys');
 const hint = document.getElementById('hint');
 let mode = 'live';
+let timer = null, animFrames = {}, fi = 0;
 
 function refresh(){
+  if (timer) { clearInterval(timer); timer = null; }
+  if (mode.startsWith('anim:')) {
+    const base = mode.slice(5), fr = animFrames[base];
+    fi = 0;
+    const step = () => { img.src = '/screen/' + fr[fi % fr.length]; fi++; };
+    step();
+    timer = setInterval(step, 200);
+    keys.style.display = 'none';
+    hint.textContent = base + ' - ' + fr.length + ' frames looping at 5 fps.';
+  } else {
   img.src = (mode === 'live' ? '/frame.png?t=' + Date.now()
                              : '/screen/' + mode + '?t=' + Date.now());
   keys.style.display = (mode === 'live') ? 'flex' : 'none';
   hint.textContent = (mode === 'live')
     ? 'Click the panel, then type. Enter sends, Backspace deletes.'
     : mode + ' - a rendered proposal. Switch to live to type.';
+  }
   [...tabs.children].forEach(b =>
     b.style.borderColor = (b.dataset.m2 === mode) ? '#c98b4b' : '#454a3b');
 }
@@ -149,6 +161,15 @@ document.querySelectorAll('[data-k]').forEach(b =>
 
 fetch('/screens.json').then(r => r.json()).then(list => {
   tab('live', 'live');
+  // a base screen with -f2, -f3 ... siblings is a frame sequence
+  list.forEach(n => {
+    if (!list.includes(n + '-f2')) return;
+    const fr = [n];
+    for (let i = 2; list.includes(n + '-f' + i); ++i) fr.push(n + '-f' + i);
+    animFrames[n] = fr;
+    fr.forEach(f => { const im = new Image(); im.src = '/screen/' + f; });
+    tab('anim:' + n, n + ' \u25b6');
+  });
   list.forEach(n => tab(n, n));
   refresh();
 });
