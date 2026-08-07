@@ -57,6 +57,11 @@ public:
 
 	// Out-of-range coordinates are ignored, not wrapped.
 	void set_pixel(uint16_t x, uint16_t y, bool black);
+
+	// 5x7 text. Returns the x just past the last glyph.
+	uint16_t draw_text(uint16_t x, uint16_t y, const char* s, bool black = true);
+	void fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black);
+	void draw_hline(uint16_t x, uint16_t y, uint16_t w, bool black);
 	bool get_pixel(uint16_t x, uint16_t y) const;
 
 	// Sends only changed lines. Returns the number of lines sent.

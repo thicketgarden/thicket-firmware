@@ -8,3 +8,6 @@ test_interop/**/.pio/
 test_interop/**/__pycache__/
 test_interop/deps/
 test_interop/*/.pio/
+
+screens/*.pbm
+screens/*.png

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "SharpLcd.h"
+#include "Glyphs.h"
 
 #include <string.h>
 
@@ -45,6 +46,31 @@ bool SharpLcd::get_pixel(uint16_t x, uint16_t y) const {
 	if (x >= LCD_WIDTH || y >= LCD_HEIGHT) return false;
 	const uint8_t b = _fb[(uint32_t)y * LCD_LINE_BYTES + (x >> 3)];
 	return (b & (uint8_t)(0x80u >> (x & 7))) == 0;   // 0 = black
+}
+
+uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) {
+	for (; *s; ++s) {
+		const unsigned char c = (unsigned char)*s;
+		if (c < 32 || c > 126) { x += GLYPH_W + 1; continue; }
+		const uint8_t* g = GLYPHS[c - 32];
+		for (uint8_t col = 0; col < GLYPH_W; ++col) {
+			for (uint8_t row = 0; row < GLYPH_H; ++row) {
+				if (g[col] & (1u << row)) set_pixel((uint16_t)(x + col),
+				                                    (uint16_t)(y + row), black);
+			}
+		}
+		x = (uint16_t)(x + GLYPH_W + 1);
+	}
+	return x;
+}
+
+void SharpLcd::fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black) {
+	for (uint16_t yy = y; yy < y + h; ++yy)
+		for (uint16_t xx = x; xx < x + w; ++xx) set_pixel(xx, yy, black);
+}
+
+void SharpLcd::draw_hline(uint16_t x, uint16_t y, uint16_t w, bool black) {
+	for (uint16_t xx = x; xx < x + w; ++xx) set_pixel(xx, y, black);
 }
 
 uint16_t SharpLcd::flush() {
