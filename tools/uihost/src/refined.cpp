@@ -129,9 +129,10 @@ static std::vector<std::string> wrap(const char* s, size_t cols) {
 // --- chrome ----------------------------------------------------------------
 
 // The header the design settled on: mark, wordmark, and what the screen is.
-static void head(SharpLcd& l, const char* right) {
+static void head(SharpLcd& l, const char* right, bool peer = false) {
 	mark(l, M, 4, 1);
 	l.draw_text(M + 32, 9, "thicket", true);
+	if (peer) mark(l, 400 - M - 30 - 96, 4, 1);   // whose conversation this is
 	if (right && *right) {
 		const int w = (int)strlen(right) * CW;
 		l.draw_text((uint16_t)(400 - M - w), 9, right, true);
@@ -148,11 +149,11 @@ static void foot(SharpLcd& l, const char* left, const char* right) {
 	}
 }
 
-static int bubble_h(const char* t) { return (int)wrap(t, 30).size() * LH + 14; }
+static int bubble_h(const char* t) { return (int)wrap(t, 34).size() * LH + 14; }
 
 static int bubble(SharpLcd& l, int y, const char* text, bool mine,
                   const char* when, const char* state) {
-	auto lines = wrap(text, 30);
+	auto lines = wrap(text, 34);
 	size_t wide = 0; for (auto& s : lines) if (s.size() > wide) wide = s.size();
 	const int pad = 8;
 	const int bw = (int)wide * CW + pad * 2;
@@ -246,7 +247,7 @@ static void conversation(VirtualPanel& p, SharpLcd& l) {
 		{"bring the small lamp",             false, "9:20", nullptr},
 	};
 	l.fill_white();
-	head(l, "mara · close by");
+	head(l, "mara · close by", true);
 	int total = 0; for (auto& r : rows) total += bubble_h(r.t) + 10;
 	int y = BODY_BOT - total; if (y < BODY_TOP) y = BODY_TOP;
 	for (auto& r : rows) y = bubble(l, y, r.t, r.mine, r.when, r.st);
@@ -254,30 +255,47 @@ static void conversation(VirtualPanel& p, SharpLcd& l) {
 	l.flush(); save(p, "r2-conversation");
 }
 
+// Who is near, as the place itself. The wheel walks between them, so "turn to
+// look around" is literal rather than a figure of speech.
 static void people(VirtualPanel& p, SharpLcd& l) {
-	struct F { const char* n; const char* s; int near; bool unread; };
+	struct F { const char* n; const char* s; int x; int sc; bool unread; };
 	const F fr[] = {
-		{"mara",             "close by",           3, true},
-		{"sam",              "a way off",          2, true},
-		{"the orchard relay","passing messages",   3, false},
-		{"base",             "through the orchard",1, false},
+		{"sam",              "a way off",           44, 2, true},
+		{"mara",             "close by",           140, 4, true},
+		{"the orchard relay","passing messages",   258, 3, false},
+		{"base",             "through the orchard",340, 1, false},
 	};
-	const int SEL = 0;
+	const int SEL = 1;
+
 	l.fill_white();
 	head(l, "2 new");
-	int y = 44;
+
 	for (int i = 0; i < 4; ++i) {
-		const bool sel = (i == SEL);
-		if (sel) rr(l, M - 4, y - 6, 400 - 2*M + 8, 30, 8, true);
-		l.draw_text(M + 4, (uint16_t)y, fr[i].n, !sel);
-		l.draw_text(200,   (uint16_t)y, fr[i].s, !sel);
-		if (fr[i].unread) l.draw_text((uint16_t)(400 - M - 44), (uint16_t)y, "●", !sel);
-		// nearness as leaves, on a short stem
-		for (int k = 0; k < fr[i].near; ++k)
-			leaf(l, 400 - M - 30 + k * 9, y + 3, !sel);
-		y += 40;
+		mark(l, fr[i].x, GROUND - 20 * fr[i].sc, fr[i].sc, (i & 1) != 0);
+		if (fr[i].unread) {
+			// a spore above the cap: something waiting, drawn not counted
+			const int cx = fr[i].x + 12 * fr[i].sc;
+			const int cy = GROUND - 20 * fr[i].sc - 8;
+			for (int dy = -3; dy <= 3; ++dy)
+				for (int dx = -3; dx <= 3; ++dx)
+					if (dx*dx + dy*dy <= 9) l.set_pixel((uint16_t)(cx+dx), (uint16_t)(cy+dy), true);
+		}
 	}
-	foot(l, "press to open", "♥♥♡");
+	hairline(l, 24, GROUND, 352);
+
+	// the selected one is named, under a bracket that points at it
+	const int bx = fr[SEL].x + 12 * fr[SEL].sc;
+	for (int i = -8; i <= 8; ++i) l.set_pixel((uint16_t)(bx+i), (uint16_t)(GROUND+4), true);
+	for (int i = 0; i < 4; ++i) {
+		l.set_pixel((uint16_t)(bx-8), (uint16_t)(GROUND+4+i), true);
+		l.set_pixel((uint16_t)(bx+8), (uint16_t)(GROUND+4+i), true);
+	}
+	char line[64];
+	snprintf(line, sizeof(line), "%s  ·  %s", fr[SEL].n, fr[SEL].s);
+	const int lw = (int)strlen(line) * CW;
+	l.draw_text((uint16_t)((400 - lw) / 2), GROUND + 18, line, true);
+
+	foot(l, "turn to look around", "press to open");
 	l.flush(); save(p, "r3-people");
 }
 
