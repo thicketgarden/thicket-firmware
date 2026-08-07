@@ -26,6 +26,7 @@ SCENARIOS=(
   # be sent.
   "transport-forward|transport_forwarder|run_transport_forward.sh"
   "encstore-vectors|encstore_vectors|run_encstore_vectors.sh"
+  "two-node|two_node|run_two_node.sh"
 )
 
 echo "=== fetching pinned dependencies ==="

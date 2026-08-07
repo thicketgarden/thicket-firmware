@@ -11,6 +11,18 @@
 #   CPP_PROJECT  absolute path to the scenario's PlatformIO project dir
 #   TIMEOUT_S    (optional, default 40) per-side timeout
 #
+# TWO-C++ MODE. Set PEER_CPP_ROLE instead of PY_SCRIPT and the first side is a
+# second copy of the same binary rather than a Python process, with THICKET_ROLE
+# set to that value; the C++ side then gets CPP_ROLE.
+#
+# Added for the two-node scenario, where BOTH ends are ours. That contract had
+# already been stretched twice by having the Python side spawn a child, and
+# stretching it a third time would have hidden the thing being tested inside a
+# process tree. Everything else is unchanged: both sides must exit 0 AND print
+# SUCCESS, which is exactly the guarantee this scenario needs, because a node
+# that stays silent because it crashed looks identical to one with nothing to
+# say.
+#
 # A scenario PASSES iff BOTH sides exit 0 AND BOTH logs contain "SUCCESS".
 # Requiring an explicit SUCCESS token in addition to the exit code is
 # deliberate: a process that dies before it asserts anything exits non-zero,
@@ -32,7 +44,7 @@ if [[ ! -x "$CPP_BIN" ]]; then
   exit 1
 fi
 
-if ! command -v python3 >/dev/null 2>&1; then
+if [[ -z "${PEER_CPP_ROLE:-}" ]] && ! command -v python3 >/dev/null 2>&1; then
   echo "[driver] $SCENARIO: no python3 on PATH" >&2
   exit 1
 fi
@@ -49,12 +61,25 @@ trap cleanup EXIT
 PY_LOG="$WORKDIR/python.log"
 CPP_LOG="$WORKDIR/cpp.log"
 
-echo "[driver] $SCENARIO: launching Python side"
-# PY_RNS is honoured for parity with the upstream drivers; empty (the normal
-# case here) means "use whatever RNS is importable from PATH's python3".
-PYTHONPATH="${PY_RNS:-}" python3 "$PY_SCRIPT" --timeout "$TIMEOUT_S" $PY_ARGS \
-  >"$PY_LOG" 2>&1 &
-PY_PID=$!
+if [[ -n "${PEER_CPP_ROLE:-}" ]]; then
+  # Two-C++ mode. Same scratch-directory treatment as the second side below:
+  # microStore's POSIX adapter ignores its basepath and works at the process
+  # CWD, so two nodes sharing one directory would share an identity store and
+  # silently stop being two nodes.
+  PEER_RUNDIR="$WORKDIR/peer"
+  mkdir -p "$PEER_RUNDIR"
+  echo "[driver] $SCENARIO: launching C++ peer (role=$PEER_CPP_ROLE)"
+  ( cd "$PEER_RUNDIR" && THICKET_INTEROP_TIMEOUT_S="$TIMEOUT_S" \
+      THICKET_ROLE="$PEER_CPP_ROLE" exec "$CPP_BIN" ) >"$PY_LOG" 2>&1 &
+  PY_PID=$!
+else
+  echo "[driver] $SCENARIO: launching Python side"
+  # PY_RNS is honoured for parity with the upstream drivers; empty (the normal
+  # case here) means "use whatever RNS is importable from PATH's python3".
+  PYTHONPATH="${PY_RNS:-}" python3 "$PY_SCRIPT" --timeout "$TIMEOUT_S" $PY_ARGS \
+    >"$PY_LOG" 2>&1 &
+  PY_PID=$!
+fi
 
 sleep 2
 
@@ -69,7 +94,8 @@ CPP_RUNDIR="$WORKDIR/cpp"
 mkdir -p "$CPP_RUNDIR"
 # Keep the C++ side's own deadline inside the watchdog's, so a failure ends in
 # its TIMEOUT diagnostic rather than an uninformative SIGTERM.
-( cd "$CPP_RUNDIR" && THICKET_INTEROP_TIMEOUT_S="$TIMEOUT_S" exec "$CPP_BIN" ) \
+( cd "$CPP_RUNDIR" && THICKET_INTEROP_TIMEOUT_S="$TIMEOUT_S" \
+    THICKET_ROLE="${CPP_ROLE:-}" exec "$CPP_BIN" ) \
   >"$CPP_LOG" 2>&1 &
 CPP_PID=$!
 
@@ -90,7 +116,7 @@ kill "$CPP_PID" 2>/dev/null
 wait "$PY_PID"  2>/dev/null; PY_RC=$?
 wait "$CPP_PID" 2>/dev/null; CPP_RC=$?
 
-echo "--- python side ---"
+echo "--- ${PEER_CPP_ROLE:+c++ peer ($PEER_CPP_ROLE)}${PEER_CPP_ROLE:-python side} ---"
 cat "$PY_LOG"
 echo "--- c++ side ---"
 cat "$CPP_LOG"
