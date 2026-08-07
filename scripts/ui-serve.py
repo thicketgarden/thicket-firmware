@@ -23,16 +23,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 BIN = os.path.join(ROOT, "tools", "uihost", ".pio", "build", "native17", "program")
 FRAME = "/tmp/thicket_ui_frame.pbm"
+SCREENS = os.path.join(ROOT, "screens")
 
 lock = threading.Lock()
 proc = None
 
 
 def start():
+    """Bring up the interactive host. Missing binary is not fatal: the
+    rendered proposals are still worth serving without it."""
     global proc
     if not os.path.exists(BIN):
-        sys.exit(f"[ui] no binary at {BIN}\n"
-                 f"[ui] build it: cd tools/uihost && pio run -e native17")
+        print(f"[ui] no live host at {BIN}")
+        print("[ui] build it with: cd tools/uihost && pio run -e native17")
+        print("[ui] serving rendered screens only")
+        return
     proc = subprocess.Popen([BIN, FRAME], stdin=subprocess.PIPE,
                             stdout=subprocess.PIPE, text=True, bufsize=1)
     proc.stdout.readline()          # "ready"
@@ -40,16 +45,22 @@ def start():
 
 def send(cmd):
     with lock:
-        if proc.poll() is not None:
+        if proc is None or proc.poll() is not None:
             return False
         proc.stdin.write(cmd + "\n")
         proc.stdin.flush()
         return bool(proc.stdout.readline())
 
 
-def frame_png():
-    with open(FRAME, "rb") as fh:
-        tok = [l.split(b"#", 1)[0].strip() for l in fh]
+def list_screens():
+    if not os.path.isdir(SCREENS):
+        return []
+    return sorted(f[:-4] for f in os.listdir(SCREENS) if f.endswith(".pbm"))
+
+
+def pbm_png(path):
+    with open(path, "rb") as fh:
+            tok = [l.split(b"#", 1)[0].strip() for l in fh]
     tok = [t for t in tok if t]
     w, h = (int(v) for v in tok[1].split())
     bits = bytes(c for c in b"".join(tok[2:]) if c in (48, 49))
@@ -69,6 +80,10 @@ def frame_png():
             + chunk(b"IEND", b""))
 
 
+def frame_png():
+    return pbm_png(FRAME)
+
+
 PAGE = """<!doctype html><meta charset=utf8>
 <meta name=viewport content="width=device-width,initial-scale=1">
 <title>Thicket panel</title>
@@ -84,21 +99,45 @@ PAGE = """<!doctype html><meta charset=utf8>
  button:hover{background:#3a3f31}
  #hint{color:#8b8878}
 </style>
+<div class=row id=tabs></div>
 <img id=panel alt="virtual panel">
-<div class=row>
+<div class=row id=keys>
   <button data-m=shift>SHIFT</button>
   <button data-m=alt>ALT</button>
   <button data-m=sym>SYM</button>
   <button data-k=enter>ENTER</button>
   <button data-k=back>BACK</button>
 </div>
-<div id=hint>Click the panel, then type. <kbd>Enter</kbd> sends, <kbd>Backspace</kbd> deletes.</div>
+<div id=hint></div>
 <script>
-const img = document.getElementById('panel');
-function refresh(){ img.src = '/frame.png?t=' + Date.now(); }
-async function send(cmd){ await fetch('/key', {method:'POST', body:cmd}); refresh(); }
+const img  = document.getElementById('panel');
+const tabs = document.getElementById('tabs');
+const keys = document.getElementById('keys');
+const hint = document.getElementById('hint');
+let mode = 'live';
+
+function refresh(){
+  img.src = (mode === 'live' ? '/frame.png?t=' + Date.now()
+                             : '/screen/' + mode + '?t=' + Date.now());
+  keys.style.display = (mode === 'live') ? 'flex' : 'none';
+  hint.textContent = (mode === 'live')
+    ? 'Click the panel, then type. Enter sends, Backspace deletes.'
+    : mode + ' - a rendered proposal. Switch to live to type.';
+  [...tabs.children].forEach(b =>
+    b.style.borderColor = (b.dataset.m2 === mode) ? '#c98b4b' : '#454a3b');
+}
+function tab(name, label){
+  const b = document.createElement('button');
+  b.textContent = label; b.dataset.m2 = name;
+  b.onclick = () => { mode = name; refresh(); };
+  tabs.appendChild(b);
+}
+async function send(cmd){
+  if (mode !== 'live') return;
+  await fetch('/key', {method:'POST', body:cmd}); refresh();
+}
 document.addEventListener('keydown', e => {
-  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  if (e.metaKey || e.ctrlKey || e.altKey || mode !== 'live') return;
   if (e.key === 'Enter')      { e.preventDefault(); send('enter'); }
   else if (e.key === 'Backspace'){ e.preventDefault(); send('back'); }
   else if (e.key.length === 1) { e.preventDefault(); send('k ' + e.key.toLowerCase()); }
@@ -107,7 +146,12 @@ document.querySelectorAll('[data-m]').forEach(b =>
   b.onclick = () => send('m ' + b.dataset.m));
 document.querySelectorAll('[data-k]').forEach(b =>
   b.onclick = () => send(b.dataset.k));
-refresh();
+
+fetch('/screens.json').then(r => r.json()).then(list => {
+  tab('live', 'live');
+  list.forEach(n => tab(n, n));
+  refresh();
+});
 </script>
 """
 
@@ -126,8 +170,25 @@ class H(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             self._send(200, PAGE.encode(), "text/html; charset=utf-8")
         elif path == "/frame.png":
+            if proc is None:
+                self._send(503, b"no live host built", "text/plain")
+                return
             try:
                 self._send(200, frame_png(), "image/png")
+            except Exception as e:
+                self._send(500, str(e).encode(), "text/plain")
+        elif path == "/screens.json":
+            import json as _j
+            self._send(200, _j.dumps(list_screens()).encode(),
+                       "application/json")
+        elif path.startswith("/screen/"):
+            name = os.path.basename(path[len("/screen/"):])
+            f = os.path.join(SCREENS, name + ".pbm")
+            if not os.path.exists(f):
+                self._send(404, b"no such screen", "text/plain")
+                return
+            try:
+                self._send(200, pbm_png(f), "image/png")
             except Exception as e:
                 self._send(500, str(e).encode(), "text/plain")
         else:
