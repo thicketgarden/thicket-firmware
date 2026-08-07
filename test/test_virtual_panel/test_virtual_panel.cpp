@@ -91,31 +91,31 @@ void test_render_message_screen(void) {
 	lcd.fill_white();
 
 	// Status bar
-	lcd.fill_rect(0, 0, LCD_WIDTH, 11, true);
-	lcd.draw_text(3, 2, "THICKET", false);
-	lcd.draw_text(200, 2, "914.9 SF8", false);
-	lcd.draw_text(330, 2, "BATT 82%", false);
+	lcd.fill_rect(0, 0, LCD_WIDTH, 14, true);
+	lcd.draw_text(3, 1, "THICKET", false);
+	lcd.draw_text(190, 1, "914.9 SF8", false);
+	lcd.draw_text(328, 1, "BATT 82%", false);
 
 	// Conversation
-	lcd.draw_text(3, 16, "0795eea0  T-Deck", true);
-	lcd.draw_hline(0, 26, LCD_WIDTH, true);
+	lcd.draw_text(3, 17, "0795eea0  T-Deck", true);
+	lcd.draw_hline(0, 32, LCD_WIDTH, true);
 
-	lcd.draw_text(3,  32, "them  hi", true);
-	lcd.draw_text(3,  44, "us    #0 up73s r-46 s+13.5", true);
-	lcd.draw_text(3,  56, "them  hi 2", true);
-	lcd.draw_text(3,  68, "us    #1 up697s r-73 s+12.8", true);
+	lcd.draw_text(3,  36, "them  hi", true);
+	lcd.draw_text(3,  50, "us    #0 up73s r-46 s+13.5", true);
+	lcd.draw_text(3,  64, "them  hi 2", true);
+	lcd.draw_text(3,  78, "us    #1 up697s r-73 s+12.8", true);
 
 	// Telegram tape
-	lcd.draw_hline(0, 196, LCD_WIDTH, true);
-	lcd.draw_text(3, 202, "QUEUED", true);
-	lcd.draw_text(70, 202, "ON AIR", true);
-	lcd.draw_text(140, 202, "RELAY", true);
-	lcd.fill_rect(200, 199, 78, 13, true);
-	lcd.draw_text(204, 202, "DELIVERED", false);
+	lcd.draw_hline(0, 194, LCD_WIDTH, true);
+	lcd.draw_text(3, 199, "QUEUED", true);
+	lcd.draw_text(60, 199, "ON AIR", true);
+	lcd.draw_text(120, 199, "RELAY", true);
+	lcd.fill_rect(176, 196, 62, 16, true);
+	lcd.draw_text(178, 199, "DELIVD", false);
 
 	// Compose line
-	lcd.draw_hline(0, 220, LCD_WIDTH, true);
-	lcd.draw_text(3, 226, "> on my way_", true);
+	lcd.draw_hline(0, 218, LCD_WIDTH, true);
+	lcd.draw_text(3, 224, "> on my way_", true);
 
 	lcd.flush();
 
@@ -128,9 +128,9 @@ void test_render_boot_screen(void) {
 	SharpLcd lcd(panel, fb);
 	lcd.fill_white();
 
-	lcd.draw_text(150, 40, "THICKET", true);
+	lcd.draw_text(164, 40, "THICKET", true);
 	lcd.draw_hline(140, 52, 120, true);
-	lcd.draw_text(112, 70, "Reticulum handheld", true);
+	lcd.draw_text(146, 70, "Reticulum handheld", true);
 
 	lcd.draw_text(60, 110, "radio", true);
 	lcd.draw_text(200, 110, "914.875 MHz SF8", true);
@@ -141,8 +141,8 @@ void test_render_boot_screen(void) {
 	lcd.draw_text(60, 152, "peers", true);
 	lcd.draw_text(200, 152, "1 known", true);
 
-	lcd.fill_rect(150, 190, 100, 14, true);
-	lcd.draw_text(160, 194, "LISTENING", false);
+	lcd.fill_rect(164, 188, 72, 18, true);
+	lcd.draw_text(167, 191, "LISTENING", false);
 
 	lcd.flush();
 	TEST_ASSERT_TRUE(panel.write_pbm("screens/boot.pbm", 2));

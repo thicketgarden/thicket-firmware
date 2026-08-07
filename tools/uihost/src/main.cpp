@@ -53,36 +53,36 @@ static uint32_t refused = 0;
 static void draw(SharpLcd& lcd) {
 	lcd.fill_white();
 
-	lcd.fill_rect(0, 0, LCD_WIDTH, 11, true);
-	lcd.draw_text(3, 2, "THICKET", false);
-	lcd.draw_text(196, 2, "914.9 SF8", false);
-	lcd.draw_text(330, 2, "BATT 82%", false);
+	lcd.fill_rect(0, 0, LCD_WIDTH, 14, true);
+	lcd.draw_text(3, 1, "THICKET", false);
+	lcd.draw_text(190, 1, "914.9 SF8", false);
+	lcd.draw_text(328, 1, "BATT 82%", false);
 
-	lcd.draw_text(3, 16, "0795eea0  T-Deck", true);
-	lcd.draw_hline(0, 26, LCD_WIDTH, true);
+	lcd.draw_text(3, 17, "0795eea0  T-Deck", true);
+	lcd.draw_hline(0, 32, LCD_WIDTH, true);
 
-	// Newest at the bottom, 13 rows of history at a 12-pixel pitch.
-	const int rows = 13;
+	// Newest at the bottom, 11 rows of history at a 14-pixel pitch.
+	const int rows = 11;
 	int first = (int)log_.size() - rows;
 	if (first < 0) first = 0;
-	int y = 32;
+	int y = 36;
 	for (size_t i = (size_t)first; i < log_.size(); ++i) {
 		lcd.draw_text(3, (uint16_t)y, log_[i].ours ? "us  " : "them", true);
-		lcd.draw_text(34, (uint16_t)y, log_[i].text.c_str(), true);
+		lcd.draw_text(36, (uint16_t)y, log_[i].text.c_str(), true);
 		if (!log_[i].meta.empty())
-			lcd.draw_text(300, (uint16_t)y, log_[i].meta.c_str(), true);
-		y += 12;
+			lcd.draw_text(340, (uint16_t)y, log_[i].meta.c_str(), true);
+		y += 14;
 	}
 
-	lcd.draw_hline(0, 196, LCD_WIDTH, true);
-	lcd.draw_text(3, 202, "QUEUED", true);
-	lcd.draw_text(70, 202, "ON AIR", true);
-	lcd.draw_text(140, 202, "RELAY", true);
+	lcd.draw_hline(0, 194, LCD_WIDTH, true);
+	lcd.draw_text(3, 199, "QUEUED", true);
+	lcd.draw_text(60, 199, "ON AIR", true);
+	lcd.draw_text(120, 199, "RELAY", true);
 	if (!log_.empty() && log_.back().ours) {
-		lcd.fill_rect(200, 199, 78, 13, true);
-		lcd.draw_text(204, 202, "DELIVERED", false);
+		lcd.fill_rect(176, 196, 62, 16, true);
+		lcd.draw_text(178, 199, "DELIVD", false);
 	} else {
-		lcd.draw_text(204, 202, "DELIVERED", true);
+		lcd.draw_text(178, 199, "DELIVD", true);
 	}
 
 	// Modifier state has to be visible or one-shot modifiers are unusable.
@@ -90,16 +90,16 @@ static void draw(SharpLcd& lcd) {
 	if (pending_mods & MOD_SHIFT) strcat(mods, "SHIFT ");
 	if (pending_mods & MOD_ALT)   strcat(mods, "ALT ");
 	if (pending_mods & MOD_SYM)   strcat(mods, "SYM ");
-	if (mods[0]) lcd.draw_text(300, 202, mods, true);
+	if (mods[0]) lcd.draw_text(250, 199, mods, true);
 	if (refused) {
 		char r[32];
 		snprintf(r, sizeof(r), "GHOST %u", refused);
-		lcd.draw_text(300, 186, r, true);
+		lcd.draw_text(330, 199, r, true);
 	}
 
-	lcd.draw_hline(0, 220, LCD_WIDTH, true);
+	lcd.draw_hline(0, 218, LCD_WIDTH, true);
 	std::string line = "> " + compose + "_";
-	lcd.draw_text(3, 226, line.c_str(), true);
+	lcd.draw_text(3, 224, line.c_str(), true);
 
 	lcd.flush();
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "SharpLcd.h"
-#include "Glyphs.h"
+#include "CozetteFont.h"
 
 #include <string.h>
 
@@ -49,17 +49,22 @@ bool SharpLcd::get_pixel(uint16_t x, uint16_t y) const {
 }
 
 uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) {
+	// Cozette is monospaced and its 6px advance already includes side bearing,
+	// so glyphs butt up with no extra column.
 	for (; *s; ++s) {
 		const unsigned char c = (unsigned char)*s;
-		if (c < 32 || c > 126) { x += GLYPH_W + 1; continue; }
-		const uint8_t* g = GLYPHS[c - 32];
-		for (uint8_t col = 0; col < GLYPH_W; ++col) {
-			for (uint8_t row = 0; row < GLYPH_H; ++row) {
-				if (g[col] & (1u << row)) set_pixel((uint16_t)(x + col),
-				                                    (uint16_t)(y + row), black);
+		if (c >= FONT_FIRST && c <= FONT_LAST) {
+			const uint8_t* g = FONT[c - FONT_FIRST];
+			for (uint8_t row = 0; row < FONT_H; ++row) {
+				const uint8_t bits = g[row];
+				if (!bits) continue;
+				for (uint8_t col = 0; col < FONT_W; ++col) {
+					if (bits & (uint8_t)(0x80u >> col))
+						set_pixel((uint16_t)(x + col), (uint16_t)(y + row), black);
+				}
 			}
 		}
-		x = (uint16_t)(x + GLYPH_W + 1);
+		x = (uint16_t)(x + FONT_W);
 	}
 	return x;
 }
