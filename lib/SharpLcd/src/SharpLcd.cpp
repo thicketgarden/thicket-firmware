@@ -105,6 +105,30 @@ uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) 
 	return x;
 }
 
+uint16_t SharpLcd::draw_text_scaled(uint16_t x, uint16_t y, const char* s,
+                                    bool black, uint8_t scale) {
+	if (scale <= 1) return draw_text(x, y, s, black);
+	while (*s) {
+		const uint32_t cp = next_cp(s);
+		const uint8_t* g = glyph_for(cp);
+		if (g) {
+			for (uint8_t row = 0; row < FONT_H; ++row) {
+				const uint8_t bits = g[row];
+				if (!bits) continue;
+				for (uint8_t col = 0; col < FONT_INK_W; ++col) {
+					if (!(bits & (uint8_t)(0x80u >> col))) continue;
+					for (uint8_t sy = 0; sy < scale; ++sy)
+						for (uint8_t sx = 0; sx < scale; ++sx)
+							set_pixel((uint16_t)(x + col * scale + sx),
+							          (uint16_t)(y + row * scale + sy), black);
+				}
+			}
+		}
+		x = (uint16_t)(x + FONT_W * scale);
+	}
+	return x;
+}
+
 void SharpLcd::fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black) {
 	for (uint16_t yy = y; yy < y + h; ++yy)
 		for (uint16_t xx = x; xx < x + w; ++xx) set_pixel(xx, yy, black);

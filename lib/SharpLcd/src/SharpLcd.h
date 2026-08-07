@@ -60,6 +60,11 @@ public:
 
 	// 5x7 text. Returns the x just past the last glyph.
 	uint16_t draw_text(uint16_t x, uint16_t y, const char* s, bool black = true);
+
+	// Same glyphs at an integer scale. Advance scales with them, so a run of
+	// text stays monospaced.
+	uint16_t draw_text_scaled(uint16_t x, uint16_t y, const char* s,
+	                          bool black = true, uint8_t scale = 1);
 	void fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black);
 	void draw_hline(uint16_t x, uint16_t y, uint16_t w, bool black);
 	bool get_pixel(uint16_t x, uint16_t y) const;

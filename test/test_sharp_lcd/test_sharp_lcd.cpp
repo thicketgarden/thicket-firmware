@@ -247,6 +247,41 @@ void test_clear_carries_vcom(void) {
 
 // --- budget ----------------------------------------------------------------
 
+// Scaled text must be the same glyph, not a re-derived one: every lit source
+// pixel becomes a solid scale x scale block, and the advance scales with it.
+void test_scaled_text_is_the_glyph_blown_up(void) {
+	FakeBus b1, b2;
+	static uint8_t fb1[LCD_FB_BYTES], fb2[LCD_FB_BYTES];
+	SharpLcd a(b1, fb1), b(b2, fb2);
+	a.fill_white();
+	b.fill_white();
+
+	a.draw_text(0, 0, "8", true);
+	b.draw_text_scaled(0, 0, "8", true, 3);
+
+	int lit = 0;
+	for (uint16_t y = 0; y < 13; ++y) {
+		for (uint16_t x = 0; x < 7; ++x) {
+			if (!a.get_pixel(x, y)) continue;
+			++lit;
+			for (uint16_t sy = 0; sy < 3; ++sy)
+				for (uint16_t sx = 0; sx < 3; ++sx)
+					TEST_ASSERT_TRUE(b.get_pixel((uint16_t)(x * 3 + sx),
+					                             (uint16_t)(y * 3 + sy)));
+		}
+	}
+	TEST_ASSERT_TRUE(lit > 10);   // the glyph is not blank
+}
+
+void test_scaled_text_advance_scales(void) {
+	FakeBus bus;
+	static uint8_t fbs[LCD_FB_BYTES];
+	SharpLcd l(bus, fbs);
+	l.fill_white();
+	TEST_ASSERT_EQUAL_UINT16(24, l.draw_text_scaled(0, 0, "ab", true, 2));
+	TEST_ASSERT_EQUAL_UINT16(12, l.draw_text_scaled(0, 40, "ab", true, 1));
+}
+
 void test_framebuffer_size_matches_the_ram_budget(void) {
 	// 12,000 B is what the RAM budget reserves. A change here moves the
 	// largest single allocation in the device.
@@ -273,6 +308,8 @@ int main(int, char**) {
 	RUN_TEST(test_toggle_vcom_sends_no_pixel_data);
 	RUN_TEST(test_clear_uses_the_panel_command_not_a_full_transfer);
 	RUN_TEST(test_clear_carries_vcom);
+	RUN_TEST(test_scaled_text_is_the_glyph_blown_up);
+	RUN_TEST(test_scaled_text_advance_scales);
 	RUN_TEST(test_framebuffer_size_matches_the_ram_budget);
 	return UNITY_END();
 }

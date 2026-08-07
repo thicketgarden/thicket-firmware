@@ -295,30 +295,129 @@ static void d_compose(VirtualPanel& p, SharpLcd& l) {
 	l.flush(); save(p, "d4-compose");
 }
 
-// The panel holds its image with no redraw, so the idle screen is static by
-// design: every frame costs a 12,000-byte transfer. Nothing here animates.
+// --- the idle dashboard ----------------------------------------------------
+//
+// Static by design: the panel holds its image with no redraw, so every animated
+// frame would be another 12,000-byte transfer. All the life here is in the
+// drawing rather than in motion.
+
+struct Ball { float x, y, r; };
+
+static float field(const Ball* b, int n, float px, float py) {
+	float s = 0.0f;
+	for (int i = 0; i < n; ++i) {
+		const float dx = px - b[i].x, dy = py - b[i].y;
+		const float d2 = dx * dx + dy * dy;
+		s += (b[i].r * b[i].r) / (d2 < 1.0f ? 1.0f : d2);
+	}
+	return s;
+}
+
+// Metaballs, so the shell is a grown shape rather than a rounded rectangle.
+// Safe to solve rather than hand-draw: these are 170px across, far above the
+// size where an equation degenerates into a bar.
+static void blob(SharpLcd& l, const Ball* b, int n, int x0, int y0, int x1, int y1,
+                 bool fill, bool ink) {
+	for (int y = y0; y <= y1; ++y) {
+		for (int x = x0; x <= x1; ++x) {
+			if (field(b, n, (float)x, (float)y) < 1.0f) continue;
+			if (fill) { l.set_pixel((uint16_t)x, (uint16_t)y, ink); continue; }
+			const bool edge = field(b, n, (float)(x - 2), (float)y) < 1.0f ||
+			                  field(b, n, (float)(x + 2), (float)y) < 1.0f ||
+			                  field(b, n, (float)x, (float)(y - 2)) < 1.0f ||
+			                  field(b, n, (float)x, (float)(y + 2)) < 1.0f;
+			if (edge) l.set_pixel((uint16_t)x, (uint16_t)y, ink);
+		}
+	}
+}
+
+// A highlight line set in from the edge, knocked out of the fill. Gives the
+// mass some depth without any grey to work with.
+static void blob_inner_ring(SharpLcd& l, const Ball* b, int n,
+                            int x0, int y0, int x1, int y1, int inset) {
+	for (int y = y0; y <= y1; ++y) {
+		for (int x = x0; x <= x1; ++x) {
+			if (field(b, n, (float)x, (float)y) < 1.0f) continue;
+			const bool near_out =
+				field(b, n, (float)(x - inset), (float)y) < 1.0f ||
+				field(b, n, (float)(x + inset), (float)y) < 1.0f ||
+				field(b, n, (float)x, (float)(y - inset)) < 1.0f ||
+				field(b, n, (float)x, (float)(y + inset)) < 1.0f;
+			const bool on_edge =
+				field(b, n, (float)(x - inset / 2), (float)y) < 1.0f ||
+				field(b, n, (float)(x + inset / 2), (float)y) < 1.0f ||
+				field(b, n, (float)x, (float)(y - inset / 2)) < 1.0f ||
+				field(b, n, (float)x, (float)(y + inset / 2)) < 1.0f;
+			if (near_out && !on_edge) l.set_pixel((uint16_t)x, (uint16_t)y, false);
+		}
+	}
+}
+
+static void dot_field(SharpLcd& l, int step) {
+	for (int y = 6; y < 240; y += step)
+		for (int x = 6; x < 400; x += step)
+			l.set_pixel((uint16_t)x, (uint16_t)y, true);
+}
+
+// Text over the dot field needs its own clearance, or a stray dot lands beside
+// a glyph and reads as punctuation.
+static void field_text(SharpLcd& l, int x, int y, const char* s, int scale) {
+	const int w = tw(s) * scale, h = 13 * scale;
+	l.fill_rect((uint16_t)(x - 3), (uint16_t)(y - 2), (uint16_t)(w + 6),
+	            (uint16_t)(h + 4), false);
+	if (scale <= 1) l.draw_text((uint16_t)x, (uint16_t)y, s, true);
+	else            l.draw_text_scaled((uint16_t)x, (uint16_t)y, s, true, (uint8_t)scale);
+}
+
+// Segmented capsule. Reads as a gauge without borrowing the battery icon.
+static void gauge(SharpLcd& l, int x, int y, int w, int h, int filled, int cells) {
+	rrect_line(l, x, y, w, h, h / 2, true);
+	const int cw = (w - 8) / cells;
+	for (int i = 0; i < filled && i < cells; ++i)
+		l.fill_rect((uint16_t)(x + 4 + i * cw + 1), (uint16_t)(y + 3),
+		            (uint16_t)(cw - 2), (uint16_t)(h - 6), true);
+}
+
 static void d_rest(VirtualPanel& p, SharpLcd& l) {
 	l.fill_white();
-	status_bar(l, "thicket", "9:22", 72);
+	dot_field(l, 16);
 
-	card(l, BODY_TOP, 74, true, 20);
-	l.draw_text(CARD_X + 10, BODY_TOP + 4, "2 messages waiting", false);
-	l.draw_text(CARD_X + 10, BODY_TOP + 28, "mara", true);
-	text_right(l, CARD_X + CARD_W - 10, BODY_TOP + 28, "9:14", true);
-	l.draw_text(CARD_X + 10, BODY_TOP + 46, "sam", true);
-	text_right(l, CARD_X + CARD_W - 10, BODY_TOP + 46, "8:02", true);
+	// the shell: one grown mass carrying the time
+	const Ball shell[] = {
+		{78.0f,  74.0f, 40.0f},
+		{108.0f, 120.0f, 52.0f},
+		{76.0f,  164.0f, 40.0f},
+		{140.0f, 112.0f, 34.0f},
+	};
+	blob(l, shell, 4, 6, 18, 200, 214, true, true);
+	blob_inner_ring(l, shell, 4, 6, 18, 200, 214, 8);
 
-	card(l, 106, 44, false, 0);
-	l.draw_text(CARD_X + 10, 113, "4 people reachable", true);
-	text_right(l, CARD_X + CARD_W - 10, 113, "1 relay", true);
-	l.draw_text(CARD_X + 10, 129, "orchard relay is passing messages", true);
+	l.draw_text(58, 60, "thicket", false);
+	l.draw_text_scaled(58, 92, "9:22", false, 3);
+	l.draw_text(58, 146, "tue 5 aug", false);
+	for (int i = 0; i < 64; i += 3) l.set_pixel((uint16_t)(58 + i), 168, false);
 
-	card(l, 156, 44, false, 0);
-	l.draw_text(CARD_X + 10, 163, "listening", true);
-	text_right(l, CARD_X + CARD_W - 10, 163, "3 days of battery", true);
-	l.draw_text(CARD_X + 10, 179, "last heard from mara 8 minutes ago", true);
+	// two counts, each in its own shell
+	const Ball tile1[] = {
+		{252.0f, 64.0f, 30.0f}, {302.0f, 64.0f, 32.0f}, {352.0f, 64.0f, 30.0f},
+	};
+	blob(l, tile1, 3, 206, 20, 396, 112, false, true);
+	field_text(l, 238, 44, "2", 3);
+	field_text(l, 268, 50, "messages", 1);
+	field_text(l, 268, 66, "waiting", 1);
 
-	hint_bar(l, "press to open messages", NULL, HINT_Y);
+	const Ball tile2[] = {
+		{252.0f, 162.0f, 30.0f}, {302.0f, 162.0f, 32.0f}, {352.0f, 162.0f, 30.0f},
+	};
+	blob(l, tile2, 3, 206, 118, 396, 210, false, true);
+	field_text(l, 238, 142, "4", 3);
+	field_text(l, 268, 148, "people", 1);
+	field_text(l, 268, 164, "reachable", 1);
+
+	gauge(l, 8, 220, 96, 14, 3, 4);
+	field_text(l, 112, 221, "3 days", 1);
+	field_text(l, 392 - tw("listening"), 221, "listening", 1);
+
 	l.flush(); save(p, "d5-rest");
 }
 
