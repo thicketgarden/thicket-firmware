@@ -112,18 +112,6 @@ static void hint_bar(SharpLcd& l, const char* left, const char* right, int y) {
 	if (right) text_right(l, 400 - MARGIN, y + 6, right, true);
 }
 
-// Card. Selected gets a second border and a filled title strip.
-static void card(SharpLcd& l, int y, int h, bool sel, int head_h) {
-	rrect_line(l, CARD_X, y, CARD_W, h, 6, true);
-	if (!sel) {
-		if (head_h > 0) l.draw_hline((uint16_t)(CARD_X + 1), (uint16_t)(y + head_h),
-		                             (uint16_t)(CARD_W - 2), true);
-		return;
-	}
-	rrect_line(l, CARD_X + 1, y + 1, CARD_W - 2, h - 2, 5, true);
-	if (head_h > 0) rrect_fill(l, CARD_X + 2, y + 2, CARD_W - 4, head_h - 2, 4, 0, true);
-}
-
 static std::vector<std::string> wrap(const char* text, size_t cols) {
 	std::vector<std::string> out;
 	std::string line, word;
@@ -151,42 +139,97 @@ static void save(VirtualPanel& p, const char* name) {
 
 // --- screens ---------------------------------------------------------------
 
-static void d_messages(VirtualPanel& p, SharpLcd& l) {
-	struct Conv {
-		const char* who; const char* last; const char* route;
-		const char* when; int unread;
-	};
-	const Conv rows[] = {
-		{"mara", "Are you coming down to the river?", "direct",             "9:14", 2},
-		{"sam",  "Found the thing you left by the gate", "via orchard relay", "1h",  0},
-		{"base", "Weather turning tonight",           "direct",             "3h",   0},
-	};
-	const int SEL = 0, H = 56, GAP = 5;
+struct Conv {
+	const char* who; const char* last; const char* route;
+	const char* when; int unread;
+};
+static const Conv CONVS[3] = {
+	{"mara", "Are you coming down to the river?",    "direct",            "9:14", 2},
+	{"sam",  "Found the thing you left by the gate", "via orchard relay", "1h",   0},
+	{"base", "Weather turning tonight",              "direct",            "3h",   0},
+};
+static const int CONV_H = 58, CONV_GAP = 4;
 
+// Selection as a filled mass with a line set in from its edge - the same move
+// the shell makes, and for the same reason: there is no grey to give an object
+// depth with.
+static void select_card(SharpLcd& l, int y, int h, int inset = 4) {
+	rrect_fill(l, CARD_X, y, CARD_W, h, 6, 6, true);
+	rrect_line(l, CARD_X + inset, y + inset, CARD_W - 2 * inset, h - 2 * inset,
+	           inset < 4 ? 3 : 4, false);
+}
+
+struct Ball;
+static void dot_field(SharpLcd& l, int step);
+
+// Ground shared by the screens that carry one message rather than a list, so
+// they read as the same family as the idle screen.
+static void hero_ground(SharpLcd& l) {
+	dot_field(l, 16);
+	l.fill_rect(0, 0, LCD_WIDTH, 20, false);
+	l.fill_rect(0, 204, LCD_WIDTH, 36, false);
+}
+
+static void d_messages_frame(SharpLcd& l, int sel) {
 	l.fill_white();
 	status_bar(l, "messages", "9:22", 72);
 
 	for (int i = 0; i < 3; ++i) {
-		const int y = BODY_TOP + i * (H + GAP);
-		const bool sel = (i == SEL);
-		card(l, y, H, sel, 20);
-		const bool head_ink = !sel;
+		const int y = BODY_TOP + i * (CONV_H + CONV_GAP);
+		const bool s = (i == sel);
+		if (s) select_card(l, y, CONV_H);
+		else   rrect_line(l, CARD_X, y, CARD_W, CONV_H, 6, true);
+		const bool ink = !s;
 
-		l.draw_text(CARD_X + 10, (uint16_t)(y + 4), rows[i].who, head_ink);
-		int right = CARD_X + CARD_W - 10;
-		if (rows[i].unread) {
-			badge(l, right, y + 3, rows[i].unread, head_ink);
+		// the name is what the eye is looking for, so it is the big thing
+		l.draw_text_scaled((uint16_t)(CARD_X + 12), (uint16_t)(y + 6),
+		                   CONVS[i].who, ink, 2);
+
+		int right = CARD_X + CARD_W - 12;
+		if (CONVS[i].unread) {
+			badge(l, right, y + 11, CONVS[i].unread, ink);
 			right -= tw("2") + 12 + 8;
 		}
-		text_right(l, right, y + 4, rows[i].when, head_ink);
+		text_right(l, right, y + 12, CONVS[i].when, ink);
 
-		l.draw_text(CARD_X + 10, (uint16_t)(y + 26), rows[i].last, true);
-		l.draw_text(CARD_X + 10, (uint16_t)(y + 41), rows[i].route, true);
+		l.draw_text((uint16_t)(CARD_X + 12), (uint16_t)(y + 38), CONVS[i].last, ink);
+		text_right(l, CARD_X + CARD_W - 12, y + 38, CONVS[i].route, ink);
 	}
 
-	scrollbar(l, BODY_TOP, 3 * (H + GAP) - GAP, 6, 3, 0);
+	scrollbar(l, BODY_TOP, 3 * (CONV_H + CONV_GAP) - CONV_GAP, 6, 3, 0);
 	hint_bar(l, "press to open", "turn to move", HINT_Y);
-	l.flush(); save(p, "d1-messages");
+}
+
+static uint8_t compose_fb[LCD_FB_BYTES];
+
+// Copy a composed frame across pixel by pixel so a line is dirty only where it
+// truly changed. Redrawing in place marks every line touched and the cost
+// numbers become fiction.
+static void blit(SharpLcd& dst, SharpLcd& src) {
+	for (uint16_t y = 0; y < LCD_HEIGHT; ++y)
+		for (uint16_t x = 0; x < LCD_WIDTH; ++x)
+			dst.set_pixel(x, y, src.get_pixel(x, y));
+}
+
+static void d_messages(VirtualPanel& p, SharpLcd& l) {
+	VirtualPanel sink;
+	SharpLcd c(sink, compose_fb);
+
+	l.fill_white();
+	d_messages_frame(c, 0);
+	blit(l, c);
+	p.reset_counters();
+	l.flush();
+	save(p, "d1-messages");
+
+	// what one detent of the wheel actually costs
+	d_messages_frame(c, 1);
+	blit(l, c);
+	p.reset_counters();
+	l.flush();
+	save(p, "d1-messages-next");
+	printf("    one wheel detent: %u lines, %u bytes on the wire\n",
+	       (unsigned)p.lines_written(), (unsigned)(2 + 52 * p.lines_written()));
 }
 
 static int bubble(SharpLcd& l, int y, const char* text, bool mine, const char* when) {
@@ -249,24 +292,27 @@ static void d_conversation(VirtualPanel& p, SharpLcd& l) {
 static void d_people(VirtualPanel& p, SharpLcd& l) {
 	struct Person { const char* name; const char* route; const char* seen; };
 	const Person rows[] = {
-		{"mara",          "direct",             "last seen just now"},
-		{"sam",           "via orchard relay",  "last seen 1h ago"},
-		{"base",          "direct",             "last seen 3h ago"},
-		{"ilse",          "not reachable",      "last seen yesterday"},
+		{"mara", "direct",            "last seen just now"},
+		{"sam",  "via orchard relay", "last seen 1h ago"},
+		{"base", "direct",            "last seen 3h ago"},
+		{"ilse", "not reachable",     "last seen yesterday"},
 	};
-	const int SEL = 0, H = 42, GAP = 4;
+	// Four kept visible rather than three: a contact list is scanned for a
+	// name you already know, so density beats size here.
+	const int SEL = 0, H = 42, GAP = 3;
 
 	l.fill_white();
 	status_bar(l, "people", "9:22", 72);
 
 	for (int i = 0; i < 4; ++i) {
 		const int y = BODY_TOP + i * (H + GAP);
-		const bool sel = (i == SEL);
-		card(l, y, H, sel, 20);
-		const bool head_ink = !sel;
-		l.draw_text(CARD_X + 10, (uint16_t)(y + 4), rows[i].name, head_ink);
-		text_right(l, CARD_X + CARD_W - 10, y + 4, rows[i].route, head_ink);
-		l.draw_text(CARD_X + 10, (uint16_t)(y + 25), rows[i].seen, true);
+		const bool s = (i == SEL);
+		if (s) select_card(l, y, H, 3);
+		else   rrect_line(l, CARD_X, y, CARD_W, H, 6, true);
+		const bool ink = !s;
+		l.draw_text((uint16_t)(CARD_X + 12), (uint16_t)(y + 7), rows[i].name, ink);
+		text_right(l, CARD_X + CARD_W - 12, y + 7, rows[i].route, ink);
+		l.draw_text((uint16_t)(CARD_X + 12), (uint16_t)(y + 23), rows[i].seen, ink);
 	}
 
 	scrollbar(l, BODY_TOP, 4 * (H + GAP) - GAP, 7, 4, 0);
@@ -285,7 +331,7 @@ static void d_compose(VirtualPanel& p, SharpLcd& l) {
 	for (int i = 0; i < 6; ++i) {
 		const int y = BODY_TOP + i * (H + GAP);
 		const bool sel = (i == SEL);
-		if (sel) rrect_fill(l, CARD_X, y, CARD_W, H, 6, 6, true);
+		if (sel) select_card(l, y, H, 3);
 		else     rrect_line(l, CARD_X, y, CARD_W, H, 6, true);
 		l.draw_text(CARD_X + 12, (uint16_t)(y + 6), quick[i], !sel);
 	}
@@ -363,7 +409,7 @@ static void dot_field(SharpLcd& l, int step) {
 // a glyph and reads as punctuation.
 static void field_text(SharpLcd& l, int x, int y, const char* s, int scale) {
 	const int w = tw(s) * scale, h = 13 * scale;
-	l.fill_rect((uint16_t)(x - 3), (uint16_t)(y - 2), (uint16_t)(w + 6),
+	l.fill_rect((uint16_t)(x - 7), (uint16_t)(y - 2), (uint16_t)(w + 14),
 	            (uint16_t)(h + 4), false);
 	if (scale <= 1) l.draw_text((uint16_t)x, (uint16_t)y, s, true);
 	else            l.draw_text_scaled((uint16_t)x, (uint16_t)y, s, true, (uint8_t)scale);
@@ -459,8 +505,6 @@ static void rest_compose(SharpLcd& l, int frame) {
 	field_text(l, 392 - tw("listening"), 221, "listening", 1);
 }
 
-static uint8_t compose_fb[LCD_FB_BYTES];
-
 static void d_rest(VirtualPanel& p, SharpLcd& l) {
 	// Compose off to the side and copy pixel by pixel, so a line is only dirty
 	// when it genuinely changed. Clearing and redrawing in place would mark
@@ -471,9 +515,7 @@ static void d_rest(VirtualPanel& p, SharpLcd& l) {
 	l.fill_white();
 	for (int f = 0; f < FRAMES; ++f) {
 		rest_compose(c, f);
-		for (uint16_t y = 0; y < LCD_HEIGHT; ++y)
-			for (uint16_t x = 0; x < LCD_WIDTH; ++x)
-				l.set_pixel(x, y, c.get_pixel(x, y));
+		blit(l, c);
 
 		p.reset_counters();
 		l.flush();
@@ -487,16 +529,22 @@ static void d_rest(VirtualPanel& p, SharpLcd& l) {
 	}
 }
 
+// Deliberately uneven: two equal lobes at the same height merge into a flat
+// top, and the design language calls rigid symmetry off-language anyway.
+static const Ball HERO[3] = {
+	{126.0f, 120.0f, 56.0f}, {266.0f, 104.0f, 58.0f}, {198.0f, 132.0f, 50.0f},
+};
+
 static void d_first_run(VirtualPanel& p, SharpLcd& l) {
 	l.fill_white();
+	hero_ground(l);
+	blob(l, HERO, 3, 38, 22, 372, 212, false, true);
 	status_bar(l, "thicket", "9:22", 100);
 
-	card(l, 54, 108, true, 22);
-	l.draw_text(CARD_X + 10, 58, "No one added yet", false);
-	l.draw_text(CARD_X + 10, 88, "Hold this next to another thicket", true);
-	l.draw_text(CARD_X + 10, 104, "and press the wheel on both. They", true);
-	l.draw_text(CARD_X + 10, 120, "will remember each other after that.", true);
-	l.draw_text(CARD_X + 10, 142, "Nothing is sent until you add someone.", true);
+	field_text(l, 100, 68, "No one added yet", 2);
+	field_text(l, 104, 110, "Hold this next to another thicket", 1);
+	field_text(l, 104, 128, "and press the wheel on both.", 1);
+	field_text(l, 104, 150, "Nothing is sent until you do.", 1);
 
 	hint_bar(l, "press to add someone", NULL, HINT_Y);
 	l.flush(); save(p, "d6-first-run");
@@ -504,17 +552,14 @@ static void d_first_run(VirtualPanel& p, SharpLcd& l) {
 
 static void d_queued(VirtualPanel& p, SharpLcd& l) {
 	l.fill_white();
+	hero_ground(l);
+	blob(l, HERO, 3, 38, 22, 372, 212, false, true);
 	status_bar(l, "messages", "9:22", 41);
 
-	card(l, 54, 96, true, 22);
-	l.draw_text(CARD_X + 10, 58, "Nothing in range", false);
-	l.draw_text(CARD_X + 10, 88, "3 messages are waiting to go out.", true);
-	l.draw_text(CARD_X + 10, 106, "They will send on their own as soon", true);
-	l.draw_text(CARD_X + 10, 122, "as anything comes within reach.", true);
-
-	card(l, 162, 38, false, 0);
-	l.draw_text(CARD_X + 10, 172, "Last in range", true);
-	text_right(l, CARD_X + CARD_W - 10, 172, "40 minutes ago", true);
+	field_text(l, 100, 68, "Nothing in range", 2);
+	field_text(l, 106, 110, "3 messages are waiting to go.", 1);
+	field_text(l, 106, 128, "They send as soon as anything", 1);
+	field_text(l, 106, 146, "comes within reach.", 1);
 
 	hint_bar(l, "press to see them", "turn to move", HINT_Y);
 	l.flush(); save(p, "d7-queued");
