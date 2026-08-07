@@ -378,41 +378,40 @@ static void gauge(SharpLcd& l, int x, int y, int w, int h, int filled, int cells
 		            (uint16_t)(cw - 2), (uint16_t)(h - 6), true);
 }
 
-// The shell, hoisted so the breathing frames can repaint over it exactly.
-static const Ball SHELL[4] = {
-	{78.0f,  74.0f, 40.0f},
+// The shell and the two count tiles, as they sit at rest. Each frame displaces
+// them slightly; the phases differ so the masses do not pulse in unison.
+static const Ball SHELL0[4] = {
+	{78.0f,  74.0f,  40.0f},
 	{108.0f, 120.0f, 52.0f},
 	{76.0f,  164.0f, 40.0f},
 	{140.0f, 112.0f, 34.0f},
 };
+static const Ball TILE1_0[3] = {
+	{252.0f, 64.0f, 30.0f}, {302.0f, 64.0f, 32.0f}, {352.0f, 64.0f, 30.0f},
+};
+static const Ball TILE2_0[3] = {
+	{252.0f, 162.0f, 30.0f}, {302.0f, 162.0f, 32.0f}, {352.0f, 162.0f, 30.0f},
+};
 
-// The breathing element and the box it is confined to. Keeping it small is the
-// whole point: flush sends dirty lines only, so the cost of a frame is set by
-// how many rows the motion touches.
-static const int PULSE_CX = 95, PULSE_CY = 188, PULSE_MAX = 16;
-static const int PBX0 = PULSE_CX - PULSE_MAX, PBX1 = PULSE_CX + PULSE_MAX;
-static const int PBY0 = PULSE_CY - PULSE_MAX, PBY1 = PULSE_CY + PULSE_MAX;
+static const int FRAMES = 6;
 
-static void dot_field(SharpLcd& l, int step);
-
-// Repaint the pulse box from scratch: shell where the field says so, ground
-// dots elsewhere. Exact, so the box may sit across the shell edge.
-static void rest_restore(SharpLcd& l) {
-	for (int y = PBY0; y <= PBY1; ++y)
-		for (int x = PBX0; x <= PBX1; ++x)
-			l.set_pixel((uint16_t)x, (uint16_t)y,
-			            field(SHELL, 4, (float)x, (float)y) >= 1.0f);
-	for (int y = PBY0; y <= PBY1; ++y)
-		for (int x = PBX0; x <= PBX1; ++x)
-			if ((x - 6) % 16 == 0 && (y - 6) % 16 == 0 &&
-			    field(SHELL, 4, (float)x, (float)y) < 1.0f)
-				l.set_pixel((uint16_t)x, (uint16_t)y, true);
+// Displacement returns to zero at frame FRAMES, so the loop closes.
+static void morph(const Ball* in, Ball* out, int n, int frame, float phase,
+                  float amp) {
+	const float t = 6.2831853f * (float)frame / (float)FRAMES;
+	for (int i = 0; i < n; ++i) {
+		const float ph = phase + 1.7f * (float)i;
+		out[i].x = in[i].x + amp * 0.9f * __builtin_cosf(t + ph);
+		out[i].y = in[i].y + amp * 0.7f * __builtin_sinf(t + ph * 1.3f);
+		out[i].r = in[i].r + amp * __builtin_sinf(t + ph * 0.6f);
+	}
 }
 
-// Six radii that return to where they started, so the loop has no seam.
+static const int PULSE_CX = 95, PULSE_CY = 188;
+
 static void rest_pulse(SharpLcd& l, int frame) {
-	static const int R[6] = {4, 6, 8, 10, 8, 6};
-	const int r = R[frame % 6];
+	static const int R[FRAMES] = {4, 6, 8, 10, 8, 6};
+	const int r = R[frame % FRAMES];
 	for (int dy = -r; dy <= r; ++dy)
 		for (int dx = -r; dx <= r; ++dx)
 			if (dx * dx + dy * dy <= r * r)
@@ -425,30 +424,32 @@ static void rest_pulse(SharpLcd& l, int frame) {
 	}
 }
 
-static void rest_static(SharpLcd& l) {
+static void rest_compose(SharpLcd& l, int frame) {
+	Ball shell[4], t1[3], t2[3];
+	// Amplitude is free: the shapes already dirty nearly every line they
+	// cross, so a bigger displacement costs the same as a small one.
+	morph(SHELL0,  shell, 4, frame, 0.0f, 5.0f);
+	morph(TILE1_0, t1,    3, frame, 2.1f, 3.5f);
+	morph(TILE2_0, t2,    3, frame, 4.2f, 3.5f);
+
 	l.fill_white();
 	dot_field(l, 16);
 
-	blob(l, SHELL, 4, 6, 18, 200, 214, true, true);
-	blob_inner_ring(l, SHELL, 4, 6, 18, 200, 214, 8);
+	blob(l, shell, 4, 2, 14, 204, 218, true, true);
+	blob_inner_ring(l, shell, 4, 2, 14, 204, 218, 8);
 
 	l.draw_text(58, 60, "thicket", false);
 	l.draw_text_scaled(58, 92, "9:22", false, 3);
 	l.draw_text(58, 146, "tue 5 aug", false);
 	for (int i = 0; i < 64; i += 3) l.set_pixel((uint16_t)(58 + i), 168, false);
+	rest_pulse(l, frame);
 
-	const Ball tile1[] = {
-		{252.0f, 64.0f, 30.0f}, {302.0f, 64.0f, 32.0f}, {352.0f, 64.0f, 30.0f},
-	};
-	blob(l, tile1, 3, 206, 20, 396, 112, false, true);
+	blob(l, t1, 3, 202, 16, 398, 116, false, true);
 	field_text(l, 238, 44, "2", 3);
 	field_text(l, 268, 50, "messages", 1);
 	field_text(l, 268, 66, "waiting", 1);
 
-	const Ball tile2[] = {
-		{252.0f, 162.0f, 30.0f}, {302.0f, 162.0f, 32.0f}, {352.0f, 162.0f, 30.0f},
-	};
-	blob(l, tile2, 3, 206, 118, 396, 210, false, true);
+	blob(l, t2, 3, 202, 114, 398, 214, false, true);
 	field_text(l, 238, 142, "4", 3);
 	field_text(l, 268, 148, "people", 1);
 	field_text(l, 268, 164, "reachable", 1);
@@ -458,21 +459,28 @@ static void rest_static(SharpLcd& l) {
 	field_text(l, 392 - tw("listening"), 221, "listening", 1);
 }
 
-static void d_rest(VirtualPanel& p, SharpLcd& l) {
-	rest_static(l);
-	rest_pulse(l, 0);
-	p.reset_counters();
-	l.flush();
-	printf("    frame 1 (full): %u lines\n", (unsigned)p.lines_written());
-	save(p, "d5-rest");
+static uint8_t compose_fb[LCD_FB_BYTES];
 
-	for (int f = 1; f < 6; ++f) {
-		rest_restore(l);
-		rest_pulse(l, f);
+static void d_rest(VirtualPanel& p, SharpLcd& l) {
+	// Compose off to the side and copy pixel by pixel, so a line is only dirty
+	// when it genuinely changed. Clearing and redrawing in place would mark
+	// every line it touched and the cost below would be fiction.
+	VirtualPanel sink;
+	SharpLcd c(sink, compose_fb);
+
+	l.fill_white();
+	for (int f = 0; f < FRAMES; ++f) {
+		rest_compose(c, f);
+		for (uint16_t y = 0; y < LCD_HEIGHT; ++y)
+			for (uint16_t x = 0; x < LCD_WIDTH; ++x)
+				l.set_pixel(x, y, c.get_pixel(x, y));
+
 		p.reset_counters();
 		l.flush();
+
 		char name[32];
-		snprintf(name, sizeof(name), "d5-rest-f%d", f + 1);
+		if (f == 0) snprintf(name, sizeof(name), "d5-rest");
+		else        snprintf(name, sizeof(name), "d5-rest-f%d", f + 1);
 		save(p, name);
 		printf("    frame %d: %u lines, %u bytes on the wire\n", f + 1,
 		       (unsigned)p.lines_written(), (unsigned)(2 + 52 * p.lines_written()));
