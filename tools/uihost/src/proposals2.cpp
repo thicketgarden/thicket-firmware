@@ -7,6 +7,7 @@
 
 #include "SharpLcd.h"
 #include "VirtualPanel.h"
+#include "ui_marks.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -173,6 +174,8 @@ static void b2(VirtualPanel& p, SharpLcd& l) {
 // C2 — THE TAPE, wheel-first. Almost no frame; the chrome is organic.
 // ===========================================================================
 
+static void c2_friends(VirtualPanel& p, SharpLcd& l);
+
 static void c2(VirtualPanel& p, SharpLcd& l) {
 	l.fill_white();
 
@@ -211,43 +214,96 @@ static void c2(VirtualPanel& p, SharpLcd& l) {
 	l.draw_text(280, 206, "hold for more", true);
 	l.flush(); save(p, "c2a-tape");
 
-	// friends, with the rail doubling as who is reachable
+	c2_friends(p, l);
+}
+
+// ---------------------------------------------------------------------------
+// C2b — who is near. Each friend is a fruiting body standing on their own
+// ground, and how near they are is how big they have grown. The words say the
+// same thing plainly; nothing here asks the reader to know what a bar means.
+// ---------------------------------------------------------------------------
+
+static void c2_friends(VirtualPanel& p, SharpLcd& l) {
+	struct F {
+		const char* name;
+		const char* how;
+		const MarkArt* art;
+		bool faded;     // not heard from: present, but not filled in
+		bool waiting;   // something of theirs is here for you
+	};
+	const F fr[] = {
+		{"mara",             "close by",            &MARK_L, false, true },
+		{"sam",              "a way off",           &MARK_M, false, false},
+		{"the orchard relay","passing messages",    &MARK_L, false, false},
+		{"base",             "through the orchard", &MARK_S, false, false},
+		{"ilse",             "not heard today",     &MARK_S, true,  false},
+	};
+	const int N = 5, FSEL = 0;
+
+	const int TOP = 30, PITCH = 34, SLOT_X = 14, SLOT_W = 24;
+	const int RAIL_X = 366;
+
 	l.fill_white();
 	sprig(l, 8, 18, 1);
+	sprig(l, 392, 18, -1);   // mirrored, so the header is grown at both ends
 	l.draw_text(44, 6, "who is near", true);
 	soft_rule(l, 6, 24, 388);
 
-	struct F { const char* name; const char* how; int near; };
-	const F fr[] = {
-		{"mara",            "close by",            3},
-		{"sam",             "a way off",           2},
-		{"the orchard relay","passing messages",   3},
-		{"base",            "through the orchard", 1},
-		{"ilse",            "not heard today",     0},
-	};
-	const int FSEL = 0;
-	y = 40;
-	for (int i = 0; i < 5; ++i) {
+	for (int i = 0; i < N; ++i) {
 		const bool sel = (i == FSEL);
-		if (sel) band(l, 8, y - 4, 340, 26);
-		l.draw_text(20, (uint16_t)y, fr[i].name, !sel);
-		l.draw_text(180, (uint16_t)y, fr[i].how, !sel);
-		// nearness as growth: more leaves, not more bars
-		for (int n = 0; n < 3; ++n) {
-			const int lx = 316 + n * 10, ly = y + 8;
-			if (n < fr[i].near)
-				for (int dy = -3; dy <= 3; ++dy)
-					for (int dx = -2; dx <= 2; ++dx)
-						if (dx * dx * 2 + dy * dy <= 9)
-							l.set_pixel((uint16_t)(lx + dx), (uint16_t)(ly + dy), !sel);
-			else
-				l.set_pixel((uint16_t)lx, (uint16_t)ly, !sel);
+		const int row = TOP + PITCH * i;
+		const int ground = row + 25;
+		const bool ink = !sel;          // knocked out of the band when selected
+
+		if (sel) band(l, 8, row - 1, 344, 32);
+
+		const MarkArt& m = *fr[i].art;
+		const int mx = SLOT_X + (SLOT_W - m.w) / 2;
+		draw_mark(l, m, mx, ground, ink, fr[i].faded);
+
+		// the ground they stand on, so they are in a place rather than floating.
+		// It follows the mark's own width - a wide ground under a small mark
+		// reads as a shelf the thing is sitting on rather than ground.
+		for (int k = 0; k < m.w + 6; k += 2)
+			l.set_pixel((uint16_t)(mx - 3 + k), (uint16_t)ground, ink);
+
+		// the spore drifts off the edge of the cap rather than sitting centred
+		// above it like a balloon, and it stays inside the selection band
+		if (fr[i].waiting)
+			draw_spore(l, mx + m.w - 3, ground - m.h - 2, ink);
+
+		// names rest on the same ground the marks stand on, so a row is one
+		// thing rather than a picture with a caption beside it
+		const int ty_text = ground - 13;
+		l.draw_text(52, (uint16_t)ty_text, fr[i].name, ink);
+		l.draw_text(196, (uint16_t)ty_text, fr[i].how, ink);
+
+		// rail tick beside the row it belongs to, so the stem reads as position
+		const int ty = row + 14;
+		if (sel) {
+			for (int dy = -4; dy <= 4; ++dy)
+				for (int dx = -4; dx <= 4; ++dx)
+					if (dx * dx + dy * dy <= 16)
+						l.set_pixel((uint16_t)(RAIL_X + dx), (uint16_t)(ty + dy), true);
+		} else {
+			const int dir = (i & 1) ? 1 : -1;
+			for (int k = 2; k <= 5; ++k)
+				l.set_pixel((uint16_t)(RAIL_X + k * dir), (uint16_t)ty, true);
 		}
-		y += 32;
 	}
-	rail(l, 366, 42, 150, 5, FSEL);
-	soft_rule(l, 6, 200, 388);
-	l.draw_text(30, 210, "press to write to mara", true);
+
+	for (int i = 0; i < TOP + PITCH * (N - 1) + 14 - 30; ++i)
+		if ((i & 3) != 3) l.set_pixel((uint16_t)RAIL_X, (uint16_t)(30 + i), true);
+
+	soft_rule(l, 6, 206, 388);
+	// the footer offers what pressing actually does here: if they have left
+	// something, reading it comes before writing back
+	char foot[64];
+	if (fr[FSEL].waiting)
+		snprintf(foot, sizeof(foot), "press to read what %s sent", fr[FSEL].name);
+	else
+		snprintf(foot, sizeof(foot), "press to write to %s", fr[FSEL].name);
+	l.draw_text(30, 212, foot, true);
 	l.flush(); save(p, "c2b-friends");
 }
 
