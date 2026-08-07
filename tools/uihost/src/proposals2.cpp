@@ -82,25 +82,6 @@ static void soft_rule(SharpLcd& l, int x, int y, int w) {
 	}
 }
 
-// Corner flourish: a small sprig, so the frame is grown rather than cut.
-static void sprig(SharpLcd& l, int x, int y, int dir) {
-	// Curved stem with three leaves. Bigger than the first attempt, which was
-	// too small to read as anything but noise.
-	for (int i = 0; i < 16; ++i) {
-		const int sy = y - (i * i) / 26;
-		l.set_pixel((uint16_t)(x + i * dir), (uint16_t)sy, true);
-		if (i == 4 || i == 9 || i == 14) {
-			const int up = (i == 9) ? -1 : 1;
-			for (int k = 1; k <= 4; ++k) {
-				const int lx = x + (i + k / 2) * dir;
-				const int ly = sy + up * k;
-				for (int t = 0; t < 2; ++t)
-					l.set_pixel((uint16_t)(lx + t * dir), (uint16_t)ly, true);
-			}
-		}
-	}
-}
-
 static void save(VirtualPanel& p, const char* name) {
 	char path[128];
 	snprintf(path, sizeof(path), "screens/%s.pbm", name);

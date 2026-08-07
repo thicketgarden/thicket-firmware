@@ -86,6 +86,20 @@ static inline void draw_mark(SharpLcd& l, const MarkArt& m, int x, int base_y,
 	}
 }
 
+// Corner sprig. Curved stem, three leaves; drawn big enough to read.
+static inline void sprig(SharpLcd& l, int x, int y, int dir) {
+	for (int i = 0; i < 16; ++i) {
+		const int sy = y - (i * i) / 26;
+		l.set_pixel((uint16_t)(x + i * dir), (uint16_t)sy, true);
+		if (i != 4 && i != 9 && i != 14) continue;
+		const int up = (i == 9) ? -1 : 1;
+		for (int k = 1; k <= 4; ++k)
+			for (int t = 0; t < 2; ++t)
+				l.set_pixel((uint16_t)(x + (i + k / 2) * dir + t * dir),
+				            (uint16_t)(sy + up * k), true);
+	}
+}
+
 // Something waiting: a spore lifting off the cap. Not a count — the fact that
 // there is anything at all is what the reader needs.
 static inline void draw_spore(SharpLcd& l, int cx, int cy, bool ink) {
