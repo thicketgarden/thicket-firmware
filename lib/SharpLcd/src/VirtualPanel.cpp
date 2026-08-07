@@ -6,7 +6,29 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef ARDUINO
+#include <sys/stat.h>
+#include <sys/types.h>
+#endif
+
 namespace thicket {
+
+#ifndef ARDUINO
+// Create the parent directories of `path`. screens/ is gitignored and holds no
+// tracked file, so it does not exist in a fresh checkout.
+static void make_parent_dirs(const char* path) {
+	char buf[512];
+	const size_t n = strlen(path);
+	if (n >= sizeof(buf)) return;
+	memcpy(buf, path, n + 1);
+	for (char* p = buf + 1; *p; ++p) {
+		if (*p != '/') continue;
+		*p = '\0';
+		mkdir(buf, 0755);   // EEXIST is the normal case
+		*p = '/';
+	}
+}
+#endif
 
 VirtualPanel::VirtualPanel()
 	: _tx_len(0), _selected(false), _vcom(false),
@@ -76,6 +98,9 @@ bool VirtualPanel::pixel(uint16_t x, uint16_t y) const {
 
 bool VirtualPanel::write_pbm(const char* path, uint8_t scale) const {
 	if (scale == 0) scale = 1;
+#ifndef ARDUINO
+	make_parent_dirs(path);
+#endif
 	FILE* f = fopen(path, "wb");
 	if (!f) return false;
 
