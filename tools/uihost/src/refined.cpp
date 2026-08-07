@@ -17,7 +17,11 @@ static uint8_t fb[LCD_FB_BYTES];
 
 static const int CW = 6;
 static const int LH = 14;
-static const int M  = 10;          // page margin
+static const int M  = 12;          // page margin
+static const int HEAD_RULE = 30;   // everything above this is chrome
+static const int FOOT_RULE = 210;  // everything below this is chrome
+static const int BODY_TOP  = 40;
+static const int BODY_BOT  = 202;
 
 // --- primitives ------------------------------------------------------------
 
@@ -76,10 +80,19 @@ static const uint32_t MARK[20] = {
 	0x00FF00, 0x01FF80, 0x03FFC0, 0x07FFE0,
 };
 
-static void mark(SharpLcd& l, int x, int y, int scale) {
+static const uint32_t MARK_OUT[20] = {
+	0x000000, 0x00FC00, 0x03FF00, 0x0FFFC0,
+	0x1FFFE0, 0x3FFFF0, 0x7FFFF8, 0x7FFFF8,
+	0x3FFFF0, 0x03FF00, 0x00FC00, 0x007E00,
+	0x007E00, 0x007E00, 0x007E00, 0x007E00,
+	0x00FF00, 0x00FF00, 0x01FF80, 0x03FFC0,
+};
+
+static void mark(SharpLcd& l, int x, int y, int scale, bool out = false) {
+	const uint32_t* art = out ? MARK_OUT : MARK;
 	for (int row = 0; row < 20; ++row) {
 		for (int col = 0; col < 24; ++col) {
-			if (!(MARK[row] & (0x800000u >> col))) continue;
+			if (!(art[row] & (0x800000u >> col))) continue;
 			// gills: a lighter band where the cap meets the stem
 			const bool gill = (row == 8 && ((col + row) & 1));
 			for (int sy = 0; sy < scale; ++sy)
@@ -117,21 +130,21 @@ static std::vector<std::string> wrap(const char* s, size_t cols) {
 
 // The header the design settled on: mark, wordmark, and what the screen is.
 static void head(SharpLcd& l, const char* right) {
-	mark(l, M, 5, 1);
-	l.draw_text(M + 32, 8, "thicket", true);
+	mark(l, M, 4, 1);
+	l.draw_text(M + 32, 9, "thicket", true);
 	if (right && *right) {
 		const int w = (int)strlen(right) * CW;
-		l.draw_text((uint16_t)(400 - M - w), 8, right, true);
+		l.draw_text((uint16_t)(400 - M - w), 9, right, true);
 	}
-	hairline(l, M, 28, 400 - 2 * M);
+	hairline(l, M, HEAD_RULE, 400 - 2 * M);
 }
 
 static void foot(SharpLcd& l, const char* left, const char* right) {
-	hairline(l, M, 212, 400 - 2 * M);
-	if (left)  l.draw_text(M, 220, left, true);
+	hairline(l, M, FOOT_RULE, 400 - 2 * M);
+	if (left)  l.draw_text(M, FOOT_RULE + 9, left, true);
 	if (right) {
 		const int w = (int)strlen(right) * CW;
-		l.draw_text((uint16_t)(400 - M - w), 220, right, true);
+		l.draw_text((uint16_t)(400 - M - w), FOOT_RULE + 9, right, true);
 	}
 }
 
@@ -175,17 +188,54 @@ static void save(VirtualPanel& p, const char* n) {
 
 // --- screens ---------------------------------------------------------------
 
-static void resting(VirtualPanel& p, SharpLcd& l) {
+// Distant marks: how many friends are near, drawn rather than counted. The
+// number is the same fact the text used to state.
+static const int GROUND = 168;
+
+// Everything stands ON the ground: a mark is 20 rows, so its top is
+// GROUND - 20*scale. Floating them was the thing that made the first version
+// look like clip art rather than a place.
+static void distant(SharpLcd& l, int n) {
+	const int at[3][2] = {{56, 2}, {300, 2}, {352, 1}};   // x, scale
+	for (int i = 0; i < n && i < 3; ++i) {
+		const int sc = at[i][1];
+		mark(l, at[i][0], GROUND - 20 * sc, sc, (i & 1) != 0);
+	}
+}
+
+static void resting(VirtualPanel& p, SharpLcd& l, bool out, const char* tag) {
 	l.fill_white();
 	head(l, "4 days");
-
-	// The same mark, large. The device at rest is the mark itself.
-	mark(l, 152, 56, 4);   // 20 rows x4 = 80px tall, so the base lands at 136
-
-	l.draw_text(124, 154, "everything is quiet", true);
-	l.draw_text(136, 176, "3 friends near", true);
+	distant(l, 3);
+	mark(l, 152, GROUND - 80, 4, out);
+	hairline(l, 30, GROUND, 340);          // the ground they grow from
+	l.draw_text(124, 180, "everything is quiet", true);
 	foot(l, "turn to look around", "♥♥♡");
-	l.flush(); save(p, "r1-resting");
+	l.flush(); save(p, tag);
+}
+
+// A message lands while the device is resting. This is the moment the thing
+// exists for, and no screen had drawn it.
+static void arrival(VirtualPanel& p, SharpLcd& l) {
+	l.fill_white();
+	head(l, "just now");
+	distant(l, 3);
+	mark(l, 120, GROUND - 80, 4, false);
+	hairline(l, 30, GROUND, 340);
+
+	// a bubble surfacing beside it, tail pointing back at the mark
+	const char* said = "are you coming down";
+	const int bw = (int)strlen(said) * CW + 16;
+	rr(l, 246, 74, bw, 34, 8, false);
+	l.draw_text(254, 82, said, true);
+	l.draw_text(254, 94, "to the river", true);
+	for (int i = 0; i < 7; ++i)
+		for (int k = 0; k < 7 - i; ++k)
+			l.set_pixel((uint16_t)(247 - i), (uint16_t)(98 + k), true);
+
+	l.draw_text(112, 180, "mara brought you something", true);
+	foot(l, "press to read", "♥♥♥");
+	l.flush(); save(p, "r4-arrival");
 }
 
 static void conversation(VirtualPanel& p, SharpLcd& l) {
@@ -198,7 +248,7 @@ static void conversation(VirtualPanel& p, SharpLcd& l) {
 	l.fill_white();
 	head(l, "mara · close by");
 	int total = 0; for (auto& r : rows) total += bubble_h(r.t) + 10;
-	int y = 204 - total; if (y < 38) y = 38;
+	int y = BODY_BOT - total; if (y < BODY_TOP) y = BODY_TOP;
 	for (auto& r : rows) y = bubble(l, y, r.t, r.mine, r.when, r.st);
 	foot(l, "press to reply", "turn for others");
 	l.flush(); save(p, "r2-conversation");
@@ -234,7 +284,9 @@ static void people(VirtualPanel& p, SharpLcd& l) {
 int main() {
 	VirtualPanel panel; SharpLcd lcd(panel, fb);
 	printf("[refined]\n");
-	resting(panel, lcd);
+	resting(panel, lcd, false, "r1-resting");
+	resting(panel, lcd, true, "r1b-breath");
+	arrival(panel, lcd);
 	conversation(panel, lcd);
 	people(panel, lcd);
 	return 0;
