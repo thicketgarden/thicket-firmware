@@ -147,7 +147,7 @@ static void b2(VirtualPanel& p, SharpLcd& l) {
 	l.draw_text(140, 222, "press to open", true);
 	l.flush(); save(p, "b2a-list");
 
-	// quick replies: the wheel-only path M2 asks for
+	// quick replies: the wheel-only path the bench-messenger stage asks for
 	l.fill_white();
 	panel(l, 2, 2, 396, 236, 10);
 	l.fill_rect(14, 10, 120, 15, true);
