@@ -97,9 +97,9 @@ Event InputLayer::key_down(uint8_t code) {
 }
 
 void InputLayer::key_up(uint8_t code) {
-	// Releasing a modifier deliberately does NOT clear it. One-shot means the
-	// arm survives the release and is spent by the next ordinary key; that is
-	// the whole point, and it is why two keys are never held together.
+	// Releasing a modifier deliberately does NOT clear it: one-shot means the
+	// arm survives the release and is spent by the next ordinary key, so a
+	// modifier is never held down alongside another key.
 	track_up(code);
 }
 

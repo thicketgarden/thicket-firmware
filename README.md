@@ -72,9 +72,9 @@ compatibility claim available, and it is the direction that matters for a
 handheld — being reached rather than transmitting.
 
 The exchange was then repeated with the board **running from its battery, with
-nothing attached** — message delivered, reply returned. That run is
-founder-reported rather than independently captured, because being untethered
-means there is no serial log; it is recorded that way deliberately.
+nothing attached** — message delivered, reply returned. That run was
+observed at the bench rather than captured to a log: running untethered means
+there is no serial connection to record it, and it is reported as such.
 
 **Still unproven:** the bring-up environment regenerates its identity every
 boot, so nothing is shown about state surviving a power cycle, and the peer was

@@ -8,11 +8,11 @@
 // nothing about modifiers in return: it turns register bytes into
 // (row, column, pressed) and stops there.
 //
-// PROVENANCE. Every register address, bit position and encoding here was read
-// in TI's datasheet SCPS215G (September 2009, revised June 2018), sections 8.3
-// and 8.6. **[V, read at the primary source 2026-08-06]**
+// SOURCE. Every register address, bit position and encoding here was read from
+// TI's datasheet SCPS215G (September 2009, revised June 2018), sections 8.3
+// and 8.6, rather than from any secondhand description.
 //
-// That mattered more than usual. A summary of the same PDF, produced by a model
+// That distinction matters here. A summary of the same PDF, produced by a model
 // rather than read, got the slave address and the event encoding roughly right
 // and then placed KP_GPIO1 at 0x08 (it is 0x1D), GPI_EM1 at 0x0B (0x20),
 // DEBOUNCE_DIS1 at 0x0F (0x29), and called the FIFO four events deep (it is

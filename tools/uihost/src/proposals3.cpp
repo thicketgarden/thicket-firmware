@@ -1,8 +1,9 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// C, third pass: the message view as a phone conversation - bubbles, sides,
-// tails - with the chrome tightened.
+// Message view as a conversation: bubbles, speaker sides, and tails.
+//
+// Renders to screens/*.pbm. Build: pio run -e proposals3
 
 #include "SharpLcd.h"
 #include "VirtualPanel.h"

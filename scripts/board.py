@@ -16,8 +16,8 @@
 #      A failed one warns that the target is not in DFU mode and still exits
 #      zero. `flash` keys on "Device programmed" rather than the exit code.
 #      Do NOT use elapsed time as the failure signal: this times the whole
-#      `pio run -t upload`, so a fresh env compiling from scratch takes minutes
-#      and an earlier version of this script failed a good upload because of it.
+#      `pio run -t upload`, so a fresh env compiling from scratch legitimately
+#      takes minutes.
 #
 #   2. The boot banner is gone before you can read it. USB-CDC buffers nothing
 #      before a host opens the port, and the firmware prints once at startup
@@ -108,10 +108,9 @@ class Capture(threading.Thread):
                     line, buf = buf.split(b"\n", 1)
                     text = line.decode("utf-8", "replace").rstrip()
                     self.lines.append(text)
-                    # Emit immediately. `capture` used to collect silently and
-                    # print everything only when the timer expired, which meant
-                    # a long capture showed nothing at all until it ended --
-                    # indistinguishable from a dead board, and it cost a real
+                    # Emit immediately rather than buffering until the timer
+                    # expires. A long capture that prints nothing until it ends
+                    # is indistinguishable from a dead board, and costs a real
                     # test on 2026-08-05: a message arrived, the log looked
                     # empty, the capture was restarted to "fix" it, and the
                     # exchange went with it. Watching a board is the whole job
@@ -198,9 +197,8 @@ def cmd_flash(args):
           flush=True)
     if elapsed > 120:
         # Not a failure. This times the whole `pio run -t upload`, so a fresh
-        # env that has to compile from scratch legitimately takes minutes. An
-        # earlier version treated it as a failed flash and cried wolf on a
-        # perfectly good upload. "Device programmed" above is the real signal.
+        # env that has to compile from scratch legitimately takes minutes.
+        # "Device programmed" above is the real signal.
         print(f"[board] (slow: {elapsed:.0f}s -- almost certainly a full "
               f"rebuild, not an upload problem)", flush=True)
     print(f"[board] listening {args.seconds}s for boot output", flush=True)

@@ -189,8 +189,8 @@ static void save(VirtualPanel& p, const char* n) {
 
 // --- screens ---------------------------------------------------------------
 
-// Distant marks: how many friends are near, drawn rather than counted. The
-// number is the same fact the text used to state.
+// Distant marks: how many peers are near, drawn rather than stated as a
+// number.
 static const int GROUND = 168;
 
 // Everything stands ON the ground: a mark is 20 rows, so its top is

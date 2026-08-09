@@ -19,17 +19,17 @@ The same code is also proposed upstream as
 (`lib/encrypted_store/`), open since 2026-04-07 and unmerged. We take the
 standalone repository rather than the PR, so nothing here waits on that review.
 
-> **The upstream licence is stated twice and the two do not agree — we read it
-> as MIT.** *(2026-08-05, founder ruling)*
+> **The upstream licence is stated twice and the two statements disagree. This
+> project treats it as MIT.**
 >
 > The repository's `LICENSE` file is MIT and GitHub's API reports `MIT`
-> **[V, `gh api repos/konsumer/arduino-rns-encrypted-store`, 2026-08-05]**. The
+> (checked with `gh api repos/konsumer/arduino-rns-encrypted-store`, 2026-08-05). The
 > same commit's `library.json` carries `"license": "Apache-2.0"`.
 >
 > MIT is the deliberate statement and Apache-2.0 is the leftover. The `LICENSE`
-> file was added on 2026-08-02, in direct response to the founder asking on the
-> PR thread — the repositories carried no licence at all before that, which is
-> what blocked us in the first place. `library.json` was not touched in that
+> file was added on 2026-08-02 in response to a question raised on the PR
+> thread; the repositories carried no licence at all before that.
+> `library.json` was not touched in that
 > change and still reflects the file's origin inside the Apache-2.0
 > microReticulum tree, where this code was first proposed.
 >
@@ -71,7 +71,7 @@ argument does not apply — upstream publishes this as a whole repository, so a
 written against microReticulum at `54c934e`, the base of PR #44, where `src/`
 was flat: `src/Identity.h`, `src/Cryptography/HKDF.h`. Those includes were
 correct on 2026-04-07. microReticulum has since restructured to
-`src/microReticulum/…` — **including attermann's own HEAD [V, 2026-08-05]**, so
+`src/microReticulum/…` — including attermann's own HEAD (checked 2026-08-05) — so
 this is not a peculiarity of our fork. The library as published no longer
 compiles against the dependency its own `library.json` declares. Its PR has had
 no maintainer action since 2026-05-05, so nothing ever forced a rebase.

@@ -202,7 +202,7 @@ to another microReticulum-family peer.
 ### Verified — read off the board on 2026-08-03
 
 Boot log captured over USB serial, `wiscore_rak4631-noflash`, no RAK15001
-fitted. **[V]**
+fitted. Captured directly from the device.
 
 - Radio: `LoRa init succeeded`, SX1262 online, continuous receive.
   914.875 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm.
@@ -222,12 +222,12 @@ fitted. **[V]**
 **Encrypted message storage, 2026-08-05.** `store round trip verified on this
 filesystem (encrypt, write, read, decrypt)` at bring-up, then a real exchange:
 `conversations=1 saved_in=1 saved_out=1` with the reply delivered under proof.
-Inbound and outbound both stored encrypted. **[V-hw]** This populates no matrix
+Inbound and outbound both stored encrypted, verified on hardware. This populates no matrix
 row — there is no Python counterpart to a fixed-pool message store — but it is
 the first hardware evidence the encryption paths execute on this silicon at
 all; everything before it was a host result.
 
-### Interoperation with the Python reference over LoRa — 2026-08-05 **[V-hw]**
+### Interoperation with the Python reference over LoRa — 2026-08-05, on hardware
 
 **The first time this stack and the reference implementation have exchanged
 messages over a radio.** Peer: `rnsd` 1.4.2 with LXMF, running on a Raspberry Pi
@@ -245,10 +245,10 @@ own lineage. Versions read on the Pi at run time, not copied from a document.
 Both LXMF delivery methods therefore work against the reference, in the
 direction that matters for a handheld — being reached.
 
-**Repeated on battery, untethered — 2026-08-05 [R].** The same exchange with
+**Repeated on battery, untethered — 2026-08-05, reported rather than captured.** The same exchange with
 NomadNet on the Pi, with the board disconnected from USB and running from its
-battery: a message was delivered and the device's reply came back. **Reported by
-the founder, observed in NomadNet, not independently captured** — untethered
+battery: a message was delivered and the device's reply came back. **Reported from the
+bench, observed in NomadNet, not independently captured** — untethered
 means no serial log, which is the point of the run and the limit of its
 evidence. The board was still carrying the diagnostic build
 (`-DTHICKET_LOG_DEBUG -DRNS_LOG_LEVEL=7`), which is heavier than the shipping
@@ -280,9 +280,10 @@ Two lessons, both cheap next time: **a stale cached path presents as a protocol
 incompatibility**, and the peer's log settles in one line what ours cannot settle
 at all.
 
-### Reported by the founder — a round trip, not independently observed
+### Observed at the bench — a round trip, not independently captured
 
-**[R]** The firmware has exchanged LXMF messages with a **T-Deck running
+Reported, not independently captured: the firmware has exchanged LXMF messages
+with a **T-Deck running
 pyxis**, using the auto-reply path: an inbound message is received, decrypted,
 and a reply is composed, signed and encrypted **on the nRF** before going back
 over LoRa.

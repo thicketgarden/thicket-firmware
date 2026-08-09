@@ -1,9 +1,10 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// B and C, second pass: wheel-first navigation and heavier organic chrome.
-// Every screen is a list with exactly one selection; the wheel moves it and
-// the axial press commits.
+// Wheel-first screen layouts. Every screen is a list with exactly one
+// selection: rotating the wheel moves it, the axial press commits.
+//
+// Renders to screens/*.pbm. Build: pio run -e proposals2
 
 #include "SharpLcd.h"
 #include "VirtualPanel.h"
@@ -90,7 +91,7 @@ static void save(VirtualPanel& p, const char* name) {
 }
 
 // ===========================================================================
-// B2 — THE POD, wheel-first. Heavy chrome, one selection, press to enter.
+// Framed list: heavy chrome, one selection, press to enter.
 // ===========================================================================
 
 static void b2(VirtualPanel& p, SharpLcd& l) {
@@ -129,7 +130,7 @@ static void b2(VirtualPanel& p, SharpLcd& l) {
 	l.draw_text(140, 222, "press to open", true);
 	l.flush(); save(p, "b2a-list");
 
-	// quick replies: the wheel-only path the bench-messenger stage asks for
+	// Quick replies: a send path that needs no keyboard at all.
 	l.fill_white();
 	panel(l, 2, 2, 396, 236, 10);
 	l.fill_rect(14, 10, 120, 15, true);
@@ -152,7 +153,7 @@ static void b2(VirtualPanel& p, SharpLcd& l) {
 }
 
 // ===========================================================================
-// C2 — THE TAPE, wheel-first. Almost no frame; the chrome is organic.
+// Minimal frame: a continuous ribbon of messages rather than boxed rows.
 // ===========================================================================
 
 static void c2_friends(VirtualPanel& p, SharpLcd& l);
@@ -199,9 +200,8 @@ static void c2(VirtualPanel& p, SharpLcd& l) {
 }
 
 // ---------------------------------------------------------------------------
-// C2b — who is near. Each friend is a fruiting body standing on their own
-// ground, and how near they are is how big they have grown. The words say the
-// same thing plainly; nothing here asks the reader to know what a bar means.
+// Peer list. Reachability is shown as the size of each peer's mark and stated
+// in words beside it, rather than as a signal-strength bar.
 // ---------------------------------------------------------------------------
 
 static void c2_friends(VirtualPanel& p, SharpLcd& l) {

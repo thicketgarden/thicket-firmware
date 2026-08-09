@@ -130,8 +130,8 @@ static const char* DISPLAY_NAME = "Thicket";
 static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 
 // How often to re-announce, seconds. Reticulum's own guidance is sparing;
-// this is a bring-up value chosen so the founder does not have to wait around
-// with a T-Deck. TODO(bring-up): drive announces from user action plus a much longer
+// this is a bring-up value chosen so testing does not involve waiting at the
+// bench. TODO(bring-up): drive announces from user action plus a much longer
 // timer once there is a UI.
 static const double ANNOUNCE_INTERVAL_S = 120.0;
 
@@ -170,8 +170,8 @@ static const size_t BODY_BUF = 72;
 //   -DTHICKET_AUTOSEND_INTERVAL_S=60
 //   -DTHICKET_AUTOSEND_DEST=<32 hex chars, the peer's lxmf.delivery hash>
 //
-// This is the fallback for the case where auto-reply misbehaves and the founder
-// needs to know whether the transmit path works at all. It is deliberately not
+// This is the fallback for the case where auto-reply misbehaves and you need
+// to know whether the transmit path works at all. It is deliberately not
 // the default: a stock build transmits announces and replies, and never
 // unsolicited traffic. It also requires knowing the peer's destination hash at
 // build time, which is exactly the reflash-after-you-find-out problem that
@@ -351,10 +351,10 @@ static void info_u32(const char* key, uint32_t value) {
 // framework-arduinoadafruitnrf52, never in system_nrf52840.c. So whatever
 // state the module arrives in is the state it stays in.
 //
-// Why we care: we are considering holding an encryption
-// "pepper" in the MCU's internal flash so that dumping the external SPI flash
-// yields ciphertext and no key. That is only worth anything if the debug port
-// cannot simply be used to read internal flash back out.
+// Why this matters: one option for at-rest encryption is to hold a "pepper" in
+// the MCU's internal flash, so that dumping the external SPI flash yields
+// ciphertext and no key. That is only worth anything if the debug port cannot
+// simply be used to read internal flash back out.
 // ---------------------------------------------------------------------------
 // Set by report_silicon_and_approtect(). False means the debug port is open,
 // or open-by-default, on this particular chip.
@@ -617,8 +617,8 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 // settles the choice.
 //
 // A second argument has been made upstream that an internal-flash erase masks
-// interrupts long enough to time out RadioLib's SPI to the SX1262. We have not
-// measured that and it is not our figure. Treat it as unverified; the capacity
+// interrupts long enough to time out RadioLib's SPI to the SX1262. That figure
+// is unverified here and has not been measured on this hardware; the capacity
 // argument does not depend on it.
 static bool bringup_storage() {
 	step(1, "External SPI flash + microStore");
@@ -974,10 +974,9 @@ static bool bringup_lxmf() {
 			probe[i] = (uint8_t)(i * 31 + 7);
 		}
 		// Filesystem root, not the store's directory. MessageStore derives its
-		// own layout internally -- the real failure earlier named `/m/...`, not
-		// the base path this firmware passes in -- so writing "inside" it means
-		// guessing at a directory that may not exist, and a probe that fails
-		// because it guessed wrong is worse than no probe. Root always exists,
+		// own layout internally, so writing "inside" it means guessing at a
+		// directory that may not exist, and a probe that fails because it
+		// guessed wrong is worse than no probe. Root always exists,
 		// and the two things being tested (can this filesystem hold a
 		// message-sized file, does the codec survive this silicon) do not care
 		// which directory they happen in.
@@ -992,11 +991,10 @@ static bool bringup_lxmf() {
 			why = "codec could not encrypt - out of memory?";
 		}
 		else if (RNS::Utilities::OS::write_file(probe_path, sealed) != sealed.size()) {
-			// Deliberately does NOT say "full". The first version of this
-			// asserted a full disk and printed it next to 26 KB free, because
-			// the probe was writing to a directory that did not exist. Report
-			// what is known -- the write did not complete -- and print the
-			// free space beside it so the reader draws their own conclusion.
+			// Deliberately does NOT claim the disk is full: a failed write to
+			// a missing directory looks identical here. Report only what is
+			// known -- the write did not complete -- and print the free space
+			// beside it so the reader can draw their own conclusion.
 			why = "could not write a message-sized file (see free space below)";
 		}
 		else if (RNS::Utilities::OS::read_file(probe_path, read_back) != sealed.size()) {
@@ -1147,8 +1145,7 @@ static bool bringup_lxmf() {
 	// When we do attach one, its pool constants must be overridden first: they
 	// are `static constexpr` in MessageStore.h with no #ifndef guard, and at
 	// upstream's 32x256 the object is 266,896 bytes and the link fails
-	// outright. Guarding them is a six-line upstream patch and should be our
-	// first contribution to microLXMF.
+	// outright. Guarding them is a six-line upstream patch.
 
 	// TODO(bring-up): no stamps. Sideband ships lxmf_require_stamps = False and
 	// announces a nil inbound stamp cost, Python LXMF skips the whole stamp
@@ -1540,8 +1537,8 @@ void setup() {
 #endif
 }
 
-// The body that used to be loop(). It now runs in a task we create ourselves,
-// for the stack -- see thicket_task() below.
+// The main work body. Runs in a task we create rather than the core's loop(),
+// for stack headroom -- see thicket_task() below.
 static void thicket_work() {
 #ifdef THICKET_PATH_INDEX_PROBE
 	// Repeat the probe a few times after boot rather than once. A host that has

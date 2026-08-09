@@ -274,15 +274,15 @@ void LoRaInterface::loop() {
 	if (_online) {
 #ifdef ARDUINO
 #ifdef THICKET_LORA_ISR
-		// Nothing to do until DIO1 has fired. This is the whole point: without
-		// it the caller spins on an SPI register read and the CPU never idles.
+		// Nothing to do until DIO1 has fired. Without this the caller spins on
+		// an SPI register read and the CPU never idles.
 		if (!_irq_pending) return;
 		_irq_pending = false;
 #endif
 		// checkIrq() reads the hardware IRQ register. Under THICKET_LORA_ISR it
-		// runs once per interrupt rather than continuously, and it is still
-		// required -- DIO1 is raised by transmit-done too, so this is what
-		// distinguishes "a frame arrived" from "we just sent one".
+		// runs once per interrupt rather than continuously, and is still
+		// required: DIO1 is raised by transmit-done as well, so this is what
+		// separates a received frame from a completed transmission.
 		if (_radio->checkIrq(RADIOLIB_IRQ_RX_DONE)) {
 			int len = _radio->getPacketLength();
 

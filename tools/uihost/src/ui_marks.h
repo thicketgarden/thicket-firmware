@@ -1,9 +1,12 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Fruiting-body marks at three sizes, hand-drawn. Below roughly eight pixels an
-// equation gives a bar or a diamond rather than the shape meant, so the small
-// sizes are placed pixel by pixel instead of scaled down from the large one.
+// Fruiting-body marks at three sizes.
+//
+// Each size is drawn pixel by pixel rather than scaled down from the largest.
+// Below roughly eight pixels, generating these shapes from a curve or a field
+// function degenerates into a bar or a diamond, and downscaling drops the
+// features that make the silhouette readable.
 
 #pragma once
 
@@ -62,13 +65,15 @@ static inline bool mark_on(const MarkArt& m, int row, int col) {
 	return (m.rows[row] & (1u << (m.w - 1 - col))) != 0;
 }
 
-// Draws the mark standing on `base_y` — its bottom row sits on that line.
-// `ink` is the colour of the body, so a mark knocked out of a selection band
-// passes false and everything inverts with it. `faded` stipples the body,
-// which is how someone not heard from today is drawn: still there, not solid.
-// An outline was tried first and came out as a scribble at twelve pixels —
-// stipple holds the silhouette at any size because it does not depend on the
-// edge being thick enough to read.
+// Draws the mark standing on `base_y`: its bottom row sits on that line.
+//
+// `ink` is the colour of the body. Pass false to knock the mark out of a
+// filled selection band; gills and stipple invert with it.
+//
+// `faded` stipples the body instead of filling it, denoting a peer that is
+// present but not currently reachable. Stipple rather than an outline: an
+// outline needs an edge several pixels thick to read, which the smaller
+// sizes do not have.
 static inline void draw_mark(SharpLcd& l, const MarkArt& m, int x, int base_y,
                              bool ink, bool faded) {
 	const int top = base_y - m.h;
@@ -100,8 +105,7 @@ static inline void sprig(SharpLcd& l, int x, int y, int dir) {
 	}
 }
 
-// Something waiting: a spore lifting off the cap. Not a count — the fact that
-// there is anything at all is what the reader needs.
+// Marks a peer with something waiting. Presence only, not a count.
 static inline void draw_spore(SharpLcd& l, int cx, int cy, bool ink) {
 	for (int dy = -2; dy <= 2; ++dy)
 		for (int dx = -2; dx <= 2; ++dx)

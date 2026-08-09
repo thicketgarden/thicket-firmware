@@ -114,10 +114,10 @@ void test_capped_store_evicts_oldest_first(void) {
 
 // Timestamps have one-second granularity, so a burst of inserts inside the same
 // second ties, and eviction order among ties is whatever the hash map iteration
-// yields. Which records survive is therefore *unspecified* - and demonstrably
-// so: an earlier version of this test asserted that the first-inserted key
-// survives, which held under libc++ and failed under libstdc++. Two standard
-// libraries, two different survivors, same source.
+// yields. Which records survive is therefore *unspecified*, and demonstrably
+// so: asserting that the first-inserted key survives holds under libc++ and
+// fails under libstdc++. Two standard libraries, two different survivors,
+// same source.
 //
 // So the only thing assertable here is the guarantee: the cap holds exactly.
 // The absence of any assertion about *which* records remain is the point of

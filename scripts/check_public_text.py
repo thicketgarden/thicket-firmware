@@ -14,18 +14,10 @@
 # reference to the private repo's paths tells them about a repository they
 # cannot open.
 #
-# WHY THIS EXISTS RATHER THAN A HABIT OF CHECKING
-#
-# The rule is old and was known. On 2026-08-04 it was swept for three separate
-# times in one day and violated three separate times in the same day, because
-# sweeping is something a person remembers to do and this is not. Fifteen commit
-# messages going back three days had to be rewritten, several of which named the
-# private repo outright. The information needed to prevent every one of them was
-# available at the moment of writing.
-#
-# So: a control, run by the push gate, over BOTH the staged content and the
-# commit messages about to go out. Messages matter as much as content and are
-# harder to fix afterwards -- fixing them means rewriting published history.
+# This runs from the push gate over both the staged content and the commit
+# messages about to go out. Messages are checked as well as content because
+# they are harder to correct afterwards: fixing a published message means
+# rewriting history.
 #
 # Usage:
 #   python3 scripts/check_public_text.py --staged      # content about to be committed
@@ -47,6 +39,18 @@ PATTERNS = [
     (re.compile(r"\bT\d{1,3}(?![\w.-])"), "task (T-number) reference"),
     (re.compile(r"\bQ\d{1,2}(?![\w.-])"), "open-question (Q-number) reference"),
     (re.compile(r"\bM[1-5](?![\w.-])"), "milestone reference"),
+    (re.compile(r"\bfounder\b", re.I), "names an internal role"),
+    (re.compile(r"\bbench-messenger\b", re.I), "internal milestone name"),
+    (re.compile(r"\[V(?:-hw)?(?=[,\]])"), "internal provenance tag"),
+    # Documents that exist only in the private repository. A path a reader
+    # cannot follow is worse than no citation at all.
+    (re.compile(r"docs/(?:decisions|open-questions|work-queue|wire|wire-integrity"
+                r"|milestones|licenses|port-notes|upstream-digest|upstream-drafts"
+                r"|interop-results|power-budget|thumb-reach|ram-budget|competitors"
+                r"|nrf-prior-art|reticulous|nomadnet-services|fcc-path|name-check"
+                r"|hardware-license|design-language|week-one|hardware-order"
+                r"|bom-handheld|tooling)\.md"),
+     "names a document in the private repository"),
 ]
 
 # Things that look like shorthand and are not. Kept narrow and explained,

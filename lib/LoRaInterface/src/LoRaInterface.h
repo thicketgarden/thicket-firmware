@@ -97,11 +97,9 @@ private:
 	// Radio parameters (RadioLib units: MHz, kHz)
 	//
 	// 914.875 is the US Reticulum community frequency, NOT a round 915.0.
-	// Corrected 2026-08-01 after the founder's working Pi<->T-Deck LoRa link
-	// was read: it runs 914.875 and we were 125 kHz above it — exactly one
-	// channel width, so the passbands barely overlap and the two ends are
-	// mutually deaf. This would have presented on bring-up as "the radio is
-	// dead": announces into silence, nothing heard, no error anywhere.
+	// Being one channel width (125 kHz) off leaves the passbands barely
+	// overlapping and both ends mutually deaf. It presents as a dead radio:
+	// announces go out, nothing is heard, and no error is raised anywhere.
 	//
 	// frequency, bandwidth and spreading factor must match a peer EXACTLY.
 	// Coding rate and TX power do not (docs/lora-parameters.md).

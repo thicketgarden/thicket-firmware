@@ -26,11 +26,11 @@
 // GRAMMAR OF RECORD
 //
 // markqvist/NomadNet, nomadnet/ui/textui/MicronParser.py, read 2026-08-01.
-// Implemented against that file directly, NOT against a summary --- an earlier
-// second-hand summary in docs/nomadnet-services.md got four things wrong:
-// it had `= as a divider (it is the literal toggle), a lone backtick as the
-// literal toggle (it is a style reset), no tables, and no `FT/`BT true-colour
-// forms. See MICRON.md for the full delta.
+// Implemented against that file directly rather than against any secondhand
+// description of the format. Four details secondhand accounts commonly get
+// wrong: `= is the literal toggle, not a divider; a lone backtick is a style
+// reset, not the literal toggle; tables exist; and the `FT/`BT true-colour
+// forms exist. See MICRON.md for the full delta.
 //
 // NOT YET IMPLEMENTED, deliberately, each a no-op that does not corrupt the
 // rest of the line:  `t tables  ·  `{ partials

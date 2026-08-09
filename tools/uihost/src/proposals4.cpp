@@ -1,9 +1,11 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// D: cards. Conventional list/detail patterns — status bar, cards, scrollbar,
-// badges, bubbles — drawn for a 1-bit panel. Outline vs fill carries selection
-// because it is the only strong contrast available.
+// Card-based screen layouts: status bar, cards, scrollbar, badges, and
+// conversation bubbles, drawn for a 1-bit panel. Selection is carried by
+// outline versus fill, the only strong contrast the panel offers.
+//
+// Renders to screens/*.pbm. Build: pio run -e proposals4
 
 #include "SharpLcd.h"
 #include "VirtualPanel.h"
@@ -72,7 +74,7 @@ static void text_right(SharpLcd& l, int right, int y, const char* s, bool ink) {
 	l.draw_text((uint16_t)(right - tw(s)), (uint16_t)y, s, ink);
 }
 
-// Unread count. Filled pill, count knocked out — the familiar badge.
+// Unread count as a filled pill with the number knocked out.
 static void badge(SharpLcd& l, int right, int y, int n, bool ink) {
 	char s[8];
 	snprintf(s, sizeof(s), "%d", n);
@@ -150,9 +152,8 @@ static const Conv CONVS[3] = {
 };
 static const int CONV_H = 58, CONV_GAP = 4;
 
-// Selection as a filled mass with a line set in from its edge - the same move
-// the shell makes, and for the same reason: there is no grey to give an object
-// depth with.
+// Draws the selected card: filled, with a highlight line inset from its edge.
+// The panel is 1-bit, so an inset line is what gives the fill any depth.
 static void select_card(SharpLcd& l, int y, int h, int inset = 4) {
 	rrect_fill(l, CARD_X, y, CARD_W, h, 6, 6, true);
 	rrect_line(l, CARD_X + inset, y + inset, CARD_W - 2 * inset, h - 2 * inset,
@@ -181,7 +182,7 @@ static void d_messages_frame(SharpLcd& l, int sel) {
 		else   rrect_line(l, CARD_X, y, CARD_W, CONV_H, 6, true);
 		const bool ink = !s;
 
-		// the name is what the eye is looking for, so it is the big thing
+		// Sender at 2x: it is the field the list is scanned by.
 		l.draw_text_scaled((uint16_t)(CARD_X + 12), (uint16_t)(y + 6),
 		                   CONVS[i].who, ink, 2);
 
@@ -202,9 +203,9 @@ static void d_messages_frame(SharpLcd& l, int sel) {
 
 static uint8_t compose_fb[LCD_FB_BYTES];
 
-// Copy a composed frame across pixel by pixel so a line is dirty only where it
-// truly changed. Redrawing in place marks every line touched and the cost
-// numbers become fiction.
+// Copies a composed frame across pixel by pixel, so a line is marked dirty
+// only where it actually changed. Drawing in place would dirty every line it
+// touched, including lines whose final contents are identical.
 static void blit(SharpLcd& dst, SharpLcd& src) {
 	for (uint16_t y = 0; y < LCD_HEIGHT; ++y)
 		for (uint16_t x = 0; x < LCD_WIDTH; ++x)
@@ -222,7 +223,7 @@ static void d_messages(VirtualPanel& p, SharpLcd& l) {
 	l.flush();
 	save(p, "d1-messages");
 
-	// what one detent of the wheel actually costs
+	// Cost of moving the selection one row, reported on stdout.
 	d_messages_frame(c, 1);
 	blit(l, c);
 	p.reset_counters();
@@ -343,9 +344,9 @@ static void d_compose(VirtualPanel& p, SharpLcd& l) {
 
 // --- the idle dashboard ----------------------------------------------------
 //
-// Static by design: the panel holds its image with no redraw, so every animated
-// frame would be another 12,000-byte transfer. All the life here is in the
-// drawing rather than in motion.
+// The panel holds its image without redraw, so an idle frame costs nothing
+// until something moves. Motion here is therefore deliberate and slow: see
+// rest_compose() for the per-frame transfer cost this trades against.
 
 struct Ball { float x, y, r; };
 
@@ -359,9 +360,10 @@ static float field(const Ball* b, int n, float px, float py) {
 	return s;
 }
 
-// Metaballs, so the shell is a grown shape rather than a rounded rectangle.
-// Safe to solve rather than hand-draw: these are 170px across, far above the
-// size where an equation degenerates into a bar.
+// Renders a metaball field as a filled or outlined shape.
+//
+// Generated rather than hand-drawn, which suits these shapes at ~170 px across.
+// The small marks in ui_marks.h are hand-drawn for the opposite reason.
 static void blob(SharpLcd& l, const Ball* b, int n, int x0, int y0, int x1, int y1,
                  bool fill, bool ink) {
 	for (int y = y0; y <= y1; ++y) {
@@ -377,8 +379,7 @@ static void blob(SharpLcd& l, const Ball* b, int n, int x0, int y0, int x1, int 
 	}
 }
 
-// A highlight line set in from the edge, knocked out of the fill. Gives the
-// mass some depth without any grey to work with.
+// Knocks a highlight line out of a filled blob, inset from its edge.
 static void blob_inner_ring(SharpLcd& l, const Ball* b, int n,
                             int x0, int y0, int x1, int y1, int inset) {
 	for (int y = y0; y <= y1; ++y) {
@@ -405,8 +406,8 @@ static void dot_field(SharpLcd& l, int step) {
 			l.set_pixel((uint16_t)x, (uint16_t)y, true);
 }
 
-// Text over the dot field needs its own clearance, or a stray dot lands beside
-// a glyph and reads as punctuation.
+// Draws text over the dot field, clearing a box behind it first so no stray
+// dot lands against a glyph.
 static void field_text(SharpLcd& l, int x, int y, const char* s, int scale) {
 	const int w = tw(s) * scale, h = 13 * scale;
 	l.fill_rect((uint16_t)(x - 7), (uint16_t)(y - 2), (uint16_t)(w + 14),
@@ -472,8 +473,8 @@ static void rest_pulse(SharpLcd& l, int frame) {
 
 static void rest_compose(SharpLcd& l, int frame) {
 	Ball shell[4], t1[3], t2[3];
-	// Amplitude is free: the shapes already dirty nearly every line they
-	// cross, so a bigger displacement costs the same as a small one.
+	// Amplitude does not affect transfer cost: these shapes put a moved edge
+	// on nearly every line they cross, so those lines are dirty either way.
 	morph(SHELL0,  shell, 4, frame, 0.0f, 5.0f);
 	morph(TILE1_0, t1,    3, frame, 2.1f, 3.5f);
 	morph(TILE2_0, t2,    3, frame, 4.2f, 3.5f);

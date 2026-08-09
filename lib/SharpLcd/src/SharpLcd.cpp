@@ -91,9 +91,9 @@ uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) 
 				const uint8_t bits = g[row];
 				if (!bits) continue;
 				// FONT_INK_W, not FONT_W: box and block glyphs are 7 wide
-				// against a 6 advance so neighbouring cells touch and rules
-				// join. Drawing only the advance clips that column and every
-				// frame comes out dashed.
+				// against a 6px advance so neighbouring cells touch and rules
+				// join. Drawing only the advance clips that column and breaks
+				// every rule into dashes.
 				for (uint8_t col = 0; col < FONT_INK_W; ++col) {
 					if (bits & (uint8_t)(0x80u >> col))
 						set_pixel((uint16_t)(x + col), (uint16_t)(y + row), black);

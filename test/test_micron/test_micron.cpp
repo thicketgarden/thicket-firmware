@@ -3,9 +3,9 @@
 //
 // Unit tests for the Micron parser, run on the host: `pio test -e native`.
 //
-// Cases are taken from markqvist/NomadNet's MicronParser.py behaviour, and
-// several exist specifically because an earlier second-hand summary of the
-// grammar was wrong about them. Those are marked FIXES-SUMMARY.
+// Cases are taken from markqvist/NomadNet's MicronParser.py behaviour. Several
+// cover details that secondhand descriptions of the grammar commonly get
+// wrong; those are marked FIXES-SUMMARY.
 
 #include <unity.h>
 #include <string>

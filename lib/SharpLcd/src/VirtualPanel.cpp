@@ -14,8 +14,8 @@
 namespace thicket {
 
 #ifndef ARDUINO
-// Create the parent directories of `path`. screens/ is gitignored and holds no
-// tracked file, so it does not exist in a fresh checkout.
+// Create the parent directories of `path`. The output directory is not tracked
+// by git, so it will not exist in a fresh checkout.
 static void make_parent_dirs(const char* path) {
 	char buf[512];
 	const size_t n = strlen(path);

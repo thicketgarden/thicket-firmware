@@ -11,13 +11,14 @@
 // password the example's README states (`1234`) using the author's own
 // `identity_tool.py`.
 //
-// That is the whole point of this file. Round-tripping our own output proves
-// only that we agree with ourselves. Decrypting a ciphertext someone else
-// produced, with an implementation that shares no code with theirs above the
-// primitives, is what proves the on-disk format.
+// That is what this file is for. Round-tripping our own output proves only
+// self-consistency; decrypting a ciphertext produced elsewhere, by an
+// implementation sharing no code above the primitives, is what proves the
+// on-disk format.
 //
-// [V, read at source 2026-08-05: repo cloned at 5ccdc65, vector decrypted with
-//     upstream's identity_tool.py, plaintext reproduced below verbatim]
+// Generated from upstream directly (2026-08-05): repository cloned at 5ccdc65,
+// vector decrypted with upstream's identity_tool.py, plaintext reproduced
+// below verbatim.
 
 #pragma once
 #include <stdint.h>
