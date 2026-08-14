@@ -11,3 +11,10 @@ test_interop/*/.pio/
 
 screens/*.pbm
 screens/*.png
+
+# Runtime state written by the native interop scenarios when they start a
+# Reticulum instance in their working directory.
+transport_identity
+hashlist_store/
+known_store/
+path_store/

@@ -41,6 +41,7 @@ Use a venv built from `/opt/homebrew/bin/python3`:
 | transport forwarding | `run_transport_forward.sh` | **The only scenario where our stack is the router, not the leaf.** Two Python peers sit on UDP segments with no member in common except us, so a payload reaching the far end proves we forwarded it — and it must arrive at `hops=2`, because RNS counts a hop on ingress at every node and a packet that really crossed us is counted twice. Runs with `transport_enabled(true)`, which no other scenario does, and which is the mode `Transport.cpp`'s four local patches are about. |
 | LXMF delivery inbound | `run_lxmf_inbound.sh` | The Python LXMF reference sends to our `lxmf.delivery` address. C++ asserts signature, title, content, timestamp, field count, field wire bytes and source hash; Python asserts the message reached `DELIVERED`. |
 | identity vectors | `run_identity_vectors.sh` | `Identity` key derivation, hashing, HKDF, Ed25519 signing/verification and decryption of a reference ciphertext, against fixed outputs of the Python reference. Python re-derives and diffs the vectors so they cannot rot. |
+| wire oracle | `run_wire_oracle.sh` | Packets packed through microReticulum's real `pack()` are decoded by the reference's own `RNS.Packet` and compared field by field: header type, packet type, destination type, transport type, context, destination hash, transport id and body. Also asserts that a named constant means the same number on both sides, so a shared misunderstanding cannot pass. No network — the packets are never sent. |
 | link inbound | `run_link_inbound.sh` | Python establishes a Link **to** a C++ destination (the existing microReticulum link scenario is C++ to Python only), round-trips 200 bytes over it, idles it past five keepalive intervals, then cuts the wire through a UDP relay and requires the reference's watchdog to close the link with `TIMEOUT`. Takes about a minute; the phases are timed. |
 
 UDP port pairs, so scenarios can coexist: cold inbound 14262/14263, multi-hop
@@ -114,6 +115,7 @@ Recorded here because they are the strongest evidence the suite has:
 | suppress `proof_packet.prove()` in microLXMF | LXMF inbound FAILs on the Python side only |
 | revert the X25519 clamping commit | identity vectors FAILs 4 checks — **and cold inbound still PASSes**, which is exactly why the vectors exist |
 | comment out the keepalive reply in `Link::receive` | link inbound FAILs the idle phase, which is what proves the C++ side really is answering keepalives rather than the assertion being vacuous |
+| flip one bit of a packed packet's context byte (`run_wire_oracle.sh --self-test-break`) | wire oracle FAILs and names the field, which is the point: the failure reads as `context: we packed 0, the reference read 9` rather than as a message that did not arrive |
 
 ## How the dependencies are wired
 

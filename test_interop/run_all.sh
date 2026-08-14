@@ -20,6 +20,7 @@ SCENARIOS=(
   "multihop-inbound|cold_inbound_receiver|run_multihop_inbound.sh"
   "lxmf-inbound|lxmf_inbound_receiver|run_lxmf_inbound.sh"
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
+  "wire-oracle|wire_oracle|run_wire_oracle.sh"
   "link-inbound|link_inbound_responder|run_link_inbound.sh"
   # The only scenario where we are the router rather than the leaf. Slowest of
   # the six: three processes, and a path has to be learned before anything can
