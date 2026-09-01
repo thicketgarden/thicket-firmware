@@ -242,7 +242,12 @@ def cmd_flash(args):
     print(f"[board] uploading {args.env}", flush=True)
     started = time.time()
     proc = subprocess.run(
-        ["pio", "run", "-e", args.env, "-t", "upload"],
+        # --upload-port is not optional here. Without it PlatformIO does its
+        # own port detection, which with two boards attached picks one of them
+        # arbitrarily -- so the upload can land on a different board than the
+        # one this command resolved and is about to read back from. The verify
+        # then passes against a board nobody chose.
+        ["pio", "run", "-e", args.env, "-t", "upload", "--upload-port", port],
         capture_output=True, text=True)
     elapsed = time.time() - started
     # Attach before doing anything else with the result.
