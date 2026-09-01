@@ -50,6 +50,10 @@
 #ifdef THICKET_RAM_PROBE
 #include <malloc.h>
 #endif
+#ifdef THICKET_POOL_SOAK
+#include <microReticulum/Utilities/Memory.h>
+#include <microReticulum/Utilities/tlsf/tlsf.h>
+#endif
 #include <microStore/FileSystem.h>
 #ifdef THICKET_PATH_INDEX_PROBE
 #include <unordered_map>
@@ -1657,6 +1661,47 @@ static void thicket_work() {
 // unconditionally in the core's own main.cpp with no #ifndef. No build flag can
 // reach it.
 //
+#ifdef THICKET_POOL_SOAK
+// Periodic pool sample, printed as CSV for scripts/pool-soak-analyse.py.
+//
+// The host soak (test_interop/pool_soak) cannot deliver a message to itself,
+// so it never exercises the inbound decrypt path -- which is the path the
+// board's worst fragmentation reading came from. This is that measurement,
+// taken where it counts, while a real peer sends real traffic.
+//
+// Off unless -DTHICKET_POOL_SOAK: it prints on a timer and would otherwise be
+// noise in every capture.
+static void pool_soak_sample() {
+	static uint32_t last_ms = 0;
+	const uint32_t now = millis();
+	if (last_ms != 0 && (now - last_ms) < THICKET_POOL_SOAK_MS) return;
+	last_ms = now;
+
+	struct Acc { uint32_t uc, us, fc, fs, fmax; } a = {0, 0, 0, 0, 0};
+	auto& info = RNS::Utilities::Memory::heap_pool_info;
+	if (!info.tlsf) {
+		Serial.println("SOAK,unbacked,0,0,0,0,0,0");
+		return;
+	}
+	tlsf_walk_pool(tlsf_get_pool(info.tlsf),
+		[](void*, size_t size, int used, void* user) {
+			Acc* x = (Acc*)user;
+			if (used) { x->uc++; x->us += (uint32_t)size; }
+			else { x->fc++; x->fs += (uint32_t)size;
+			       if ((uint32_t)size > x->fmax) x->fmax = (uint32_t)size; }
+		}, &a);
+
+	// Same columns as the host harness, so one analyser reads both.
+	const double frag = a.fs ? 100.0 * (1.0 - (double)a.fmax / (double)a.fs) : 0.0;
+	char line[160];
+	snprintf(line, sizeof(line), "SOAK,%lu,%lu,%lu,%lu,%lu,%lu,%d.%02d",
+	         (unsigned long)(now / 1000), (unsigned long)a.us, (unsigned long)a.uc,
+	         (unsigned long)a.fs, (unsigned long)a.fc, (unsigned long)a.fmax,
+	         (int)frag, (int)((frag - (int)frag) * 100));
+	Serial.println(line);
+}
+#endif
+
 // 4 KB is not enough for what this loop does. Measured on the board, the loop
 // task had been 2,280 B deep with 1,816 B spare, but that only covers paths that
 // had actually run, and the device had done nothing but announce and idle.
@@ -1704,6 +1749,9 @@ static void thicket_task(void* arg) {
 		// ⚠ If a future upstream needs something tighter than this, the CPU
 		// stops sleeping meaningfully and the saving evaporates. That audit is
 		// a precondition of this feature, not a detail of it.
+#ifdef THICKET_POOL_SOAK
+		pool_soak_sample();
+#endif
 		ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(THICKET_TASK_TICK_MS));
 #else
 		// Yield to anything of equal or lower priority. Nothing here may block:
