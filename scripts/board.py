@@ -46,14 +46,77 @@ import time
 DEFAULT_BAUD = 115200
 
 
-def find_port(explicit=None):
+def port_serials():
+    """Map each usbmodem port to its USB serial number.
+
+    Port names are NOT stable identifiers. Flashing re-enumerates the device
+    and macOS reassigns the name, so two boards can swap between one command
+    and the next. The serial number does not move.
+    """
+    out = {}
+    try:
+        ioreg = subprocess.run(["ioreg", "-r", "-c", "IOUSBHostDevice", "-l"],
+                               capture_output=True, text=True, timeout=20).stdout
+    except Exception:
+        return out
+    for port in sorted(glob.glob("/dev/cu.usbmodem*")):
+        name = os.path.basename(port)
+        idx = ioreg.find(name)
+        if idx < 0:
+            continue
+        head = ioreg[:idx]
+        marker = head.rfind('"USB Serial Number" = "')
+        if marker < 0:
+            continue
+        serial = head[marker + len('"USB Serial Number" = "'):]
+        serial = serial.split('"', 1)[0]
+        out[port] = serial
+    return out
+
+
+def find_port(explicit=None, serial=None):
+    """Resolve a port, refusing to guess when more than one board is attached.
+
+    Picking the first of several is how the wrong board gets flashed, and the
+    mistake is invisible until something downstream reads wrong.
+    """
     if explicit:
         return explicit
-    for pat in ("/dev/cu.usbmodem*", "/dev/tty.usbmodem*"):
-        hits = sorted(glob.glob(pat))
-        if hits:
-            return hits[0]
-    return None
+
+    serial = serial or os.environ.get("THICKET_BOARD_SERIAL")
+    mapping = port_serials()
+
+    if serial:
+        matches = [p for p, s in mapping.items() if s.lower() == serial.lower()]
+        if len(matches) == 1:
+            return matches[0]
+        if not matches:
+            known = "".join(f"\n    {p}  {s}" for p, s in sorted(mapping.items()))
+            sys.exit(f"no board with serial {serial}. Attached:{known or ' none'}")
+        sys.exit(f"serial {serial} matches several ports: {matches}")
+
+    ports = sorted(glob.glob("/dev/cu.usbmodem*")) or sorted(
+        glob.glob("/dev/tty.usbmodem*"))
+    if not ports:
+        return None
+    if len(ports) == 1:
+        return ports[0]
+
+    listing = "".join(f"\n    {p}  {mapping.get(p, '?')}" for p in ports)
+    sys.exit(
+        f"{len(ports)} boards attached — refusing to guess which one.{listing}\n"
+        f"Pass --serial <SERIAL>, --port <PORT>, or set THICKET_BOARD_SERIAL. "
+        f"Use `board.py boards` to list them.")
+
+
+def cmd_boards(_args):
+    mapping = port_serials()
+    ports = sorted(glob.glob("/dev/cu.usbmodem*"))
+    if not ports:
+        print("[board] no usbmodem ports")
+        return
+    for p in ports:
+        print(f"  {p}  serial={mapping.get(p, '?')}")
 
 
 class Capture(threading.Thread):
@@ -150,7 +213,7 @@ def cmd_ports(_args):
 
 
 def cmd_capture(args):
-    port = find_port(args.port)
+    port = find_port(args.port, getattr(args, 'serial', None))
     if not port:
         sys.exit("no usbmodem port found")
     cap = Capture(port, echo=True, poke=getattr(args, "poke", False))
@@ -166,7 +229,7 @@ def cmd_capture(args):
 
 
 def cmd_flash(args):
-    port = find_port(args.port)
+    port = find_port(args.port, getattr(args, 'serial', None))
     if not port:
         sys.exit("no usbmodem port found")
 
@@ -231,7 +294,13 @@ def cmd_flash(args):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", default=None)
+    ap.add_argument("--serial", default=None,
+                    help="select the board by USB serial number; stable "
+                         "across re-enumeration where the port name is not")
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    p = sub.add_parser("boards")
+    p.set_defaults(func=cmd_boards)
 
     p = sub.add_parser("ports")
     p.set_defaults(func=cmd_ports)
