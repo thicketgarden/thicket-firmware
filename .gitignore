@@ -18,3 +18,6 @@ transport_identity
 hashlist_store/
 known_store/
 path_store/
+
+# Local state from scripts/persistence-check.sh
+.persistence-check*
