@@ -64,11 +64,17 @@ class Capture(threading.Thread):
     port disappears while the board resets and comes back a moment later.
     """
 
-    def __init__(self, port, baud=DEFAULT_BAUD, echo=False):
+    def __init__(self, port, baud=DEFAULT_BAUD, echo=False, poke=False):
         """echo=True streams each line as it arrives; echo=False keeps the
-        collect-then-return behaviour that `flash` relies on for its summary."""
+        collect-then-return behaviour that `flash` relies on for its summary.
+
+        poke=True writes a newline once the port is open. The firmware restates
+        its addresses on any serial input, which is the only way to read them
+        after a power cycle: USB CDC discards writes made while no host is
+        listening, so the boot banner is already gone by the time we attach."""
         super().__init__(daemon=True)
         self.echo = echo
+        self.poke = poke
         self.port = port
         self.baud = baud
         self.lines = []
@@ -88,6 +94,13 @@ class Capture(threading.Thread):
                     ser = serial.Serial(self.port, self.baud, timeout=0.05)
                     if self.connected_at is None:
                         self.connected_at = time.time()
+                    if self.poke:
+                        time.sleep(0.3)   # let the CDC endpoint settle
+                        try:
+                            ser.write(b"\n")
+                            ser.flush()
+                        except Exception:
+                            pass
                 except Exception:
                     ser = None
                     time.sleep(0.02)
@@ -140,9 +153,10 @@ def cmd_capture(args):
     port = find_port(args.port)
     if not port:
         sys.exit("no usbmodem port found")
-    cap = Capture(port, echo=True)
+    cap = Capture(port, echo=True, poke=getattr(args, "poke", False))
     cap.start()
-    print(f"[board] capturing {port} for {args.seconds}s", flush=True)
+    print(f"[board] capturing {port} for {args.seconds}s"
+          f"{' (poking for a restatement)' if getattr(args, 'poke', False) else ''}", flush=True)
     try:
         time.sleep(args.seconds)
     except KeyboardInterrupt:
@@ -224,6 +238,10 @@ def main():
 
     p = sub.add_parser("capture")
     p.add_argument("--seconds", type=float, default=15)
+    p.add_argument("--poke", action="store_true",
+                   help="send a newline once open; the firmware restates its "
+                        "addresses, which is the only way to read them after a "
+                        "power cycle")
     p.set_defaults(func=cmd_capture)
 
     p = sub.add_parser("flash")

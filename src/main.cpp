@@ -211,6 +211,13 @@ static void thicket_radio_wake();
 static RNS::Interface g_lora_interface({RNS::Type::NONE});
 static RNS::Identity g_identity({RNS::Type::NONE});
 
+// How the identity in use was obtained. The on-demand restatement below has to
+// say this: an address alone does not tell you whether it will still be yours
+// after the power is pulled, and that is the whole question this build exists
+// to answer.
+static const char* g_identity_source = "unknown";
+
+
 // sizeof(LXMF::LXMRouter) is 33,656 bytes. That is 14% of the 237,568 B SRAM
 // region and it is not wanted in .bss on top of the TLSF pool, so it is built
 // on the heap once the identity exists.
@@ -742,7 +749,8 @@ static bool bringup_identity() {
 	if (RNS::Utilities::OS::file_exists(IDENTITY_PATH)) {
 		g_identity = RNS::Identity::from_file(IDENTITY_PATH);
 		if (g_identity) {
-			info("source", "loaded from external flash");
+			g_identity_source = "loaded from external flash";
+			info("source", g_identity_source);
 			ok("identity restored across reboot");
 		} else {
 			// The file is there and unreadable. Do not silently mint a new
@@ -763,7 +771,8 @@ static bool bringup_identity() {
 			fail("could not persist identity to external flash");
 			return false;
 		}
-		info("source", "generated and written (first boot)");
+		g_identity_source = "generated and written (first boot)";
+		info("source", g_identity_source);
 		ok("identity created and persisted");
 	}
 
@@ -1230,6 +1239,8 @@ static void print_addresses() {
 	Serial.println(g_router->delivery_destination().hash().toHex().c_str());
 	Serial.print("   display name         : ");
 	Serial.println(DISPLAY_NAME);
+	Serial.print("   identity source      : ");
+	Serial.println(g_identity_source);
 	Serial.println();
 	Serial.println(" The identity hash must be identical after a power cycle.");
 	Serial.println(" If it is not, external-flash persistence is broken and");
@@ -1734,6 +1745,18 @@ static void thicket_task(void* arg) {
 	(void)arg;
 	for (;;) {
 		thicket_work();
+		// Any serial input restates the addresses. USB CDC discards writes
+		// made while no host is listening, so the boot banner is gone by the
+		// time a host attaches after a power cycle -- which is precisely when
+		// the identity most needs reading. Without this, verifying persistence
+		// means racing the port open against boot.
+		if (Serial.available()) {
+			while (Serial.available()) { (void)Serial.read(); }
+			print_addresses();
+		}
+#ifdef THICKET_POOL_SOAK
+		pool_soak_sample();
+#endif
 #ifdef THICKET_LORA_ISR
 		// BLOCK, rather than yield. This is where the milliamps are: with
 		// taskYIELD() the scheduler comes straight back to us and the CPU never
@@ -1749,9 +1772,6 @@ static void thicket_task(void* arg) {
 		// ⚠ If a future upstream needs something tighter than this, the CPU
 		// stops sleeping meaningfully and the saving evaporates. That audit is
 		// a precondition of this feature, not a detail of it.
-#ifdef THICKET_POOL_SOAK
-		pool_soak_sample();
-#endif
 		ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(THICKET_TASK_TICK_MS));
 #else
 		// Yield to anything of equal or lower priority. Nothing here may block:

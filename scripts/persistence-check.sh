@@ -26,6 +26,16 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 
 ENV="${ENV:-wiscore_rak4631}"
+
+# board.py needs pyserial. The python3 on PATH here does not have it, while the
+# interpreter PlatformIO was installed into does; prefer that unless told
+# otherwise. Set PYTHON to override.
+if [ -z "${PYTHON:-}" ]; then
+	for cand in "$HOME/.local/share/uv/tools/platformio/bin/python" python3; do
+		if "$cand" -c "import serial" >/dev/null 2>&1; then PYTHON="$cand"; break; fi
+	done
+fi
+: "${PYTHON:=python3}"
 STATE="${STATE:-.persistence-check}"
 SECONDS_BOOT="${SECONDS_BOOT:-25}"
 
@@ -44,9 +54,9 @@ extract_identity() {
 capture_boot() {
 	local out="$1"
 	if [ "$no_flash" = "1" ] || [ "$phase" = "verify" ]; then
-		python3 scripts/board.py capture --seconds "$SECONDS_BOOT" > "$out" 2>&1
+		"$PYTHON" scripts/board.py capture --poke --seconds "$SECONDS_BOOT" > "$out" 2>&1
 	else
-		python3 scripts/board.py flash "$ENV" --seconds "$SECONDS_BOOT" > "$out" 2>&1
+		"$PYTHON" scripts/board.py flash "$ENV" --seconds "$SECONDS_BOOT" > "$out" 2>&1
 	fi
 }
 
@@ -88,7 +98,7 @@ verify)
 	echo "[persistence] before: $before"
 	echo "[persistence] after:  $after"
 	if [ "$before" = "$after" ]; then
-		if grep -qi "identity restored across reboot" "$log"; then
+		if grep -qiE "identity restored across reboot|identity source *: *loaded from external flash" "$log"; then
 			echo "[persistence] PASS — same address, and the firmware says it was"
 			echo "[persistence] restored from external flash rather than reminted."
 			exit 0
