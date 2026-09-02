@@ -8,7 +8,7 @@
 # times.
 #
 # So this is a control rather than a resolution to be careful. It runs only the
-# fast checks — pins, public-text shorthand, then native tests — because a gate
+# fast checks: pins, public-text shorthand, then native tests, because a gate
 # slow enough to be
 # resented gets bypassed, and a bypassed gate is worse than none: it still looks
 # like coverage. The interop suites take minutes and stay in CI.
@@ -42,7 +42,7 @@ if ! command -v python3 >/dev/null 2>&1; then
 fi
 
 if ! out=$(python3 scripts/check_pins.py 2>&1); then
-	echo "push gate: BLOCKED — dependency pins disagree across build paths." >&2
+	echo "push gate: BLOCKED, dependency pins disagree across build paths." >&2
 	echo "$out" >&2
 	echo "" >&2
 	echo "Every build path has to resolve the same commit. Fix the pins, then push." >&2
@@ -55,7 +55,7 @@ fi
 # messages. Messages are checked because they are the half that cannot be fixed
 # afterwards without rewriting published history.
 if ! out=$(python3 scripts/check_public_text.py --outgoing 2>&1); then
-	echo "push gate: BLOCKED — a commit message about to be published carries" >&2
+	echo "push gate: BLOCKED, a commit message about to be published carries" >&2
 	echo "           private-repo shorthand." >&2
 	echo "$out" >&2
 	echo "" >&2
@@ -64,7 +64,7 @@ if ! out=$(python3 scripts/check_public_text.py --outgoing 2>&1); then
 fi
 
 if ! out=$(python3 scripts/check_public_text.py --all 2>&1); then
-	echo "push gate: BLOCKED — tracked content carries private-repo shorthand." >&2
+	echo "push gate: BLOCKED, tracked content carries private-repo shorthand." >&2
 	echo "$out" >&2
 	exit 2
 fi
@@ -75,12 +75,12 @@ if ! command -v pio >/dev/null 2>&1; then
 fi
 
 if ! out=$(pio test -e native 2>&1); then
-	echo "push gate: BLOCKED — native tests fail." >&2
+	echo "push gate: BLOCKED, native tests fail." >&2
 	echo "$out" | tail -25 >&2
 	exit 2
 fi
 
 echo "push gate: pins agree, no private-repo shorthand, native tests pass." >&2
-echo "note: the interop suites are not run here. If a pin moved, run them —" >&2
-echo "      bash test_interop/run_all.sh — before relying on this push." >&2
+echo "note: the interop suites are not run here. If a pin moved, run them." >&2
+echo "      bash test_interop/run_all.sh, before relying on this push." >&2
 exit 0

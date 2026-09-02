@@ -154,13 +154,13 @@ def main():
             scan(open(f, errors="replace").read(), f, findings)
 
     if not findings:
-        print("check_public_text: OK — no private-repo shorthand.")
+        print("check_public_text: OK, no private-repo shorthand.")
         return 0
 
     print(f"check_public_text: {len(findings)} reference(s) that mean nothing "
           f"to a reader of this repository:\n", file=sys.stderr)
     for label, n, tok, why, line in findings[:40]:
-        print(f"  {label}:{n}: '{tok}' — {why}", file=sys.stderr)
+        print(f"  {label}:{n}: '{tok}', {why}", file=sys.stderr)
         print(f"      {line}", file=sys.stderr)
     if len(findings) > 40:
         print(f"  … and {len(findings) - 40} more", file=sys.stderr)

@@ -137,7 +137,7 @@ def main():
     bounded = [r for r in rows if "bounded" in r[1]]
     print(f"  static frames        {len(rows) - len(dynamic) - len(bounded):>6}")
     print(f"  bounded frames       {len(bounded):>6}   (compiler proved a bound)")
-    print(f"  DYNAMIC frames       {len(dynamic):>6}   (alloca / VLA — unbounded)\n")
+    print(f"  DYNAMIC frames       {len(dynamic):>6}   (alloca / VLA, unbounded)\n")
 
     if dynamic:
         print("  ⚠ dynamic frames have no static bound. Largest reported sizes:")

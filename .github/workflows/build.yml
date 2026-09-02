@@ -5,7 +5,7 @@ name: build
 # is not a fallback.
 #
 # This job also exists to catch scripts/patch_deps.py failing. Those patches
-# are anchored to exact upstream text and sys.exit(1) when a pin moves —
+# are anchored to exact upstream text and sys.exit(1) when a pin moves,
 # which is correct, but until now the only place that alarm could fire was
 # someone's laptop, whenever they happened to build.
 
@@ -76,7 +76,7 @@ jobs:
 
   test:
     # Host-side unit tests. This is the first CI job that exercises OUR code
-    # rather than a dependency — the interop workflow proves microReticulum
+    # rather than a dependency, the interop workflow proves microReticulum
     # talks to Python RNS, and proved nothing about anything we wrote.
     name: unit tests (native)
     runs-on: ubuntu-latest

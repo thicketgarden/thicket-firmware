@@ -22,7 +22,7 @@ So there are four rules, and the third is the one nothing previously checked:
   R4  nothing that is pinned to a fork is left on an implicit default branch
 
 Exit codes: 0 pass, 1 a pin disagrees, 2 the check could not run. Two is
-deliberately distinct — a gate that could not run must not read as a gate that
+deliberately distinct, a gate that could not run must not read as a gate that
 passed.
 """
 
@@ -75,7 +75,7 @@ def main():
 
     bad = 0
 
-    # R1 + R4 — the root is authoritative, so it must be unambiguous itself.
+    # R1 + R4, the root is authoritative, so it must be unambiguous itself.
     for lib, (owner, ref, n) in sorted(root.items()):
         if ref is None:
             fail(
@@ -91,7 +91,7 @@ def main():
             )
             bad += 1
 
-    # R2 — this repo's scenario projects carry their own copies of the pins.
+    # R2, this repo's scenario projects carry their own copies of the pins.
     for ini in sorted(REPO.glob("test_interop/*/platformio.ini")):
         for lib, (owner, ref, n) in sorted(deps_in(ini).items()):
             if lib not in root:
@@ -106,7 +106,7 @@ def main():
                 )
                 bad += 1
 
-    # R3 — the pins INSIDE the pinned dependency. Nothing checked this before,
+    # R3, the pins INSIDE the pinned dependency. Nothing checked this before,
     # and it is what actually broke: microReticulum's own scenarios pin their
     # own microStore, and do not inherit ours.
     checked_inner = False
@@ -145,7 +145,7 @@ def main():
         return 1
 
     scope = "root + scenarios" + (" + inside the dependency" if checked_inner else "")
-    print(f"[check_pins] OK — {len(root)} dependencies agree across {scope}.")
+    print(f"[check_pins] OK, {len(root)} dependencies agree across {scope}.")
     return 0
 
 

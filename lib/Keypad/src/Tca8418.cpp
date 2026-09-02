@@ -71,7 +71,7 @@ size_t Tca8418::poll(KeyEvent* out, size_t max) {
 	//
 	// The CAD Interrupt Errata (SCPS215G 8.6.3) states that keys 1+11, 1+21 and
 	// 21+1+11 raise CAD_INT falsely, and that there is NO workaround. Keys 1,
-	// 11 and 21 are R0C0, R1C0 and R2C0 — so two ordinary keys held in column
+	// 11 and 21 are R0C0, R1C0 and R2C0, so two ordinary keys held in column
 	// zero during normal two-key rollover, which our input layer explicitly
 	// permits, will assert it. Treating CAD_INT as meaningful would turn
 	// ordinary typing into a spurious Ctrl-Alt-Delete.

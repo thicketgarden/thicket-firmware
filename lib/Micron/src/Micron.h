@@ -6,7 +6,7 @@
 // (at your option) any later version.
 //
 // ---------------------------------------------------------------------------
-// Micron — a streaming parser for NomadNet's page markup.
+// Micron, a streaming parser for NomadNet's page markup.
 //
 // WHY THIS SHAPE
 //

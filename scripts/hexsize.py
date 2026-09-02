@@ -9,7 +9,7 @@
 # What actually lands in the application region, measured from the Intel HEX.
 #
 # `pio run` prints a Flash number that sums .text + .ARM.exidx + .data and
-# OMITS .ARM.extab — tens of kilobytes of exception unwind tables on this
+# OMITS .ARM.extab: tens of kilobytes of exception unwind tables on this
 # stack, because microReticulum throws. It also measures against
 # boards/rak4630.json's `maximum_size`, which is right for the SoftDevice build
 # and wrong for the no-BLE one.

@@ -5,7 +5,7 @@
 //
 // Deliberately knows nothing about the TCA8418, I2C, or the matrix. It takes
 // key-down / key-up by key code and nothing else, so the whole of it runs on
-// the host and can be tested before any keyboard hardware exists — which is the
+// the host and can be tested before any keyboard hardware exists, which is the
 // case today.
 //
 // ---------------------------------------------------------------------------
@@ -14,8 +14,8 @@
 // The carrier PCB has NO PER-KEY DIODES. A diode-less matrix ghosts when three
 // keys are held at once: three keys forming an L produce a phantom fourth, and
 // the scanner cannot tell the phantom from a real press. That was accepted
-// deliberately, on the grounds that shift, alt and sym are ONE-SHOT — pressed
-// and released before the key they modify, as BlackBerry did — so a three-key
+// deliberately, on the grounds that shift, alt and sym are ONE-SHOT, pressed
+// and released before the key they modify, as BlackBerry did, so a three-key
 // chord never arises in normal use and the 34 diodes are not needed.
 //
 // **If held modifiers or chording are ever introduced here, the board is

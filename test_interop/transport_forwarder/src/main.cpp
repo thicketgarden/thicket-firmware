@@ -1,7 +1,7 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// TRANSPORT FORWARDING — the scenario where we are the router.
+// TRANSPORT FORWARDING, the scenario where we are the router.
 //
 // Every other scenario in this suite puts our stack at the edge: a leaf that
 // receives, decrypts and answers. This one puts two Python RNS peers on
@@ -13,7 +13,7 @@
 //
 // `Transport.cpp` is where all four of our local patches live, and until now it
 // had no interop coverage in the one mode those patches are about. Worse, the
-// leaf scenarios run with `transport_enabled(false)` — so the entire forwarding
+// leaf scenarios run with `transport_enabled(false)`, so the entire forwarding
 // path, the announce rebroadcast, and the path-table population that a router
 // does have never executed against the reference implementation at all.
 //
@@ -24,8 +24,8 @@
 //
 //   1. Both peers learn each other. Necessary, but an announce could in
 //      principle reach them by some path we did not intend.
-//   2. The far peer receives the originator's packet. Stronger — the two have
-//      no shared interface — but still says nothing about hop accounting.
+//   2. The far peer receives the originator's packet. Stronger, the two have
+//      no shared interface, but still says nothing about hop accounting.
 //   3. **The packet arrives with a hop count that proves it crossed us.** RNS
 //      increments hops on ingress, so a packet the originator sent at 0 arrives
 //      at the far end having been counted twice: once by us, once by them.
@@ -120,7 +120,7 @@ int main(int argc, char** argv) {
 	// THE line this scenario exists for. Every other scenario sets this false.
 	reticulum.transport_enabled(true);
 	reticulum.start();
-	info("transport ENABLED — this node routes");
+	info("transport ENABLED, this node routes");
 
 	RNS::Transport::register_announce_handler(watcher);
 

@@ -11,7 +11,7 @@ identity's own X25519 private key. Not written here.
 | Commit | `5ccdc6577ba4abff99d5ea5d74a969388491d0bf` |
 | Authored | 2026-08-02 by David Konsumer |
 | Vendored | 2026-08-05 |
-| License | MIT — full text in `./LICENSE`, copied from the upstream repo root |
+| License | MIT, full text in `./LICENSE`, copied from the upstream repo root |
 | Copyright | © 2026 David Konsumer |
 
 The same code is also proposed upstream as
@@ -45,11 +45,11 @@ standalone repository rather than the PR, so nothing here waits on that review.
 | Key derivation | HKDF-SHA256, 64 bytes, from the identity's X25519 private key, salted with the identity hash |
 | Confidentiality | AES-256-CTR with a random 16-byte IV per file |
 | Authentication | HMAC-SHA256 over version ‖ IV ‖ ciphertext, compared in constant time **before** any plaintext is produced |
-| File layout | `version(1) ‖ IV(16) ‖ ciphertext(N) ‖ HMAC(32)` — 49 bytes of overhead |
+| File layout | `version(1) ‖ IV(16) ‖ ciphertext(N) ‖ HMAC(32)`, 49 bytes of overhead |
 | User input | **none** |
 
 The keys derive from the identity, so **destroying the identity makes every
-stored message unreadable at once** — crypto-erase for the cost of deleting one
+stored message unreadable at once**, crypto-erase for the cost of deleting one
 key, with no flash wipe. On a sealed handheld that may need to be made safe in a
 hurry, that property is arguably worth more than the encryption itself.
 
@@ -57,21 +57,21 @@ hurry, that property is arguably worth more than the encryption itself.
 (`src/main.cpp`). An attacker who images the whole flash reads the identity and
 then derives these message keys from it. This defends a message store that
 leaks *without* the identity, and it buys crypto-erase. Whole-flash compromise
-needs the other half of the upstream work — the passphrase-protected identity
-vault — which is not adopted here because it needs a passphrase-entry design
+needs the other half of the upstream work, the passphrase-protected identity
+vault, which is not adopted here because it needs a passphrase-entry design
 this device does not have yet.
 
 ## Why vendored rather than a `lib_deps` entry
 
 Unlike `lib/LoRaInterface`, the "PlatformIO cannot depend on a subdirectory"
-argument does not apply — upstream publishes this as a whole repository, so a
+argument does not apply, upstream publishes this as a whole repository, so a
 `lib_deps` URL would have been structurally fine. Three other things decided it.
 
 **1. The includes are stale, and no fetch method fixes that.** Upstream was
 written against microReticulum at `54c934e`, the base of PR #44, where `src/`
 was flat: `src/Identity.h`, `src/Cryptography/HKDF.h`. Those includes were
 correct on 2026-04-07. microReticulum has since restructured to
-`src/microReticulum/…` — including attermann's own HEAD (checked 2026-08-05) — so
+`src/microReticulum/…`, including attermann's own HEAD (checked 2026-08-05), so
 this is not a peculiarity of our fork. The library as published no longer
 compiles against the dependency its own `library.json` declares. Its PR has had
 no maintainer action since 2026-05-05, so nothing ever forced a rebase.
@@ -96,7 +96,7 @@ Kept to the minimum, each marked in place with `THICKET:`.
 
 1. **`#include <Arduino.h>` dropped from the header.** The library targets
    Arduino only; we also build this on the host for the conformance scenario,
-   where that header does not exist. Nothing in the file used it — the Arduino
+   where that header does not exist. Nothing in the file used it, the Arduino
    types it would supply are not referenced.
 
 Nothing else is changed. The key derivation, the file layout, the constant-time

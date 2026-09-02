@@ -5,8 +5,8 @@
 The far end of the TRANSPORT FORWARDING scenario.
 
 It sits on the other side of our C++ router from the originator, on a UDP
-segment the originator is not a member of. It announces, waits, and reports —
-verbatim, on stdout — what it receives and at what hop count.
+segment the originator is not a member of. It announces, waits, and reports,
+verbatim, on stdout, what it receives and at what hop count.
 
 It is a separate process because the two Python peers must not share an
 interface: if they did, they could reach each other directly and the scenario
@@ -136,7 +136,7 @@ def main():
     if state["hops"] != args.expect_hops:
         print(f"[far] FAILURE hops={state['hops']}, expected "
               f"{args.expect_hops}. RNS counts a hop on ingress at every node, "
-              f"so a packet that really crossed the router is counted twice — "
+              f"so a packet that really crossed the router is counted twice, "
               f"once by it, once by us. A lower number means it reached us by "
               f"some path that did not go through the node under test, and the "
               f"scenario proved nothing.", flush=True)

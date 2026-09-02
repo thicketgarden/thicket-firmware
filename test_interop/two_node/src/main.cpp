@@ -7,7 +7,7 @@
 //
 // Every other scenario in this suite has the Python reference ORIGINATE and us
 // receive. That is the right primary test and it is the direction a handheld
-// spends its life in — but it means our OUTBOUND constructs have only ever been
+// spends its life in, but it means our OUTBOUND constructs have only ever been
 // validated by whatever the reference happened to accept along the way. Nothing
 // makes our stack both produce and consume the same thing.
 //
@@ -24,15 +24,15 @@
 // ONE PROCESS, TWO ROLES
 //
 // Role comes from THICKET_ROLE, set by the driver. One binary rather than two
-// projects so that both ends are provably the same code — if the originator and
+// projects so that both ends are provably the same code, if the originator and
 // receiver were separate builds, "we can parse what we emit" would be a claim
 // about two artefacts rather than one.
 //
 // TOPOLOGY: a direct UDP pair, not a routed pair.
 //
 // The task sketched two segments joined by a router. A direct pair proves the
-// assertions that matter here — our decode of our encode, and a proof
-// validating between two microReticulum instances — with far less machinery,
+// assertions that matter here, our decode of our encode, and a proof
+// validating between two microReticulum instances, with far less machinery,
 // and `transport_forwarder` already covers us routing. Routed two-node is a
 // worthwhile extension, not a precondition, and it is noted as such rather than
 // silently skipped.

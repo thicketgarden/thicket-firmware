@@ -38,12 +38,12 @@ Use a venv built from `/opt/homebrew/bin/python3`:
 |---|---|---|
 | cold inbound | `run_cold_inbound.sh` | A Python peer originates an encrypted packet to a C++ destination that has announced but never transmitted to it. C++ decrypts and validates 383 bytes (`ENCRYPTED_MDU`); Python validates the returned proof and a digest of the recovered plaintext. |
 | multi-hop inbound | `run_multihop_inbound.sh` | The same leaf and payload as cold inbound, but with a transport-enabled reference node between the two ends, so the packet reaches us **through a router** rather than off the same wire. Proves the leaf learns a path from a relayed announce, decrypts a packet that arrived with a non-zero hop count, and returns a proof that travels back across the relay. The hop count itself is asserted, so a run that arrived directly fails instead of passing. |
-| transport forwarding | `run_transport_forward.sh` | **The only scenario where our stack is the router, not the leaf.** Two Python peers sit on UDP segments with no member in common except us, so a payload reaching the far end proves we forwarded it — and it must arrive at `hops=2`, because RNS counts a hop on ingress at every node and a packet that really crossed us is counted twice. Runs with `transport_enabled(true)`, which no other scenario does, and which is the mode `Transport.cpp`'s four local patches are about. |
+| transport forwarding | `run_transport_forward.sh` | **The only scenario where our stack is the router, not the leaf.** Two Python peers sit on UDP segments with no member in common except us, so a payload reaching the far end proves we forwarded it, and it must arrive at `hops=2`, because RNS counts a hop on ingress at every node and a packet that really crossed us is counted twice. Runs with `transport_enabled(true)`, which no other scenario does, and which is the mode `Transport.cpp`'s four local patches are about. |
 | LXMF delivery inbound | `run_lxmf_inbound.sh` | The Python LXMF reference sends to our `lxmf.delivery` address. C++ asserts signature, title, content, timestamp, field count, field wire bytes and source hash; Python asserts the message reached `DELIVERED`. |
 | identity vectors | `run_identity_vectors.sh` | `Identity` key derivation, hashing, HKDF, Ed25519 signing/verification and decryption of a reference ciphertext, against fixed outputs of the Python reference. Python re-derives and diffs the vectors so they cannot rot. |
-| wire oracle | `run_wire_oracle.sh` | Packets packed through microReticulum's real `pack()` are decoded by the reference's own `RNS.Packet` and compared field by field: header type, packet type, destination type, transport type, context, destination hash, transport id and body. Also asserts that a named constant means the same number on both sides, so a shared misunderstanding cannot pass. No network — the packets are never sent. |
+| wire oracle | `run_wire_oracle.sh` | Packets packed through microReticulum's real `pack()` are decoded by the reference's own `RNS.Packet` and compared field by field: header type, packet type, destination type, transport type, context, destination hash, transport id and body. Also asserts that a named constant means the same number on both sides, so a shared misunderstanding cannot pass. No network, the packets are never sent. |
 | examples echo | `run_examples_echo.sh` | Runs **`Examples/Echo.py` from the reference source tree, unmodified**, at the installed RNS version, and talks to it as the client. Every other scenario here talks to a Python script we wrote, which cannot catch a misreading of the protocol because our script shares it. The proof *is* the echo: Echo.py sets PROVE_ALL and its own client measures success as `receipt.status == DELIVERED`. Since the destination is SINGLE, the reference had to decrypt our packet to prove it, and both sides assert separately. |
-| pool soak | `run_pool_soak.sh` | Drives message traffic through the real LXMRouter and samples the RNS container pool every cycle, then reports whether use and fragmentation **plateau or climb** — the two shapes call for opposite decisions, and only one data point (2% at boot, 16% after a single message) existed before. Refuses to run if the pool is not backed, because an unbacked pool reads as zero fragmentation. Prints its own coverage: without a peer, only the outbound path is exercised. |
+| pool soak | `run_pool_soak.sh` | Drives message traffic through the real LXMRouter and samples the RNS container pool every cycle, then reports whether use and fragmentation **plateau or climb**, the two shapes call for opposite decisions, and only one data point (2% at boot, 16% after a single message) existed before. Refuses to run if the pool is not backed, because an unbacked pool reads as zero fragmentation. Prints its own coverage: without a peer, only the outbound path is exercised. |
 | link inbound | `run_link_inbound.sh` | Python establishes a Link **to** a C++ destination (the existing microReticulum link scenario is C++ to Python only), round-trips 200 bytes over it, idles it past five keepalive intervals, then cuts the wire through a UDP relay and requires the reference's watchdog to close the link with `TIMEOUT`. Takes about a minute; the phases are timed. |
 
 UDP port pairs, so scenarios can coexist: cold inbound 14262/14263, multi-hop
@@ -79,7 +79,7 @@ cd ../.. && BUILD=0 PATH="/tmp/rnsvenv/bin:$PATH" \
 pointer and `size_t` is twice its width on the nRF52840, so the figure is an
 upper bound on what the same workload costs there. It can prove a pool size is
 *sufficient*; it cannot prove one is *necessary*, and it is not a substitute
-for measuring on the board. Rebuild without the flags afterwards — `run_all.sh`
+for measuring on the board. Rebuild without the flags afterwards, `run_all.sh`
 does that for you.
 
 ## Proving a scenario can fail
@@ -115,7 +115,7 @@ Recorded here because they are the strongest evidence the suite has:
 | corrupt one byte of every `Identity::sign` output | cold inbound FAILs; Python rejects the announce |
 | `Identity::prove` signs the wrong material | cold inbound FAILs on the Python side only, isolating the proof assertion |
 | suppress `proof_packet.prove()` in microLXMF | LXMF inbound FAILs on the Python side only |
-| revert the X25519 clamping commit | identity vectors FAILs 4 checks — **and cold inbound still PASSes**, which is exactly why the vectors exist |
+| revert the X25519 clamping commit | identity vectors FAILs 4 checks, **and cold inbound still PASSes**, which is exactly why the vectors exist |
 | comment out the keepalive reply in `Link::receive` | link inbound FAILs the idle phase, which is what proves the C++ side really is answering keepalives rather than the assertion being vacuous |
 | flip one bit of a packed packet's context byte (`run_wire_oracle.sh --self-test-break`) | wire oracle FAILs and names the field, which is the point: the failure reads as `context: we packed 0, the reference read 9` rather than as a message that did not arrive |
 | point the echo client at an aspect the reference never announces (`run_examples_echo.sh --self-test-break`) | examples echo FAILs: no announce is matched, nothing is learned, and neither side prints SUCCESS |
@@ -143,8 +143,8 @@ the firmware does.
    `Cryptography/HKDF.cpp` calls `HKDFCommon::extract(out, len)` and never
    passes `context`, though the underlying `attermann/Crypto` API accepts
    `extract(out, outLen, info, infoLen)`. The reference mixes context into
-   every expansion block. No packet is affected today — `get_context()` returns
-   empty on both sides — but it is a silently wrong public function. Pinned as
+   every expansion block. No packet is affected today, `get_context()` returns
+   empty on both sides, but it is a silently wrong public function. Pinned as
    a strict expected-failure in `identity_vectors/src/main.cpp`: if it is ever
    fixed, that check goes red and forces the exemption to be deleted.
 
@@ -157,7 +157,7 @@ the firmware does.
 
 3. **There is no Link watchdog.** `Link::start_watchdog()` (Link.cpp:884) has an
    empty body and `Link::__watchdog_job()` sits inside a `/*p TODO */` comment
-   block, so `Link::send_keepalive()` — which is compiled — has no caller.
+   block, so `Link::send_keepalive()`, which is compiled, has no caller.
    Consequences: a C++ link initiator never sends keepalives, a PENDING link
    never times out, and an ACTIVE link never goes STALE. Answering an inbound
    keepalive does work (Link.cpp:1455-1460 is live), which is what the link
@@ -168,7 +168,7 @@ the firmware does.
    (Packet.cpp:907) reads `//z if (link.validate(signature, _object->_hash)) {`
    followed by `if (false) {`, so a receipt for a packet sent over a Link never
    reaches DELIVERED and its delivery callback never fires. Not covered by a
-   scenario yet — the LXMF scenario uses OPPORTUNISTIC delivery, which proves
+   scenario yet, the LXMF scenario uses OPPORTUNISTIC delivery, which proves
    through the Destination rather than the Link. This is the same bug
    microLXMF's conformance work found and fixed in *torlando-tech's*
    microReticulum fork; our fork descends from attermann's and does not have

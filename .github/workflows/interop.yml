@@ -5,7 +5,7 @@ name: interop
 #
 # WHY THIS EXISTS
 #
-# microReticulum declares no target RNS version anywhere — no constant, no
+# microReticulum declares no target RNS version anywhere: no constant, no
 # README statement, no CHANGELOG entry. So our interoperation with current
 # Reticulum is demonstrated BY TEST and never BY CONTRACT, which means it can
 # regress with no signal at all: no compile error, no version warning. The
@@ -13,12 +13,12 @@ name: interop
 #
 # Two jobs, doing two different things:
 #
-#   interop-pinned  — every push, against a KNOWN RNS version. Deterministic.
+#   interop-pinned : every push, against a KNOWN RNS version. Deterministic.
 #                     Must pass. Catches us breaking ourselves, and fires
 #                     automatically whenever the microReticulum pin is bumped
 #                     (because the pin is read out of platformio.ini below).
 #
-#   interop-latest  — weekly, against whatever RNS is CURRENT. Allowed to
+#   interop-latest : weekly, against whatever RNS is CURRENT. Allowed to
 #                     fail, and a failure is the entire point: it is the only
 #                     early warning that the ecosystem moved out from under
 #                     us. A red scheduled run emails the repo owner, which
@@ -36,7 +36,7 @@ on:
       - 'platformio.ini'
       - '.github/workflows/interop.yml'
   schedule:
-    # Mondays 07:00 UTC. Weekly is enough — RNS releases are not daily, and a
+    # Mondays 07:00 UTC. Weekly is enough, RNS releases are not daily, and a
     # week of exposure is acceptable for something nothing currently watches.
     - cron: '0 7 * * 1'
   workflow_dispatch:
@@ -91,7 +91,7 @@ jobs:
       - name: Install PlatformIO and Python RNS
         env:
           # The version we have actually demonstrated interoperation against.
-          # Change this deliberately, with a run to back it up — not to make
+          # Change this deliberately, with a run to back it up, not to make
           # a red build go green.
           RNS_VERSION: '1.4.2'
         run: |
@@ -118,9 +118,9 @@ jobs:
           if-no-files-found: ignore
 
   interop-latest:
-    name: interop (RNS latest — early warning)
+    name: interop (RNS latest, early warning)
     # Scheduled and manual only. On every push it would be noise; weekly it is
-    # a signal. A failure here does NOT mean we are broken today — it means
+    # a signal. A failure here does NOT mean we are broken today. It means
     # current RNS and our pinned stack have diverged and someone should look.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -232,7 +232,7 @@ jobs:
           if-no-files-found: ignore
 
   thicket-interop-latest:
-    name: thicket interop (RNS + LXMF latest — early warning)
+    name: thicket interop (RNS + LXMF latest, early warning)
     # Same contract as interop-latest above, one layer up. That job watches
     # current RNS against microReticulum's suite, which never touches LXMF.
     # Ours is the only suite that drives the LXMF reference, so it is the only
@@ -283,12 +283,12 @@ jobs:
     # the interop scenarios to FAIL.
     #
     # This exists because our other interop jobs test our FORK, which carries
-    # the transport_enabled store-init fix — so they can prove the fix works
+    # the transport_enabled store-init fix, so they can prove the fix works
     # and can never demonstrate the bug it fixes. Before telling a maintainer
     # that his own test suite fails, we should be able to show it failing.
     #
     # A green run here means "the bug reproduces, as reported".
-    # A red run here means "upstream is fine and our issue is wrong" — which
+    # A red run here means "upstream is fine and our issue is wrong", which
     # is the outcome worth catching before it is sent, not after.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -319,7 +319,7 @@ jobs:
           echo "--- Transport.cpp around the store-init gate ---"
           sed -n '378,382p' src/microReticulum/Transport.cpp
           grep -q 'if (Reticulum::transport_enabled())' src/microReticulum/Transport.cpp \
-            || { echo "::error::gate not found — upstream moved, re-anchor this job"; exit 1; }
+            || { echo "::error::gate not found, upstream moved, re-anchor this job"; exit 1; }
 
       - name: Confirm the senders run with transport disabled
         working-directory: upstream
@@ -334,7 +334,7 @@ jobs:
           set -e
           echo "run_all.sh exit code: $rc"
           if [ "$rc" -eq 0 ]; then
-            echo "::error::Upstream interop PASSED. The bug does not reproduce as reported —"
+            echo "::error::Upstream interop PASSED. The bug does not reproduce as reported."
             echo "::error::do NOT send the issue until this is understood."
             exit 1
           fi

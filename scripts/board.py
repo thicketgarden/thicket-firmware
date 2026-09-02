@@ -104,7 +104,7 @@ def find_port(explicit=None, serial=None):
 
     listing = "".join(f"\n    {p}  {mapping.get(p, '?')}" for p in ports)
     sys.exit(
-        f"{len(ports)} boards attached — refusing to guess which one.{listing}\n"
+        f"{len(ports)} boards attached, refusing to guess which one.{listing}\n"
         f"Pass --serial <SERIAL>, --port <PORT>, or set THICKET_BOARD_SERIAL. "
         f"Use `board.py boards` to list them.")
 

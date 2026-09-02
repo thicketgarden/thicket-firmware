@@ -60,7 +60,7 @@ static void save(VirtualPanel& p, const char* name) {
 }
 
 // ===========================================================================
-// A — THE CREATURE. A living thing that reacts to real events.
+// A, THE CREATURE. A living thing that reacts to real events.
 // The mesh has a body; the messages are what it brings you.
 // ===========================================================================
 
@@ -147,7 +147,7 @@ static void proposal_a(VirtualPanel& p, SharpLcd& l) {
 }
 
 // ===========================================================================
-// B — THE POD. Framed, boxed, cozy. A little machine you carry.
+// B, THE POD. Framed, boxed, cozy. A little machine you carry.
 // ===========================================================================
 
 static void proposal_b(VirtualPanel& p, SharpLcd& l) {
@@ -202,14 +202,14 @@ static void proposal_b(VirtualPanel& p, SharpLcd& l) {
 	frame(l, 58, 68, 284, 94);
 	l.draw_text(76, 84, "nobody can hear you here", true);
 	l.draw_text(76, 108, "walk somewhere higher, or", true);
-	l.draw_text(76, 122, "wait — it keeps trying", true);
+	l.draw_text(76, 122, "wait, it keeps trying", true);
 	l.draw_text(76, 142, "♡ 3 messages waiting to go", true);
 	l.draw_text(18, 212, "← back", true);
 	l.flush(); save(p, "b3-alone");
 }
 
 // ===========================================================================
-// C — THE TAPE. Text-forward, warm, almost no chrome. A continuous ribbon.
+// C, THE TAPE. Text-forward, warm, almost no chrome. A continuous ribbon.
 // ===========================================================================
 
 static void proposal_c(VirtualPanel& p, SharpLcd& l) {

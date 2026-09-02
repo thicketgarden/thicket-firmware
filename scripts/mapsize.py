@@ -77,22 +77,22 @@ def parse(path):
         .text.averyverylongsymbolname
                        0x0000000000026130       0x18 path/to/obj.o
 
-    The second shape wraps when the section name is long enough — which, on a
+    The second shape wraps when the section name is long enough, which, on a
     C++ codebase compiled with -ffunction-sections, is most of them.
     """
-    # section name, address, size, object — all on one line
+    # section name, address, size, object, all on one line
     one_line = re.compile(
         r"^\s(\.\S+)\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(\S.*?)\s*$")
     # section name alone (wrapped form)
     name_only = re.compile(r"^\s(\.\S+)\s*$")
-    # address, size, object — the continuation of the wrapped form
+    # address, size, object, the continuation of the wrapped form
     continuation = re.compile(
         r"^\s+(0x[0-9a-fA-F]+)\s+(0x[0-9a-fA-F]+)\s+(\S.*?)\s*$")
 
     sizes = {}
     pending = None
     # Everything before "Linker script and memory map" is the
-    # "Discarded input sections" block — sections --gc-sections threw away.
+    # "Discarded input sections" block, sections --gc-sections threw away.
     # Counting them inflates the total by more than the image itself.
     live = False
 

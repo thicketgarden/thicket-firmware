@@ -63,7 +63,7 @@ capture_boot() {
 report_ephemeral() {
 	cat >&2 <<'MSG'
 [persistence] The firmware reports an EPHEMERAL identity, which means no
-[persistence] filesystem was registered — the RAK15001 is not fitted, or the
+[persistence] filesystem was registered, the RAK15001 is not fitted, or the
 [persistence] build was a -noflash / -internalfs one. That is not a
 [persistence] persistence failure; there is nothing to persist to. Fit the
 [persistence] flash and build the default env.
@@ -86,7 +86,7 @@ arm)
 	echo "[persistence]   scripts/persistence-check.sh verify"
 	;;
 verify)
-	[ -f "${STATE}.id" ] || die "nothing armed — run 'arm' first"
+	[ -f "${STATE}.id" ] || die "nothing armed, run 'arm' first"
 	before="$(cat "${STATE}.id")"
 	log="${STATE}.verify.log"
 	echo "[persistence] phase 2: reading the identity after the power cycle"
@@ -99,15 +99,15 @@ verify)
 	echo "[persistence] after:  $after"
 	if [ "$before" = "$after" ]; then
 		if grep -qiE "identity restored across reboot|identity source *: *loaded from external flash" "$log"; then
-			echo "[persistence] PASS — same address, and the firmware says it was"
+			echo "[persistence] PASS, same address, and the firmware says it was"
 			echo "[persistence] restored from external flash rather than reminted."
 			exit 0
 		fi
-		echo "[persistence] SUSPECT — the hash matches but the firmware did not" >&2
+		echo "[persistence] SUSPECT, the hash matches but the firmware did not" >&2
 		echo "[persistence] report restoring it. Read $log before believing this." >&2
 		exit 1
 	fi
-	echo "[persistence] FAIL — the address changed across the power cycle." >&2
+	echo "[persistence] FAIL, the address changed across the power cycle." >&2
 	echo "[persistence] The device is a different peer to anyone who knew it." >&2
 	exit 1
 	;;

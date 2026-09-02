@@ -6,7 +6,7 @@
 #
 # Radio settings are taken from lib/LoRaInterface/src/LoRaInterface.h and must
 # match it exactly. Being one channel width off leaves both passbands barely
-# overlapping and the two ends mutually deaf — which presents as a dead radio
+# overlapping and the two ends mutually deaf: which presents as a dead radio
 # rather than as a misconfiguration, and has cost a bring-up session before.
 #
 #   scripts/bench-peer.sh detect     # find the RNode and show its config
@@ -37,7 +37,7 @@ find_rnode() {
 case "${1:-}" in
 detect)
 	ports="$(find_rnode)"
-	[ -n "$ports" ] || die "no USB serial devices found — is the RNode plugged in?"
+	[ -n "$ports" ] || die "no USB serial devices found, is the RNode plugged in?"
 	echo "[peer] candidate ports:"
 	printf '  %s\n' $ports
 	echo "[peer] probing each (set RNODE_PORT to skip this):"
@@ -54,7 +54,7 @@ configure)
 	[ -f "$CONFIG" ] && cp "$CONFIG" "$CONFIG.bak.$(date +%Y%m%d%H%M%S)"
 
 	if grep -q "\[\[$IFACE_NAME\]\]" "$CONFIG" 2>/dev/null; then
-		echo "[peer] '$IFACE_NAME' already in $CONFIG — leaving it alone."
+		echo "[peer] '$IFACE_NAME' already in $CONFIG, leaving it alone."
 		echo "[peer] Edit it by hand or remove the block and re-run."
 		exit 0
 	fi
@@ -62,7 +62,7 @@ configure)
 	cat >> "$CONFIG" <<EOF
 
   # Added by thicket scripts/bench-peer.sh. Settings mirror
-  # lib/LoRaInterface/src/LoRaInterface.h — change both or neither.
+  # lib/LoRaInterface/src/LoRaInterface.h, change both or neither.
   [[$IFACE_NAME]]
     type = RNodeInterface
     enabled = Yes

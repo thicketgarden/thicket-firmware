@@ -4,7 +4,7 @@
 // Host tests for the TCA8418 scanner: `pio test -e native`.
 //
 // There is no keyboard and no I2C bus here. The chip is behind an abstract Bus,
-// so the register conversation can be scripted and asserted — which is the same
+// so the register conversation can be scripted and asserted, which is the same
 // reason InputLayer could be written and proven before any hardware existed.
 //
 // The load-bearing tests are the ones that use TI's OWN worked example
@@ -20,7 +20,7 @@
 using namespace thicket;
 
 // A scriptable bus. Reads come from a per-register queue when one is set, so a
-// test can make consecutive reads of the SAME register return different bytes —
+// test can make consecutive reads of the SAME register return different bytes,
 // which is exactly how the FIFO behaves and the thing a naive fake gets wrong.
 class FakeBus : public Tca8418Bus {
 public:
@@ -74,7 +74,7 @@ void test_datasheet_example_presses(void) {
 
 void test_control_alt_delete_positions(void) {
 	// The datasheet says Ctrl-Alt-Del is keys 1, 11 and 21. If our stride is
-	// right those are R0C0, R1C0, R2C0 — the independent check that the
+	// right those are R0C0, R1C0, R2C0, the independent check that the
 	// numbering runs across columns first rather than down rows.
 	KeyEvent a, b, c;
 	TEST_ASSERT_TRUE(Tca8418::decode(0x80 | 1,  a));

@@ -10,7 +10,7 @@
 //
 // **These tests exist so that constraint outlives the person who wrote it.**
 // If someone later makes modifiers held, or lets a three-key combination
-// through, the tests below fail — which is the only thing standing between a
+// through, the tests below fail, which is the only thing standing between a
 // plausible-looking firmware change and 34 missing diodes.
 
 #include <unity.h>

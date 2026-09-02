@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Thicket contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Scenario 8: TWO OF OUR OWN NODES — no reference in the middle.
+# Scenario 8: TWO OF OUR OWN NODES: no reference in the middle.
 #
 # The only scenario where our stack is on BOTH ends. It exists because every
 # other one has the reference originate and us receive, so our outbound

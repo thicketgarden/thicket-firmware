@@ -19,7 +19,7 @@
 # produces a binary that compiles and misbehaves. If a pin moves, this file is
 # where the build tells you.
 #
-# Patches are idempotent — each is marked with PATCH_MARKER and skipped if the
+# Patches are idempotent: each is marked with PATCH_MARKER and skipped if the
 # marker is already present, because PlatformIO re-runs pre: scripts on every
 # invocation against an already-patched tree.
 
@@ -46,7 +46,7 @@ def fail(path, expected, why):
         "***   what it is for: %s\n"
         "***\n"
         "*** A pinned dependency moved, or the tree is half-patched. Do not\n"
-        "*** work around this by deleting the patch — check the pin in\n"
+        "*** work around this by deleting the patch, check the pin in\n"
         "*** platformio.ini against the upstream source and re-anchor.\n\n"
         % (path, expected, why)
     )
@@ -60,7 +60,7 @@ def targets(lib, relpath):
     us (as a pinned git URL, giving `MsgPack/`) and by an upstream
     `library.json` (as a name + version range, giving `MsgPack@src-<hash>/`).
     It cannot tell that they are the same package. Only one copy ends up on the
-    include path — and it is not reliably ours — so every copy has to be
+    include path, and it is not reliably ours, so every copy has to be
     patched or the build fails in a way that looks like the patch did not run.
     """
     found = glob.glob(os.path.join(LIBDEPS, lib + "*", relpath))
@@ -110,12 +110,12 @@ def patch(lib, relpath, patch_id, replacements, why, insert_at_top=None):
 
 
 # ---------------------------------------------------------------------------
-# Class A — Arduino.h macro collision.
+# Class A: Arduino.h macro collision.
 #
 # The Adafruit nRF52 core's Arduino.h defines abs(x) and round(x) as
 # function-like macros. Any libstdc++ header pulled in afterwards that names
-# std::abs / std::round — <chrono>, reached via <mutex>, via MsgPack, via
-# ArduinoJson — fails to parse. The ESP32 Arduino core does not hit this in the
+# std::abs / std::round: <chrono>, reached via <mutex>, via MsgPack, via
+# ArduinoJson: fails to parse. The ESP32 Arduino core does not hit this in the
 # same include order, which is why upstream never saw it.
 #
 # Fix: include Arduino.h first, then #undef the two macros for the whole
@@ -124,7 +124,7 @@ def patch(lib, relpath, patch_id, replacements, why, insert_at_top=None):
 # are correct where the macro was merely convenient.
 # ---------------------------------------------------------------------------
 
-ARDUINO_MACRO_PROLOGUE = """// %s:arduino-macros — Arduino.h defines abs()/round()
+ARDUINO_MACRO_PROLOGUE = """// %s:arduino-macros, Arduino.h defines abs()/round()
 // as function-like macros. Any libstdc++ header named afterwards that mentions
 // std::abs or std::round (<chrono>, reached via <mutex> / MsgPack /
 // ArduinoJson) then fails to parse. Pull Arduino.h in first and undefine both
@@ -153,15 +153,15 @@ for _f in (
 
 
 # ---------------------------------------------------------------------------
-# Class B — no std::mutex in this toolchain.
+# Class B: no std::mutex in this toolchain.
 #
 # arm-none-eabi GCC 7.2.1 as shipped by platform nordicnrf52 is built without
 # gthreads, so <mutex> declares std::lock_guard (outside the _GLIBCXX_HAS_GTHREADS
 # guard, bits/std_mutex.h:156) but NOT std::mutex (inside it, :86).
 #
 # LXStamper's async stamp slot is guarded by one. The async worker is compiled
-# out entirely off ESP32 — the xTaskCreatePinnedToCore call sits under
-# #ifdef ESP_PLATFORM and the stamper falls back to synchronous — so there is
+# out entirely off ESP32: the xTaskCreatePinnedToCore call sits under
+# #ifdef ESP_PLATFORM and the stamper falls back to synchronous: so there is
 # no second context to race against and a no-op lock is behaviourally correct.
 #
 # std::lock_guard is a template over any BasicLockable, so this needs no
@@ -170,7 +170,7 @@ for _f in (
 
 MUTEX_SHIM = """#include <mutex>
 
-// %s:no-gthreads — this toolchain (arm-none-eabi GCC 7.2.1
+// %s:no-gthreads, this toolchain (arm-none-eabi GCC 7.2.1
 // as shipped by platform nordicnrf52) is built without gthreads, so <mutex>
 // declares std::lock_guard but not std::mutex. LXStamper's async worker is
 // ESP32-only (#ifdef ESP_PLATFORM around xTaskCreatePinnedToCore; the stamper
@@ -201,10 +201,10 @@ patch(
 
 
 # ---------------------------------------------------------------------------
-# Class C — MsgPack private members.
+# Class C: MsgPack private members.
 #
 # microLXMF calls arduino::msgpack::Packer::packRawBytes() and reads
-# Unpacker::indices — both private in hideakitai/MsgPack v0.4.2 — to splice
+# Unpacker::indices: both private in hideakitai/MsgPack v0.4.2, to splice
 # pre-encoded msgpack values into the LXMF wire stream. LXMF's field map is
 # dict[int, Any] on the wire, so the encoder has to move opaque encoded values
 # through without knowing their type.
@@ -221,7 +221,7 @@ patch(
     replacements=[
         (
             "    private:\n        void packRawByte",
-            "    public:  // %s:packer-public — was `private:`; microLXMF needs packRawBytes()\n"
+            "    public:  // %s:packer-public, was `private:`; microLXMF needs packRawBytes()\n"
             "        void packRawByte" % MARKER,
         ),
     ],
@@ -235,7 +235,7 @@ patch(
         (
             "    class Unpacker {\n        uint8_t* raw_data",
             "    class Unpacker {\n"
-            "    public:  // %s:unpacker-public — class-default private; microLXMF reads `indices`\n"
+            "    public:  // %s:unpacker-public, class-default private; microLXMF reads `indices`\n"
             "        uint8_t* raw_data" % MARKER,
         ),
     ],

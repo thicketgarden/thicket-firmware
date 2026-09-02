@@ -21,7 +21,7 @@
 // hardware.
 //
 // NO BUS DEPENDENCY. The chip is reached through an abstract Bus, so all of
-// this runs and is tested on the host with no I2C and no keyboard — the same
+// this runs and is tested on the host with no I2C and no keyboard, the same
 // reason InputLayer could be written before either existed.
 
 #pragma once
@@ -72,7 +72,7 @@ static const uint8_t TCA8418_ADDR = 0x34;
 
 // Matrix geometry is fixed by the part: 8 rows x 10 columns = 80 keys, and the
 // key numbering runs across columns first. Confirmed independently by the
-// datasheet's own Control-Alt-Delete note, which names keys 1, 11 and 21 —
+// datasheet's own Control-Alt-Delete note, which names keys 1, 11 and 21,
 // exactly R0C0, R1C0, R2C0 under a stride of ten. That cross-check is why the
 // stride is not a guess.
 static const uint8_t TCA_ROWS = 8;

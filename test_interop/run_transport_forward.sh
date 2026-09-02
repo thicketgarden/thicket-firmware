@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Thicket contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
-# Scenario 6: TRANSPORT FORWARDING — the only one where WE are the router.
+# Scenario 6: TRANSPORT FORWARDING: the only one where WE are the router.
 #
 #   python originator            C++ node            python far end
 #   14280 <---------------> 14281 | 14283 <---------------> 14282

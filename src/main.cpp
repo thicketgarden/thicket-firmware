@@ -11,7 +11,7 @@
 // GNU General Public License for more details.
 //
 // ---------------------------------------------------------------------------
-// Thicket — bring-up skeleton.
+// Thicket, bring-up skeleton.
 //
 // The Reticulum stack runs ON this device: on-device identity, on-device
 // encryption, messages composed and delivered over LoRa with nothing tethered.
@@ -43,7 +43,7 @@
 #undef abs
 #undef round
 
-// Pulls the TinyUSB stack into the link — USB-CDC Serial is undefined
+// Pulls the TinyUSB stack into the link, USB-CDC Serial is undefined
 // without it on the Adafruit nRF52 core under PlatformIO.
 #include <Adafruit_TinyUSB.h>
 
@@ -160,7 +160,7 @@ static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 static const double ANNOUNCE_INTERVAL_S = (double)(THICKET_ANNOUNCE_INTERVAL_S);
 
 // Auto-reply. The device answers anything delivered to it, addressed to the
-// source hash carried by the inbound message — nothing about the peer is
+// source hash carried by the inbound message, nothing about the peer is
 // compiled in, so no reflash is needed when the far end's address changes or a
 // second peer appears. This is the bring-up proof: it needs no screen here and no
 // host, because the reply lands on the sender's screen.
@@ -179,7 +179,7 @@ static const uint32_t REPLY_DELAY_MS = 1500;
 // float64 timestamp 9, empty title bin 2, content bin header 2, empty field
 // map 1. 159 - 96 - 15 = 48 bytes of content.
 //
-// Over budget is not an error — the router just falls back to link delivery,
+// Over budget is not an error, the router just falls back to link delivery,
 // which is slower and needs a path first. Under budget is worth staying.
 // The reply carries no title for the same reason: a title is 1-2 more bytes of
 // header plus its own text, and the peer already shows who sent it.
@@ -189,7 +189,7 @@ static const size_t REPLY_CONTENT_BUDGET = 48;
 // limit, and a body that overruns it should be visible rather than clipped.
 static const size_t BODY_BUF = 72;
 
-// Optional timed send — OFF unless both flags are compiled in.
+// Optional timed send, OFF unless both flags are compiled in.
 //
 //   -DTHICKET_AUTOSEND_INTERVAL_S=60
 //   -DTHICKET_AUTOSEND_DEST=<32 hex chars, the peer's lxmf.delivery hash>
@@ -297,7 +297,7 @@ static LoRaInterface* g_lora = nullptr;
 static bool g_stack_up = false;
 static double g_last_announce = 0.0;
 
-// Counts every message this device has composed since boot — replies and, if
+// Counts every message this device has composed since boot, replies and, if
 // compiled in, timed sends. It is the first field of the body precisely so a
 // missing number on the peer's screen means a dropped packet, unambiguously.
 static uint32_t g_send_counter = 0;
@@ -460,7 +460,7 @@ static void report_silicon_and_approtect() {
 	g_debug_port_protected = hw_approtect_part && (approt_b != 0x5A);
 
 	// A STABLE, MACHINE-READABLE line. A flasher can reconnect after DFU, read
-	// this, and tell the user in the browser what their particular chip is —
+	// this, and tell the user in the browser what their particular chip is,
 	// which matters because we intend to invite anyone with a RAK4631 to flash
 	// this, and their silicon is not ours. Serial prose warns only whoever is
 	// already staring at a terminal.
@@ -491,7 +491,7 @@ static void fail(const char* what) {
 //     #7 up812s r-96 s+8.2 id3f9ac114
 //
 // counter, uptime in seconds, RSSI in dBm, SNR in dB, and the first four bytes
-// of this device's identity hash — the same hash the boot banner prints, so a
+// of this device's identity hash, the same hash the boot banner prints, so a
 // peer can confirm which physical board answered without a cable.
 //
 // Deliberately no %f: the float formatter is a chunk of newlib we would be
@@ -575,12 +575,12 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 		// resolves the identity at send time via Identity::recall(), and asks
 		// Transport for a path if it cannot.
 		//
-		// The source, by contrast, must be a real Destination — LXMessage::pack
+		// The source, by contrast, must be a real Destination, LXMessage::pack
 		// signs with it and throws if it is absent. delivery_destination() is
 		// ours, SINGLE, backed by the identity loaded from external flash.
 		//
 		// Heap, not stack, and not by preference: sizeof(LXMF::LXMessage) is
-		// 800 bytes (measured at the pinned commit — 16 FieldEntry slots of two
+		// 800 bytes (measured at the pinned commit, 16 FieldEntry slots of two
 		// RNS::Bytes each dominate it), and the Adafruit nRF52 core runs loop()
 		// on a FreeRTOS task with LOOP_STACK_SZ = 256*4 words = 4,096 bytes
 		// total. A 20%-of-stack local in front of pack(), which nests msgpack
@@ -591,7 +591,7 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 			RNS::Destination(RNS::Type::NONE),
 			g_router->delivery_destination(),
 			RNS::Bytes((const uint8_t*)body, len),
-			RNS::Bytes(),                          // no title — see REPLY_CONTENT_BUDGET
+			RNS::Bytes(),                          // no title, see REPLY_CONTENT_BUDGET
 			LXMF::Type::Message::OPPORTUNISTIC
 		));
 		if (!message) {
@@ -635,7 +635,7 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 // Bring-up steps
 // ---------------------------------------------------------------------------
 
-// Step 1 — external SPI flash and microStore.
+// Step 1, external SPI flash and microStore.
 //
 // This runs before the radio, not after, for two reasons. Reticulum's transport
 // reads and writes persisted state from Reticulum::start() onward, so the
@@ -746,7 +746,7 @@ static bool bringup_storage() {
 #endif
 }
 
-// Step 2 — identity, created once and loaded forever after.
+// Step 2, identity, created once and loaded forever after.
 //
 // This is the half of the bring-up done-condition that a demo cannot fake: the
 // hash the paired T-Deck sees must be the same after a power cycle. First boot
@@ -801,7 +801,7 @@ static bool bringup_identity() {
 #endif
 }
 
-// Step 3 — SX1262 through the vendored LoRaInterface, 915 MHz US.
+// Step 3, SX1262 through the vendored LoRaInterface, 915 MHz US.
 //
 // Register before start: Transport has to know the interface exists before it
 // can be handed a frame, and start() is what puts the radio into continuous
@@ -811,7 +811,7 @@ static bool bringup_radio() {
 	info("band", "914.875 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm");
 	info("spi", "SPI1 (radio) - SPI stays on the flash bus");
 
-	// Keep a typed handle before the Interface wrapper swallows it — see
+	// Keep a typed handle before the Interface wrapper swallows it, see
 	// g_lora. RNS::Interface takes ownership via shared_ptr; this is an
 	// observer, never deleted here.
 	g_lora = new LoRaInterface();
@@ -827,7 +827,7 @@ static bool bringup_radio() {
 #ifdef THICKET_LORA_ISR
 	// Registered BEFORE start(): start() attaches the DIO1 interrupt, and an
 	// ISR that fires with no hook set would leave the work task asleep until
-	// its next timeout — a packet delayed by up to a full tick, intermittently,
+	// its next timeout, a packet delayed by up to a full tick, intermittently,
 	// which is precisely the class of bug this feature must not introduce.
 	LoRaInterface::set_wake_hook(thicket_radio_wake);
 #endif
@@ -841,7 +841,7 @@ static bool bringup_radio() {
 	return true;
 }
 
-// Step 4 — Reticulum.
+// Step 4, Reticulum.
 static bool bringup_reticulum() {
 	step(4, "Reticulum");
 
@@ -856,13 +856,13 @@ static bool bringup_reticulum() {
 	// hashlist stores ONLY inside `if (Reticulum::transport_enabled())`
 	// (Transport.cpp:380). Against stock upstream, this correct setting makes
 	// Identity::remember() fail on every inbound announce, so the device
-	// announces, looks healthy, and can never address a peer — all four of
+	// announces, looks healthy, and can never address a peer, all four of
 	// upstream's own test_interop scenarios fail on it.
 	//
 	// We build against our fork's `thicket/integration`, which moves those store
 	// initialisations out of the gate. Do NOT re-point lib_deps at upstream
 	// without carrying that fix, and do not "simplify" this to
-	// transport_enabled(true) to make symptoms go away — that would turn a
+	// transport_enabled(true) to make symptoms go away. That would turn a
 	// battery-powered handheld into a router.
 	g_reticulum.transport_enabled(false);
 	g_reticulum.probe_destination_enabled(true);
@@ -877,7 +877,7 @@ static bool bringup_reticulum() {
 	return true;
 }
 
-// Step 5 — the LXMF messenger layer.
+// Step 5, the LXMF messenger layer.
 //
 // Constructing the router is what creates and registers the
 // <identity>/lxmf/delivery destination, which is the address a Sideband peer
@@ -1193,7 +1193,7 @@ static bool bringup_lxmf() {
 	return true;
 }
 
-// Step 6 — announce.
+// Step 6, announce.
 static void announce(const char* why) {
 	if (!g_router) { return; }
 	Serial.print("ANNOUNCE (");
@@ -1287,7 +1287,7 @@ static void print_addresses() {
 //   B. Whether microStore's record cap bounds the index at all. The cap only
 //      applies if something calls set_max_recs(). Left at its default of 0 it
 //      disables both count eviction and the threshold compaction that reclaims
-//      expired records — so max_recs=0 and max_recs=100 should differ visibly.
+//      expired records, so max_recs=0 and max_recs=100 should differ visibly.
 // Mirrors microStore BasicFileStore's IndexMap exactly: same key type, same
 // value, same allocator, and a hash that is not noexcept - which is what makes
 // libstdc++ pick the hash-caching node. Reproducing the type rather than
@@ -1811,7 +1811,7 @@ void loop() {
 }
 
 // No _write() retarget here on purpose. microReticulum's log macros go through
-// printf, and upstream's own examples define _write to push that at Serial —
+// printf, and upstream's own examples define _write to push that at Serial,
 // but the Adafruit nRF52 core already retargets printf to Serial (CDC) in
 // cores/nRF5/main.cpp under CFG_LOGGER 0, which is the default. Defining our
 // own is a duplicate-symbol link error, not an improvement.

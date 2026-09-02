@@ -1,6 +1,6 @@
 # LoRaInterface (vendored)
 
-`RNS::InterfaceImpl` over RadioLib — the LoRa PHY that Reticulum transport
+`RNS::InterfaceImpl` over RadioLib, the LoRa PHY that Reticulum transport
 sits on. Not written here.
 
 ## Origin
@@ -11,12 +11,12 @@ sits on. Not written here.
 | Path | `examples/common/lora_interface/` |
 | Commit | `40fa628809d57140180c1c833559ab96fec992c1` (v0.5.0) |
 | Vendored | 2026-08-01 |
-| License | Apache-2.0 — full text in `./LICENSE`, copied from the upstream repo root |
+| License | Apache-2.0, full text in `./LICENSE`, copied from the upstream repo root |
 | Copyright | © 2026 Chad Attermann |
 
 ## Why vendored instead of a `lib_deps` entry
 
-It ships a `library.properties`, so it is a real Arduino library — but it lives
+It ships a `library.properties`, so it is a real Arduino library, but it lives
 in a subdirectory of the microReticulum repository, and PlatformIO cannot
 depend on a subdirectory of a git repo. Upstream's own examples reach it with
 `lora_interface=symlink://../common/lora_interface`, which only works from
@@ -36,7 +36,7 @@ Apache-2.0 §4(b) requires modified files to say so. Changes 1–3 are in
 1. **Radio moved to `SPI1`.** Upstream calls
    `SPI.setPins(MISO, SCK, MOSI); SPI.begin();`, repointing the single Arduino
    `SPI` instance at the SX1262. On the RAK4631 that instance is the WisBlock
-   IO-slot bus, which is where the RAK15001 external flash lives — and Thicket
+   IO-slot bus, which is where the RAK15001 external flash lives, and Thicket
    keeps identity, keys and messages there, never on the ~28 KB internal FS.
    Repointing the bus would break persistence the moment the radio started.
    `variants/rak4630/variant.h` now declares `SPI1` on the radio pins
@@ -57,7 +57,7 @@ Apache-2.0 §4(b) requires modified files to say so. Changes 1–3 are in
    folds back below the module's rated output. Semtech's high-power PA setting
    is ~140 mA. The OCP register is 2.5 mA/LSB (`0x28` = 100 mA, `0x38` =
    140 mA); RadioLib's `setCurrentLimit()` takes milliamps. This raises a
-   ceiling — transmit power is untouched at upstream's +17 dBm.
+   ceiling, transmit power is untouched at upstream's +17 dBm.
 
 4. **Last-frame RSSI/SNR are readable,** `last_rssi()`, `last_snr()`,
    `signal_valid()`. Upstream reads `getRSSI()`/`getSNR()` in `loop()` and

@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Thicket contributors
 # SPDX-License-Identifier: GPL-3.0-or-later
 """
-Originator for the TRANSPORT FORWARDING scenario — the one where our C++ stack
+Originator for the TRANSPORT FORWARDING scenario, the one where our C++ stack
 is the router rather than the leaf.
 
     this process            C++ router            forward_endpoint.py
@@ -191,7 +191,7 @@ def main():
             # never-sent packet would report as a timeout and hide the cause.
             RNS.Packet(far_dest, payload).send()
             sent = True
-            print("[python] no path after 20s — sending regardless so the "
+            print("[python] no path after 20s, sending regardless so the "
                   "failure is about forwarding, not about waiting", flush=True)
         time.sleep(0.1)
 
