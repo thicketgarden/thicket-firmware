@@ -1,4 +1,4 @@
-# UDPInterface2 (vendored, test-only)
+# UDPInterface2
 
 A copy of microReticulum's example UDP interface, with **one change**. The
 ports are constructor arguments instead of compile-time defines.

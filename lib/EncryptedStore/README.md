@@ -1,4 +1,4 @@
-# EncryptedStore (vendored)
+# EncryptedStore
 
 Authenticated encryption at rest for stored messages, keyed from the Reticulum
 identity's own X25519 private key. Not written here.
@@ -51,7 +51,7 @@ standalone repository rather than the PR, so nothing here waits on that review.
 The keys derive from the identity, so **destroying the identity makes every
 stored message unreadable at once**, crypto-erase for the cost of deleting one
 key, with no flash wipe. On a sealed handheld that may need to be made safe in a
-hurry, that property is arguably worth more than the encryption itself.
+hurry, that property matters more than the encryption itself.
 
 **What it does not do.** Our identity is still stored in the clear
 (`src/main.cpp`). An attacker who images the whole flash reads the identity and

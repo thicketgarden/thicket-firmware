@@ -1,4 +1,4 @@
-# LoRaInterface (vendored)
+# LoRaInterface
 
 `RNS::InterfaceImpl` over RadioLib, the LoRa PHY that Reticulum transport
 sits on. Not written here.
