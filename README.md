@@ -225,7 +225,8 @@ The identity itself is still a plaintext file on the same flash, so anyone who
 images the whole device reads it and derives the AES-256-CTR message keys from
 it. What the encryption buys is a store that stays unreadable to anyone who
 gets the flash without that identity file. Closing the rest needs a passphrase-
-protected identity, and this device has nowhere to type one.
+protected identity. The handheld's thumbwheel is the intended way to enter one,
+though that design isn't settled and none of it is built.
 
 Check your own silicon before trusting internal flash. nRF52840 modules ship in
 several build codes and the firmware prints its own at boot, as `part=` and

@@ -58,8 +58,9 @@ hurry, that property matters more than the encryption itself.
 then derives these message keys from it. This defends a message store that
 leaks *without* the identity, and it buys crypto-erase. Whole-flash compromise
 needs the other half of the upstream work, the passphrase-protected identity
-vault, which isn't adopted here because it needs a passphrase-entry design
-this device doesn't have yet.
+vault. That waits on a passphrase-entry design. The handheld's thumbwheel is
+the intended mechanism, but the design isn't settled and the hardware isn't
+built, so the development rig has no way to enter one today.
 
 ## Why vendored rather than a `lib_deps` entry
 
