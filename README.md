@@ -173,8 +173,7 @@ come home as `DELIVERED (proof received)` at -73 dBm and SNR 12.75 dB.
 
 The same exchange was repeated on 2026-08-05 with the board on its own battery,
 nothing attached. The message went out and the reply came back. That run was
-watched at the bench rather than captured, because untethered means no serial
-line to record it, so it's reported here rather than shown.
+observed at the bench, not logged, because untethered leaves no serial line.
 
 That matters more than the earlier round trip, which ran against a client built
 on the same microReticulum pin in `platformio.ini`. Two nodes of one
