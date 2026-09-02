@@ -141,7 +141,7 @@ void test_scs_is_high_for_the_whole_transaction(void) {
 	lcd.set_pixel(0, 0, true);
 	lcd.flush();
 	// Active HIGH: rises before data, falls after. FakeBus::write also asserts
-	// that nothing is written while it is low.
+	// that nothing is written while it's low.
 	TEST_ASSERT_EQUAL(2, bus.selects.size());
 	TEST_ASSERT_TRUE(bus.selects[0]);
 	TEST_ASSERT_FALSE(bus.selects[1]);
@@ -199,7 +199,7 @@ void test_vcom_alternates_and_carries_into_writes(void) {
 	TEST_ASSERT_EQUAL(2, bus.bytes.size());          // mode + dummy, no data
 	TEST_ASSERT_EQUAL_HEX8(LCD_M1_VCOM, bus.bytes[0]);
 
-	// The flag must ride along on a data update too, or a screen that is being
+	// The flag must ride along on a data update too, or a screen that's being
 	// written never inverts.
 	bus.reset();
 	lcd.set_pixel(0, 0, true);
@@ -270,7 +270,7 @@ void test_scaled_text_is_the_glyph_blown_up(void) {
 					                             (uint16_t)(y * 3 + sy)));
 		}
 	}
-	TEST_ASSERT_TRUE(lit > 10);   // the glyph is not blank
+	TEST_ASSERT_TRUE(lit > 10);   // the glyph isn't blank
 }
 
 void test_scaled_text_advance_scales(void) {

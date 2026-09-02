@@ -3,7 +3,7 @@
 //
 // Host tests for the TCA8418 scanner: `pio test -e native`.
 //
-// There is no keyboard and no I2C bus here. The chip is behind an abstract Bus,
+// There's no keyboard and no I2C bus here. The chip is behind an abstract Bus,
 // so the register conversation can be scripted and asserted, which is the same
 // reason InputLayer could be written and proven before any hardware existed.
 //
@@ -94,7 +94,7 @@ void test_last_key_of_the_matrix(void) {
 
 void test_gpi_events_are_not_matrix_keys(void) {
 	// 97-114 are row/column GPI events (Tables 2 and 3). Decoding one as a
-	// matrix key would invent a press at a coordinate that does not exist.
+	// matrix key would invent a press at a coordinate that doesn't exist.
 	KeyEvent ev;
 	TEST_ASSERT_FALSE(Tca8418::decode(0x80 | 97,  ev));
 	TEST_ASSERT_FALSE(Tca8418::decode(0x80 | 114, ev));
@@ -230,7 +230,7 @@ void test_poll_respects_the_caller_buffer(void) {
 	bus.reads[TCA_KEY_LCK_EC]  = {5};
 	bus.reads[TCA_KEY_EVENT_A] = {0x81, 0xA0, 0x97, 0xAD, 0xA9};
 	KeyEvent ev[2];
-	TEST_ASSERT_EQUAL(2, kp.poll(ev, 2));   // stops, does not overrun
+	TEST_ASSERT_EQUAL(2, kp.poll(ev, 2));   // stops, doesn't overrun
 }
 
 void test_stuck_bus_cannot_spin_forever(void) {
@@ -246,7 +246,7 @@ void test_stuck_bus_cannot_spin_forever(void) {
 }
 
 void test_gpi_event_still_consumes_a_fifo_slot(void) {
-	// A GPI event is not a matrix key, but it occupied a slot. If it did not
+	// A GPI event isn't a matrix key, but it occupied a slot. If it didn't
 	// decrement the counter the drain loop would go one read too far every
 	// time one arrived.
 	FakeBus bus; Tca8418 kp(bus);

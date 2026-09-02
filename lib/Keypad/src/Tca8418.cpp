@@ -28,7 +28,7 @@ bool Tca8418::begin(uint8_t rows, uint8_t cols) {
 	}
 
 	// Claim only the rectangle we actually use. Every other pin stays GPIO, so
-	// a half-populated matrix does not scan columns that are not wired.
+	// a half-populated matrix doesn't scan columns that aren't wired.
 	const uint8_t row_mask  = (uint8_t)((1u << rows) - 1u);
 	const uint8_t col_mask1 = (uint8_t)((cols >= 8) ? 0xFF : ((1u << cols) - 1u));
 	const uint8_t col_mask2 = (uint8_t)((cols > 8) ? ((1u << (cols - 8)) - 1u) : 0x00);
@@ -38,7 +38,7 @@ bool Tca8418::begin(uint8_t rows, uint8_t cols) {
 	if (!_bus.write_reg(TCA_KP_GPIO3, col_mask2)) return false;
 
 	// Debounce stays ENABLED (0 = enabled). The part debounces in 50 µs, two
-	// orders of magnitude below its own 25 ms scan, so there is nothing to gain
+	// orders of magnitude below its own 25 ms scan, so there's nothing to gain
 	// by turning it off and a bouncing dome to lose.
 	if (!_bus.write_reg(TCA_DEBOUNCE_DIS1, 0x00)) return false;
 
@@ -67,16 +67,16 @@ size_t Tca8418::poll(KeyEvent* out, size_t max) {
 
 	if (stat & TCA_INT_OVR_FLOW) _overflowed = true;
 
-	// ⚠ CAD_INT is read and DISCARDED, deliberately.
+	// ⚠ CAD_INT is read & DISCARDED, deliberately.
 	//
 	// The CAD Interrupt Errata (SCPS215G 8.6.3) states that keys 1+11, 1+21 and
-	// 21+1+11 raise CAD_INT falsely, and that there is NO workaround. Keys 1,
-	// 11 and 21 are R0C0, R1C0 and R2C0, so two ordinary keys held in column
+	// 21+1+11 raise CAD_INT falsely, and that there's NO workaround. Keys 1,
+	// 11 & 21 are R0C0, R1C0 & R2C0, so two ordinary keys held in column
 	// zero during normal two-key rollover, which our input layer explicitly
 	// permits, will assert it. Treating CAD_INT as meaningful would turn
 	// ordinary typing into a spurious Ctrl-Alt-Delete.
 	//
-	// We do not use the feature at all, so this costs nothing. It is written
+	// We don't use the feature at all, so this costs nothing. It's written
 	// down because "why is CAD ignored" is otherwise a reasonable question with
 	// an unreasonable answer buried in an errata section.
 	(void)TCA_INT_CAD;
@@ -84,7 +84,7 @@ size_t Tca8418::poll(KeyEvent* out, size_t max) {
 	size_t n = 0;
 	if (stat & TCA_INT_K) {
 		// Read the count, then drain. The count bounds the loop so a stuck bus
-		// returning a constant non-zero byte cannot spin here forever.
+		// returning a constant non-zero byte can't spin here forever.
 		uint8_t ec = 0;
 		if (!_bus.read_reg(TCA_KEY_LCK_EC, ec)) return 0;
 		uint8_t pending = (uint8_t)(ec & 0x0F);

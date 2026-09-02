@@ -1,5 +1,5 @@
 /*
- * LoRaInterface, vendored from attermann/microReticulum
+ * LoRaInterface: vendored from attermann/microReticulum
  * examples/common/lora_interface/ at commit
  * 40fa628809d57140180c1c833559ab96fec992c1.
  *
@@ -24,7 +24,7 @@
 // ---------------------------------------------------------------------------
 
 #if defined(BOARD_TBEAM) || defined(BOARD_LORA32_V21)
-// LILYGO T-Beam V1.X / LoRa32 V2.1, SX1276
+// LILYGO T-Beam V1.X / LoRa32 V2.1 — SX1276
 // RadioLib Module(cs, irq=DIO0, rst, gpio=DIO1)
 #define RADIO_SCLK_PIN               5
 #define RADIO_MISO_PIN              19
@@ -35,7 +35,7 @@
 #define RADIO_DIO1_PIN              33   // gpio (optional, passed to Module)
 
 #elif defined(BOARD_RAK4631)
-// RAK4631 (WisCore RAK4630), SX1262
+// RAK4631 (WisCore RAK4630) — SX1262
 // RadioLib Module(cs, irq=DIO1, rst, busy)
 #define RADIO_SCLK_PIN              43
 #define RADIO_MISO_PIN              45
@@ -50,7 +50,7 @@
 #if SPI_INTERFACES_COUNT > 1
 #define THICKET_LORA_SPI SPI1
 #else
-#error "thicket: rak4630 variant must declare SPI1 for the SX1262 (SPI_INTERFACES_COUNT 2), otherwise the radio steals the external-flash bus"
+#error "thicket: rak4630 variant must declare SPI1 for the SX1262 (SPI_INTERFACES_COUNT 2); otherwise the radio steals the external-flash bus"
 #endif
 #ifndef THICKET_SX1262_TCXO_VOLTAGE
 #define THICKET_SX1262_TCXO_VOLTAGE 1.8
@@ -60,7 +60,7 @@
 #endif
 
 #elif defined(BOARD_HELTEC_V3)
-// Heltec WiFi LoRa 32 V3, ESP32-S3 + SX1262
+// Heltec WiFi LoRa 32 V3 — ESP32-S3 + SX1262
 // RadioLib Module(cs, irq=DIO1, rst, busy)
 // Note: Heltec BSP names this pin "DIO0" but it is physically DIO1 on the SX1262
 #define RADIO_SCLK_PIN               9
@@ -72,7 +72,7 @@
 #define RADIO_BUSY_PIN              13
 
 #elif defined(BOARD_HELTEC_V4)
-// Heltec WiFi LoRa 32 V4, ESP32-S3R2 + SX1262 + external FEM (GC1109 / KCT8103L)
+// Heltec WiFi LoRa 32 V4 — ESP32-S3R2 + SX1262 + external FEM (GC1109 / KCT8103L)
 // LoRa SPI/control pins are identical to V3; FEM adds 3 extra GPIOs
 #define RADIO_SCLK_PIN               9
 #define RADIO_MISO_PIN              11
@@ -81,7 +81,7 @@
 #define RADIO_DIO1_PIN              14   // IRQ
 #define RADIO_RST_PIN               12
 #define RADIO_BUSY_PIN              13
-// FEM (GC1109) control, required for antenna path; verified against RNode firmware
+// FEM (GC1109) control — required for antenna path; verified against RNode firmware
 #define RADIO_VFEM_EN               7    // LORA_PA_PWR_EN: FEM power rail (active HIGH)
 #define RADIO_FEM_CE                2    // LORA_PA_CSD:    FEM chip enable  (active HIGH)
 #define RADIO_PA_MODE              46    // LORA_PA_CPS:    PA mode HIGH=TX, LOW=RX
@@ -131,7 +131,7 @@ bool LoRaInterface::start() {
 #ifdef ARDUINO
 
 #if defined(BOARD_TBEAM) || defined(BOARD_LORA32_V21)
-	// ESP32: T-Beam and LoRa32 use non-default SPI pins, must specify explicitly
+	// ESP32: T-Beam and LoRa32 use non-default SPI pins — must specify explicitly
 	SPI.begin(RADIO_SCLK_PIN, RADIO_MISO_PIN, RADIO_MOSI_PIN);
 	_module = new Module(RADIO_CS_PIN, RADIO_DIO0_PIN, RADIO_RST_PIN, RADIO_DIO1_PIN, SPI);
 	SX1276* chip = new SX1276(_module);
@@ -183,12 +183,12 @@ bool LoRaInterface::start() {
 	// plausible contributor to the "RAK4631 won't transmit" reports. Semtech's
 	// setting for high-power PA operation is ~140 mA. The OCP register is
 	// 2.5 mA/LSB (0x28 = 100 mA, 0x38 = 140 mA); RadioLib takes milliamps.
-	// This raises a ceiling, it does not raise transmit power, `power` above
+	// This raises a ceiling; it doesn't raise transmit power. `power` above
 	// is unchanged at +17 dBm.
 	if (state == RADIOLIB_ERR_NONE) { chip->setCurrentLimit(THICKET_SX1262_OCP_MA); }
 
 #elif defined(BOARD_HELTEC_V3)
-	// Heltec WiFi LoRa 32 V3, ESP32-S3 + SX1262, 1.8V TCXO
+	// Heltec WiFi LoRa 32 V3 — ESP32-S3 + SX1262, 1.8V TCXO
 	SPI.begin(RADIO_SCLK_PIN, RADIO_MISO_PIN, RADIO_MOSI_PIN);
 	_module = new Module(RADIO_CS_PIN, RADIO_DIO1_PIN, RADIO_RST_PIN, RADIO_BUSY_PIN, SPI);
 	SX1262* chip = new SX1262(_module);
@@ -198,9 +198,9 @@ bool LoRaInterface::start() {
 	                        RADIOLIB_SX126X_SYNC_WORD_PRIVATE, power, 20, 1.8, false);
 
 #elif defined(BOARD_HELTEC_V4)
-	// Heltec WiFi LoRa 32 V4, ESP32-S3R2 + SX1262 + external FEM, 1.8V TCXO
+	// Heltec WiFi LoRa 32 V4 — ESP32-S3R2 + SX1262 + external FEM, 1.8V TCXO
 	SPI.begin(RADIO_SCLK_PIN, RADIO_MISO_PIN, RADIO_MOSI_PIN);
-	// Power and enable the FEM, required for antenna path to function at all
+	// Power and enable the FEM — required for antenna path to function at all
 	pinMode(RADIO_VFEM_EN, OUTPUT);
 	pinMode(RADIO_FEM_CE, OUTPUT);
 	pinMode(RADIO_PA_MODE, OUTPUT);
@@ -293,7 +293,7 @@ void LoRaInterface::loop() {
 				// Thicket modification: latch the link quality of this frame so
 				// the application can read it. RadioLib's getRSSI()/getSNR()
 				// report the LAST received packet and are clobbered by the next
-				// one, and upstream only ever printed them, by the time an
+				// one, and upstream only ever printed them. By the time an
 				// LXMF message surfaces in a delivery callback the values are
 				// unreachable. Stored here, at the only point where they are
 				// known to belong to the frame just read.
@@ -314,7 +314,7 @@ void LoRaInterface::loop() {
 						buffer.clear();
 						buffer.append(rxBuf + 1, len - 1);
 					} else {
-						// Second part, sequence matches; assemble and deliver
+						// Second part — sequence matches; assemble and deliver
 						buffer.append(rxBuf + 1, len - 1);
 						_rx_seq = SEQ_UNSET;
 						on_incoming(buffer);
@@ -366,7 +366,7 @@ void LoRaInterface::loop() {
 					success = false;
 				}
 			} else {
-				// Split send, two frames with matching sequence number
+				// Split send — two frames with matching sequence number
 				uint8_t seq       = (_tx_seq_ctr++) & HEADER_SEQ_MASK;
 				uint8_t split_hdr = rand_nibble | HEADER_SPLIT | seq;
 

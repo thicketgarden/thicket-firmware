@@ -6,14 +6,14 @@
 // WHAT THIS IS FOR, AND WHAT IT IS EXPLICITLY NOT
 //
 // Every other scenario in this suite has the Python reference ORIGINATE and us
-// receive. That is the right primary test and it is the direction a handheld
+// receive. That's the right primary test and it's the direction a handheld
 // spends its life in, but it means our OUTBOUND constructs have only ever been
 // validated by whatever the reference happened to accept along the way. Nothing
 // makes our stack both produce and consume the same thing.
 //
 // This does. One of our nodes encrypts, signs and sends; another of our nodes
 // receives, decrypts and proves. The failures it can find are the asymmetric
-// ones: something we emit that we cannot parse.
+// ones: something we emit that we can't parse.
 //
 // ⚠ IT IS NOT EVIDENCE OF CONFORMANCE, and must never be cited as such. Two
 // implementations that misread the protocol identically agree with each other
@@ -34,7 +34,7 @@
 // assertions that matter here, our decode of our encode, and a proof
 // validating between two microReticulum instances, with far less machinery,
 // and `transport_forwarder` already covers us routing. Routed two-node is a
-// worthwhile extension, not a precondition, and it is noted as such rather than
+// worthwhile extension, not a precondition, and it's noted as such rather than
 // silently skipped.
 //
 // Exit 0 iff this role's checks all pass.
@@ -52,7 +52,7 @@
 #include <vector>
 
 // 14280-14283 belong to the forwarding scenario; these are its neighbours so a
-// stale process from either cannot quietly join the wrong test.
+// stale process from either can't quietly join the wrong test.
 #define ORIG_LOCAL   14290
 #define ORIG_REMOTE  14291
 #define RECV_LOCAL   14291
@@ -76,10 +76,10 @@ static void check(const char* what, bool ok, const char* note) {
 	fflush(stdout);
 }
 
-// The payload deliberately is not round numbers. Per the task: prefer something
+// The payload deliberately isn't round numbers. Per the task: prefer something
 // that exercises our own encoders. It carries an embedded NUL, a 0xFF, a
-// multi-byte UTF-8 sequence, and a length that is not a multiple of the AES
-// block size, so a padding or length bug cannot hide behind a tidy size.
+// multi-byte UTF-8 sequence, and a length that's not a multiple of the AES
+// block size, so a padding or length bug can't hide behind a tidy size.
 // `originating` decides whether the break applies, because THICKET_BREAK_PAYLOAD
 // is exported to BOTH processes by the runner -- corrupting it on both ends
 // would make them agree again and the self-test would pass, which is the exact
@@ -202,7 +202,7 @@ int main() {
 
 	// The receiver announces so the originator can learn it. The originator
 	// never announces: it has nothing the peer needs, and a silent originator
-	// makes "the receiver decrypted it" unambiguous -- there is only one
+	// makes "the receiver decrypted it" unambiguous -- there's only one
 	// identity in play that could have encrypted anything.
 	double last_announce = 0.0;
 	bool   sent = false;
@@ -223,7 +223,7 @@ int main() {
 		if (originating && peer_known && !sent) {
 			// Build the OUT side from the identity we just heard announced --
 			// not from anything shared through the filesystem or a constant.
-			// Learning the peer over the wire is part of what is being tested.
+			// Learning the peer over the wire is part of what's being tested.
 			RNS::Identity peer = RNS::Identity::recall(peer_dest_hash);
 			if (!peer) { continue; }
 			RNS::Destination to(peer, RNS::Type::Destination::OUT,

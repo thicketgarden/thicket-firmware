@@ -5,7 +5,7 @@
 # This lives in a file rather than inline in .claude/settings.json so that a
 # failure to LOCATE the gate reads differently from a failure OF the gate. The
 # inline version did `cd "$CLAUDE_PROJECT_DIR" && pio run || echo "build
-# FAILED"`, so a stale or empty project dir reported a build break that had not
+# FAILED"`, so a stale or empty project dir reported a build break that hadn't
 # happened, which sends whoever reads it chasing the wrong thing.
 set -uo pipefail
 

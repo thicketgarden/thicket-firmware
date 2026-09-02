@@ -30,7 +30,7 @@
 //   ./program [CYCLES] [CSV_OUT]
 //
 // Exit 0 if the run completed; the verdict is in the CSV and the summary.
-// This binary does not decide whether the curve is acceptable -- it measures.
+// This binary doesn't decide whether the curve is acceptable -- it measures.
 
 #include <microStore/FileSystem.h>
 #include <microStore/Adapters/UniversalFileSystem.h>
@@ -85,7 +85,7 @@ PoolSample sample_pool() {
 
 // Fragmentation as the share of free space unavailable to a single allocation
 // of the largest free block's size. 0% means all free space is one run; 90%
-// means the pool is free on paper and cannot satisfy a large request.
+// means the pool is free on paper and can't satisfy a large request.
 double fragmentation(const PoolSample& s) {
 	if (s.free_size == 0) return 0.0;
 	return 100.0 * (1.0 - (double)s.free_max / (double)s.free_size);
@@ -123,7 +123,7 @@ int main(int argc, char** argv) {
 
 	const PoolSample at_boot = sample_pool();
 
-	// A pool that is not backed reports zero used and zero free, which reads
+	// A pool that's not backed reports zero used and zero free, which reads
 	// as "no fragmentation" and is the most dangerous result this harness
 	// could print. Refuse to run rather than produce a reassuring nothing.
 	if (at_boot.used_size == 0 && at_boot.free_size == 0) {
@@ -202,7 +202,7 @@ int main(int argc, char** argv) {
 	// Coverage, stated by the run itself. Without a peer nothing is delivered,
 	// so the inbound decrypt-and-deliver path never allocates -- and that is
 	// the path the board's worst fragmentation figure came from. A clean
-	// result here does not speak for it.
+	// result here doesn't speak for it.
 	if (delivered == 0) {
 		printf("\n[soak] COVERAGE: no message was delivered in this run, so only the\n"
 		       "[soak] outbound construct-and-queue path was exercised. The inbound\n"

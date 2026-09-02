@@ -1,20 +1,20 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// TCA8418 keypad scanner: FIFO decode and configuration.
+// TCA8418 keypad scanner: FIFO decode & configuration.
 //
 // Feeds `thicket::InputLayer`, which owns the one-shot modifier logic and the
-// ghost guard and deliberately knows nothing about this chip. This half knows
+// ghost guard & deliberately knows nothing about this chip. This half knows
 // nothing about modifiers in return: it turns register bytes into
-// (row, column, pressed) and stops there.
+// (row, column, pressed) & stops there.
 //
-// SOURCE. Every register address, bit position and encoding here was read from
+// SOURCE. Every register address, bit position & encoding here was read from
 // TI's datasheet SCPS215G (September 2009, revised June 2018), sections 8.3
 // and 8.6, rather than from any secondhand description.
 //
 // That distinction matters here. A summary of the same PDF, produced by a model
 // rather than read, got the slave address and the event encoding roughly right
-// and then placed KP_GPIO1 at 0x08 (it is 0x1D), GPI_EM1 at 0x0B (0x20),
+// and then placed KP_GPIO1 at 0x08 (it's 0x1D), GPI_EM1 at 0x0B (0x20),
 // DEBOUNCE_DIS1 at 0x0F (0x29), and called the FIFO four events deep (it is
 // ten). A driver built on it would have written GPIO event masks while trying
 // to select the keypad matrix, and the failure would have looked like broken
@@ -72,14 +72,14 @@ static const uint8_t TCA8418_ADDR = 0x34;
 
 // Matrix geometry is fixed by the part: 8 rows x 10 columns = 80 keys, and the
 // key numbering runs across columns first. Confirmed independently by the
-// datasheet's own Control-Alt-Delete note, which names keys 1, 11 and 21,
+// datasheet's own Control-Alt-Delete note, which names keys 1, 11 & 21,
 // exactly R0C0, R1C0, R2C0 under a stride of ten. That cross-check is why the
-// stride is not a guess.
+// stride isn't a guess.
 static const uint8_t TCA_ROWS = 8;
 static const uint8_t TCA_COLS = 10;
 
 // Key numbers at or above this are GPI events (R0-R7 = 97-104, C0-C9 =
-// 105-114), not matrix presses. SCPS215G Tables 2 and 3.
+// 105-114), not matrix presses. SCPS215G Tables 2 & 3.
 static const uint8_t TCA_GPI_FIRST = 97;
 
 struct KeyEvent {
@@ -100,7 +100,7 @@ class Tca8418 {
 public:
 	explicit Tca8418(Tca8418Bus& bus) : _bus(bus) {}
 
-	// Configure `rows` x `cols` of the matrix and enable key-event interrupts.
+	// Configure `rows` x `cols` of the matrix & enable key-event interrupts.
 	// Anything outside that rectangle is left as GPIO.
 	bool begin(uint8_t rows, uint8_t cols);
 
@@ -114,7 +114,7 @@ public:
 	bool overflowed() const { return _overflowed; }
 	void clear_overflow() { _overflowed = false; }
 
-	// Decode one FIFO byte. Exposed for testing, and because it is the single
+	// Decode one FIFO byte. Exposed for testing, and because it's the single
 	// place the encoding is interpreted.
 	static bool decode(uint8_t raw, KeyEvent& ev);
 

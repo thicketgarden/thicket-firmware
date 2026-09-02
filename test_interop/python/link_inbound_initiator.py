@@ -73,14 +73,14 @@ IDLE_OBSERVE_S = 15.0    # > 4 keepalive intervals and > stale_time
 #       self.stale_time  = self.keepalive * STALE_FACTOR
 #
 # with KEEPALIVE_MAX=360, KEEPALIVE_MAX_RTT=1.75 -- a multiplier of ~205.7 --
-# and it is called from link establishment (Link.py:433 and :530), which happens
+# and it's called from link establishment (Link.py:433 and :530), which happens
 # AFTER the constructor returns. So assigning these on the fresh Link object,
 # as this script did until 2026-08-05, is overwritten before the first phase
 # runs. Measured on a passing local run: the script asked for 3.0/12.0 and the
 # link actually ran at keepalive=5, stale_time=10 -- the KEEPALIVE_MIN floor,
 # not our value.
 #
-# That is why the scenario flaked in CI. On loopback the multiplier lands under
+# That's why the scenario flaked in CI. On loopback the multiplier lands under
 # the floor and the effective timers are a constant 5/10, so the run looks
 # stable. On a loaded shared runner the RTT rises, the floor stops applying and
 # the timers scale linearly with it: an RTT of 0.25s gives keepalive=51s and
@@ -97,7 +97,7 @@ IDLE_OBSERVE_S = 15.0    # > 4 keepalive intervals and > stale_time
 # How long to allow for the reference's watchdog to close the link after the
 # wire is cut. With the timers actually pinned the close is stale_time +
 # rtt*KEEPALIVE_TIMEOUT_FACTOR + STALE_GRACE, so about 17s. The window stays
-# generous because the exact latency is not the property under test -- the
+# generous because the exact latency isn't the property under test -- the
 # assertion is that the reference closes the link at all, in contrast to our
 # C++ side, which has no Link watchdog (the XFAIL below). The observed close
 # time is printed either way, so a real latency regression stays visible.
@@ -105,9 +105,9 @@ CUT_OBSERVE_S = 45.0
 
 
 def assert_timers_pinned(link):
-    """Fail loudly if RNS is not running the timers this scenario asked for.
+    """Fail loudly if RNS isn't running the timers this scenario asked for.
 
-    Every timing assertion below is meaningless if these do not hold, and the
+    Every timing assertion below is meaningless if these don't hold, and the
     failure mode is silent: the run still passes locally, because on loopback
     the value RNS substitutes happens to be close enough. Checked rather than
     trusted, so a future RNS that recomputes them somewhere new is caught here
@@ -304,7 +304,7 @@ def main():
     print(f"[python] --- phase 3: idle {IDLE_OBSERVE_S}s "
           f"(keepalive={KEEPALIVE_S}s, stale_time={STALE_TIME_S}s) ---",
           flush=True)
-    # If the C++ side did not answer keepalives, our own watchdog would mark
+    # If the C++ side didn't answer keepalives, our own watchdog would mark
     # the link stale and close it inside stale_time. Surviving this window is
     # the assertion.
     idle_survived = not wait_until(lambda: state["closed"], IDLE_OBSERVE_S)

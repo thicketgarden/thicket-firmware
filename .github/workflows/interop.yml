@@ -7,7 +7,7 @@ name: interop
 #
 # microReticulum declares no target RNS version anywhere: no constant, no
 # README statement, no CHANGELOG entry. So our interoperation with current
-# Reticulum is demonstrated BY TEST and never BY CONTRACT, which means it can
+# Reticulum is demonstrated BY TEST & never BY CONTRACT, which means it can
 # regress with no signal at all: no compile error, no version warning. The
 # device would announce, look healthy, and quietly stop being reachable.
 #
@@ -19,13 +19,13 @@ name: interop
 #                     (because the pin is read out of platformio.ini below).
 #
 #   interop-latest : weekly, against whatever RNS is CURRENT. Allowed to
-#                     fail, and a failure is the entire point: it is the only
+#                     fail, and a failure is the entire point: it's the only
 #                     early warning that the ecosystem moved out from under
 #                     us. A red scheduled run emails the repo owner, which
 #                     turns an unmonitorable risk into a Tuesday morning.
 #
 # The interop senders live in the microReticulum repo, not here, so this tests
-# the stack we pin rather than our application code. That is deliberate: the
+# the stack we pin rather than our application code. That's deliberate: the
 # thing that can silently regress is the dependency.
 
 on:
@@ -36,7 +36,7 @@ on:
       - 'platformio.ini'
       - '.github/workflows/interop.yml'
   schedule:
-    # Mondays 07:00 UTC. Weekly is enough, RNS releases are not daily, and a
+    # Mondays 07:00 UTC. Weekly is enough, RNS releases aren't daily, and a
     # week of exposure is acceptable for something nothing currently watches.
     - cron: '0 7 * * 1'
   workflow_dispatch:
@@ -66,7 +66,7 @@ jobs:
           REPO_URL="${LINE%%#*}"
           SHA="${LINE##*#}"
           # Validate before it reaches actions/checkout. A ref taken from a
-          # file and passed unchecked into checkout is a ref-injection route,
+          # file & passed unchecked into checkout is a ref-injection route,
           # even when the file is ours.
           if ! printf '%s' "$SHA" | grep -qE '^[0-9a-f]{40}$'; then
             echo "::error::Refusing to check out a revision that is not a 40-char hex SHA: $SHA"
@@ -119,8 +119,8 @@ jobs:
 
   interop-latest:
     name: interop (RNS latest, early warning)
-    # Scheduled and manual only. On every push it would be noise; weekly it is
-    # a signal. A failure here does NOT mean we are broken today. It means
+    # Scheduled & manual only. On every push it would be noise; weekly it is
+    # a signal. A failure here does NOT mean we're broken today. It means
     # current RNS and our pinned stack have diverged and someone should look.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
@@ -188,7 +188,7 @@ jobs:
   #
   # These are the Python-originated scenarios: the reference speaks first and we
   # have to receive, which is the case a handheld actually lives in. They build
-  # against the microReticulum SHA in platformio.ini, so they cannot drift from
+  # against the microReticulum SHA in platformio.ini, so they can't drift from
   # the firmware.
   # ---------------------------------------------------------------------------
   thicket-interop:
@@ -235,13 +235,13 @@ jobs:
     name: thicket interop (RNS + LXMF latest, early warning)
     # Same contract as interop-latest above, one layer up. That job watches
     # current RNS against microReticulum's suite, which never touches LXMF.
-    # Ours is the only suite that drives the LXMF reference, so it is the only
+    # Ours is the only suite that drives the LXMF reference, so it's the only
     # place a new markqvist/lxmf release can be caught.
     #
-    # A failure here does NOT mean we are broken today. Our pinned build is
+    # A failure here does NOT mean we're broken today. Our pinned build is
     # green or the pinned job above would be red. It means the current
     # reference and our pinned stack have diverged and someone should look.
-    # Read the resolved versions in the log before assuming it is our fault.
+    # Read the resolved versions in the log before assuming it's our fault.
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -279,7 +279,7 @@ jobs:
           if-no-files-found: ignore
 
   verify-upstream-bug:
-    # Manual only. Runs UNPATCHED upstream attermann/microReticulum and expects
+    # Manual only. Runs UNPATCHED upstream attermann/microReticulum & expects
     # the interop scenarios to FAIL.
     #
     # This exists because our other interop jobs test our FORK, which carries
@@ -289,7 +289,7 @@ jobs:
     #
     # A green run here means "the bug reproduces, as reported".
     # A red run here means "upstream is fine and our issue is wrong", which
-    # is the outcome worth catching before it is sent, not after.
+    # is the outcome worth catching before it's sent, not after.
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20

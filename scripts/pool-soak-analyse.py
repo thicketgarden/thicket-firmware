@@ -10,7 +10,7 @@
 # container pool plateaus or climbs.
 #
 # The host harness (test_interop/pool_soak) answers the same question for the
-# outbound path. It cannot answer it for the inbound path, because with no peer
+# outbound path. It can't answer it for the inbound path, because with no peer
 # nothing is ever delivered and the decrypt path never allocates. This reads
 # the board, where a real peer is sending, so both halves get measured.
 #

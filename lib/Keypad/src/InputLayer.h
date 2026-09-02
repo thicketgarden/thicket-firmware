@@ -1,10 +1,10 @@
 // Copyright (C) 2026 Thicket contributors
 // GPL-3.0-or-later.
 //
-// The keyboard's logic layer: key events in, characters and actions out.
+// The keyboard's logic layer: key events in, characters & actions out.
 //
 // Deliberately knows nothing about the TCA8418, I2C, or the matrix. It takes
-// key-down / key-up by key code and nothing else, so the whole of it runs on
+// key-down / key-up by key code & nothing else, so the whole of it runs on
 // the host and can be tested before any keyboard hardware exists, which is the
 // case today.
 //
@@ -13,16 +13,16 @@
 //
 // The carrier PCB has NO PER-KEY DIODES. A diode-less matrix ghosts when three
 // keys are held at once: three keys forming an L produce a phantom fourth, and
-// the scanner cannot tell the phantom from a real press. That was accepted
-// deliberately, on the grounds that shift, alt and sym are ONE-SHOT, pressed
+// the scanner can't tell the phantom from a real press. That was accepted
+// deliberately, on the grounds that shift, alt & sym are ONE-SHOT, pressed
 // and released before the key they modify, as BlackBerry did, so a three-key
-// chord never arises in normal use and the 34 diodes are not needed.
+// chord never arises in normal use and the 34 diodes aren't needed.
 //
 // **If held modifiers or chording are ever introduced here, the board is
-// wrong.** There is no firmware fix; it needs diodes and a board spin. That is
+// wrong.** There's no firmware fix; it needs diodes and a board spin. That is
 // a hardware dependency carried in software, which is the kind that gets
 // forgotten, so this file guards it rather than commenting on it: three or more
-// simultaneous keys are refused as a combination and counted, and there are
+// simultaneous keys are refused as a combination & counted, and there are
 // host tests that fail if that stops being true.
 // ---------------------------------------------------------------------------
 
@@ -72,7 +72,7 @@ using KeymapFn = char (*)(uint8_t code, uint8_t mods, void* ctx);
 
 class InputLayer {
 public:
-	// Beyond this many keys physically down, the matrix reading cannot be
+	// Beyond this many keys physically down, the matrix reading can't be
 	// trusted on a diode-less board. Two is the most that normal one-shot
 	// typing produces, and it only happens on rollover between consecutive
 	// keys.
@@ -84,7 +84,7 @@ public:
 	Event key_down(uint8_t code);
 	void key_up(uint8_t code);
 
-	// Modifiers armed and waiting to be consumed by the next ordinary key.
+	// Modifiers armed & waiting to be consumed by the next ordinary key.
 	uint8_t pending_mods() const { return _pending; }
 	uint8_t keys_down() const { return _down_count; }
 

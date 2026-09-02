@@ -3,9 +3,9 @@
 
 The failure this exists to stop, from 2026-08-03: microStore was forked so that
 microReticulum could call touch() and set_protect_fn(). The root platformio.ini
-was updated. Four scenario platformio.ini files in this repo were not, and four
-more inside the pinned microReticulum tree were not either. Every one of them
-built our microReticulum against upstream microStore, where those methods do not
+was updated. Four scenario platformio.ini files in this repo weren't, and four
+more inside the pinned microReticulum tree weren't either. Every one of them
+built our microReticulum against upstream microStore, where those methods don't
 exist, and CI went red twice before the real cause was found.
 
 The second half of the same failure: a git URL with no ref resolves to the
@@ -19,10 +19,10 @@ So there are four rules, and the third is the one nothing previously checked:
   R1  every git dependency in the root platformio.ini carries a 40-hex SHA
   R2  every scenario platformio.ini in this repo agrees with the root
   R3  the pinned microReticulum tree's OWN pins agree with the root
-  R4  nothing that is pinned to a fork is left on an implicit default branch
+  R4  nothing that's pinned to a fork is left on an implicit default branch
 
-Exit codes: 0 pass, 1 a pin disagrees, 2 the check could not run. Two is
-deliberately distinct, a gate that could not run must not read as a gate that
+Exit codes: 0 pass, 1 a pin disagrees, 2 the check couldn't run. Two is
+deliberately distinct: a gate that couldn't run must not read as a gate that
 passed.
 """
 
@@ -107,8 +107,8 @@ def main():
                 bad += 1
 
     # R3, the pins INSIDE the pinned dependency. Nothing checked this before,
-    # and it is what actually broke: microReticulum's own scenarios pin their
-    # own microStore, and do not inherit ours.
+    # and it's what actually broke: microReticulum's own scenarios pin their
+    # own microStore, and don't inherit ours.
     checked_inner = False
     for libdeps in sorted(REPO.glob(".pio/libdeps/*/microReticulum")):
         checked_inner = True

@@ -5,7 +5,7 @@
 //
 // The gap this closes
 // -------------------
-// The other scenarios prove that a message arrives. That is a weaker statement
+// The other scenarios prove that a message arrives. That's a weaker statement
 // than it looks: a field can be encoded wrongly and still round-trip, because
 // both ends are the same implementation making the same mistake. An end-to-end
 // pass reports "delivered" either way, and the first symptom of a wrong header
@@ -62,7 +62,7 @@ std::vector<Case> cases;
 // `destination_type` is taken from the Destination rather than from the packed
 // Packet: microReticulum populates Packet::destination_type() only on inbound
 // packets, so on an outbound one it reads SINGLE no matter what was addressed.
-// The bytes on the wire are correct either way; the accessor is not.
+// The bytes on the wire are correct either way; the accessor isn't.
 void emit(const char* name, RNS::Packet& packet,
           const char* header_type_name,
           const char* packet_type_name,
@@ -199,7 +199,7 @@ int main(int argc, char** argv) {
 	// This port and the reference both assign the body for ANNOUNCE alone and
 	// leave it empty otherwise, so a HEADER_2 DATA packet built from a payload
 	// packs to a header with nothing after it in either implementation. That
-	// does not arise in transport, where a relayed packet is re-headered from
+	// doesn't arise in transport, where a relayed packet is re-headered from
 	// bytes it already holds rather than packed from data.
 	{
 		const RNS::Bytes transport_id = identity.hash();

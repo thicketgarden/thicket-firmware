@@ -209,7 +209,7 @@ int main() {
 		printf("[cpp]          real timeout behaviour instead.\n");
 	}
 	else {
-		// Closed, but by the peer rather than by us. That is not the watchdog
+		// Closed, but by the peer rather than by us. That's not the watchdog
 		// appearing -- it means the peer gave up on this link, which is a
 		// failure of something earlier in the scenario.
 		++failures;

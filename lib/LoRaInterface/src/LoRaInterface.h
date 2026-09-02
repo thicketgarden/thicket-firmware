@@ -1,5 +1,5 @@
 /*
- * LoRaInterface, vendored from attermann/microReticulum
+ * LoRaInterface: vendored from attermann/microReticulum
  * examples/common/lora_interface/ at commit
  * 40fa628809d57140180c1c833559ab96fec992c1.
  *
@@ -56,7 +56,7 @@ public:
 
 	//virtual inline std::string toString() const { return "LoRaInterface[" + name() + "]"; }
 
-	// Thicket addition, link quality of the most recently received LoRa frame.
+	// Thicket addition: link quality of the most recently received LoRa frame.
 	//
 	// RadioLib's getRSSI()/getSNR() are only meaningful immediately after
 	// readData() and are overwritten by the next packet, so loop() latches them
@@ -87,7 +87,7 @@ private:
 	uint8_t _rx_seq     = SEQ_UNSET;  // sequence of split RX in progress
 	uint8_t _tx_seq_ctr = 0;          // rolling TX split sequence counter
 
-	// Thicket addition, see last_rssi()/last_snr() above. Declared outside the
+	// Thicket addition: see last_rssi()/last_snr() above. Declared outside the
 	// ARDUINO guard so the accessors compile on native builds too; only
 	// written by the Arduino receive path.
 	float _last_rssi    = 0.0f;

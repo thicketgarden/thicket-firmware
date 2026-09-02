@@ -52,7 +52,7 @@ static void band(SharpLcd& l, int x, int y, int w, int h) {
 }
 
 // Where the wheel is. A stem; the current detent is a filled bud, the rest are
-// ticks. Rings this small read as diamonds, so they are drawn as marks instead.
+// ticks. Rings this small read as diamonds, so they're drawn as marks instead.
 static void rail(SharpLcd& l, int x, int y, int h, int count, int at) {
 	for (int i = 0; i < h; ++i)
 		if ((i & 3) != 3) l.set_pixel((uint16_t)x, (uint16_t)(y + i), true);
@@ -242,7 +242,7 @@ static void c2_friends(VirtualPanel& p, SharpLcd& l) {
 		const int mx = SLOT_X + (SLOT_W - m.w) / 2;
 		draw_mark(l, m, mx, ground, ink, fr[i].faded);
 
-		// the ground they stand on, so they are in a place rather than floating.
+		// the ground they stand on, so they're in a place rather than floating.
 		// It follows the mark's own width - a wide ground under a small mark
 		// reads as a shelf the thing is sitting on rather than ground.
 		for (int k = 0; k < m.w + 6; k += 2)

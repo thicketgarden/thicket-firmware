@@ -6,14 +6,14 @@
 # scenario project:
 #
 #   1. The scenarios need `examples/common/udp_interface`, which lives inside
-#      the microReticulum repo. PlatformIO cannot depend on a repo
+#      the microReticulum repo. PlatformIO can't depend on a repo
 #      subdirectory, so the scenario projects symlink into a tree we control.
 #   2. One tree shared by every scenario, rather than one clone per scenario.
 #   3. The SHA is read out of the top-level platformio.ini, so the suite always
-#      tests the stack we actually pin. It cannot drift from the firmware.
+#      tests the stack we actually pin. It can't drift from the firmware.
 #
 # The firmware's own libdeps checkout is used as the clone source when it is
-# present (no network, and it is the same object store); otherwise we clone
+# present (no network, and it's the same object store); otherwise we clone
 # from GitHub.
 
 set -euo pipefail
@@ -38,12 +38,12 @@ echo "[fetch_deps] pinned microReticulum: $PIN_URL @ $PIN_SHA"
 # The scenario projects that pull microLXMF / MsgPack / Crypto / microStore as
 # git URLs have to name a SHA in their own platformio.ini -- PlatformIO has no
 # way to inherit one. Duplicated pins rot silently, so check them here instead
-# of hoping. A drifted pin means a scenario is testing a stack we do not ship,
+# of hoping. A drifted pin means a scenario is testing a stack we don't ship,
 # which is worse than no scenario at all.
 drift=0
 for lib in microLXMF MsgPack Crypto microStore; do
   # `|| true`: not every dependency is pinned by URL, and not every
-  # scenario uses every dependency. A miss is normal; a mismatch is not.
+  # scenario uses every dependency. A miss is normal; a mismatch isn't.
   want="$(grep -Eo "https://github.com/[^ ]*/${lib}\.git#[0-9a-f]+" "$PIO_INI" | head -n1 || true)"
   [[ -z "$want" ]] && continue
   want_sha="${want##*#}"

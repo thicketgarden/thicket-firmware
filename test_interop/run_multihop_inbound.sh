@@ -17,7 +17,7 @@
 # announce, and the leaf must handle a non-zero hop count and a destination it
 # can only reach via that path.
 #
-# It is also the only interop coverage of the file that carries all four of our
+# It's also the only interop coverage of the file that carries all four of our
 # local patches, which is why the parity matrix listed it as untested.
 #
 #   PATH="/tmp/rnsvenv/bin:$PATH" bash test_interop/run_multihop_inbound.sh

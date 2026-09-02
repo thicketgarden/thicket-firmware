@@ -7,8 +7,8 @@
 // driver's framebuffer, so it doubles as a check on the wire format: a wrong
 // gate address or bit order shows up as a wrong picture.
 //
-// Not a substitute for the panel. Contrast, refresh artefacts and legibility at
-// arm's length are not modelled.
+// Not a substitute for the panel. Contrast, refresh artefacts & legibility at
+// arm's length aren't modelled.
 
 #pragma once
 
@@ -34,7 +34,7 @@ public:
 	bool overflowed() const { return _overflowed; }
 	bool vcom() const { return _vcom; }
 
-	// Portable bitmap, 1 = black. Returns false if the file cannot be opened.
+	// Portable bitmap, 1 = black. Returns false if the file can't be opened.
 	bool write_pbm(const char* path, uint8_t scale = 1) const;
 
 	void reset_counters();

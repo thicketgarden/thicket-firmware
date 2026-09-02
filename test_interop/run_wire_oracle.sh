@@ -4,15 +4,15 @@
 #
 # Scenario: WIRE ORACLE.
 #
-# Sequential rather than concurrent, so it does not use scripts/driver.sh:
+# Sequential rather than concurrent, so it doesn't use scripts/driver.sh:
 #   C++    packs a set of packets and writes them out as hex with the field
 #          values each was built from.
 #   Python decodes those same bytes with the reference implementation's own
 #          RNS.Packet and compares every field.
 #
-# What this catches that an end-to-end scenario cannot: an encoding both of our
-# own ends agree on and the rest of the network does not. A delivery test
-# passes in that case; this one does not.
+# What this catches that an end-to-end scenario can't: an encoding both of our
+# own ends agree on and the rest of the network doesn't. A delivery test
+# passes in that case; this one doesn't.
 #
 #   PATH="/tmp/rnsvenv/bin:$PATH" bash test_interop/run_wire_oracle.sh
 #

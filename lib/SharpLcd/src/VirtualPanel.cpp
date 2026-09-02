@@ -14,8 +14,8 @@
 namespace thicket {
 
 #ifndef ARDUINO
-// Create the parent directories of `path`. The output directory is not tracked
-// by git, so it will not exist in a fresh checkout.
+// Create the parent directories of `path`. The output directory isn't tracked
+// by git, so it won't exist in a fresh checkout.
 static void make_parent_dirs(const char* path) {
 	char buf[512];
 	const size_t n = strlen(path);
@@ -52,8 +52,8 @@ void VirtualPanel::select(bool on) {
 void VirtualPanel::write(const uint8_t* data, size_t len) {
 	if (!_selected) return;             // real panel ignores data with SCS low
 	for (size_t i = 0; i < len; ++i) {
-		// Truncating here would silently corrupt the image and look like a
-		// driver bug, so it is an assertion rather than a clamp.
+		// Truncating here would silently corrupt the image & look like a
+		// driver bug, so it's an assertion rather than a clamp.
 		if (_tx_len >= sizeof(_tx)) { _overflowed = true; return; }
 		_tx[_tx_len++] = data[i];
 	}

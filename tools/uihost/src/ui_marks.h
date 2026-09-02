@@ -73,7 +73,7 @@ static inline bool mark_on(const MarkArt& m, int row, int col) {
 // `faded` stipples the body instead of filling it, denoting a peer that is
 // present but not currently reachable. Stipple rather than an outline: an
 // outline needs an edge several pixels thick to read, which the smaller
-// sizes do not have.
+// sizes don't have.
 static inline void draw_mark(SharpLcd& l, const MarkArt& m, int x, int base_y,
                              bool ink, bool faded) {
 	const int top = base_y - m.h;

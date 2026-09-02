@@ -12,7 +12,7 @@
 # reports how deep the stack HAS been, which only covers paths that actually
 # ran. This reports how deep single frames CAN be, including code no test has
 # reached yet. A stack overflow on this part presents as a hard fault at a
-# random address with no diagnostic, so the paths that have not run are exactly
+# random address with no diagnostic, so the paths that haven't run are exactly
 # the ones worth bounding.
 #
 # It reports frames, not chains. GCC emits per-function sizes; turning those

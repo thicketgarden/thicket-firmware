@@ -47,7 +47,7 @@ static void dither(SharpLcd& l, uint16_t x, uint16_t y, uint16_t w, uint16_t h,
 }
 
 // Solid bar with knocked-out text. On 1-bit there is no third value, so
-// dither behind text simply competes with the glyph and both lose.
+// dither behind text competes with the glyph and both lose.
 static void bar(SharpLcd& l, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
 	l.fill_rect(x, y, w, h, true);
 }

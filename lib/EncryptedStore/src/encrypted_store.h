@@ -12,7 +12,7 @@
 // Authenticated encrypted message storage using the Reticulum identity's
 // X25519 encryption private key.
 //
-// Announcements and peers are public, this module is for sent/received
+// Announcements and peers are public — this module is for sent/received
 // message blobs that must be protected at rest.
 //
 // Key derivation:
@@ -61,7 +61,7 @@ bool encstore_write(const char* path, const RNS::Identity& identity,
 // Read and authenticate the message stored at `path`, then decrypt into
 // `data` (must be at least encstore_size(path) bytes).
 // Returns true on success; false means file missing, wrong identity, or
-// corruption, no plaintext is written in that case.
+// corruption — no plaintext is written in that case.
 bool encstore_read(const char* path, const RNS::Identity& identity,
                    uint8_t* data, size_t len);
 

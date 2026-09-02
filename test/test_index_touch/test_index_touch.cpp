@@ -47,7 +47,7 @@ const uint32_t TS_BASE = 1000000;
 void setUp(void) {}
 void tearDown(void) {}
 
-// The point of the whole exercise: a record that is touched survives an
+// The point of the whole exercise: a record that's touched survives an
 // eviction that would otherwise have taken it, without any flash write.
 void test_touched_record_survives_eviction(void) {
 	Store store(65536, 4);
@@ -112,7 +112,7 @@ void test_touch_restarts_ttl(void) {
 	// Stamped 100 s ago with a 10 s TTL: already expired.
 	store.put(key, sizeof(key), payload, sizeof(payload), /*ttl=*/10, now - 100);
 
-	// An expired record cannot be touched, and touching it reaps it.
+	// An expired record can't be touched, and touching it reaps it.
 	TEST_ASSERT_FALSE(store.touch(key, sizeof(key), now));
 	TEST_ASSERT_FALSE(store.exists(key, sizeof(key)));
 

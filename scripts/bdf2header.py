@@ -14,7 +14,7 @@ FIRST, LAST = 32, 126
 
 # Beyond ASCII, only what the UI actually draws. A curated list rather than
 # whole blocks: every one is verified present in Cozette, and unused glyphs are
-# flash we do not spend.
+# flash we don't spend.
 EXTRA = [
     0x2500, 0x2502, 0x250C, 0x2510, 0x2514, 0x2518,       # box drawing
     0x251C, 0x2524, 0x252C, 0x2534, 0x253C,

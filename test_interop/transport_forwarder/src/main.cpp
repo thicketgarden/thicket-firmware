@@ -1,12 +1,12 @@
 // Copyright (C) 2026 Thicket contributors
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// TRANSPORT FORWARDING, the scenario where we are the router.
+// TRANSPORT FORWARDING, the scenario where we're the router.
 //
 // Every other scenario in this suite puts our stack at the edge: a leaf that
 // receives, decrypts and answers. This one puts two Python RNS peers on
 // opposite sides of us and makes them reach each other *through* us. They share
-// no interface and cannot hear one another directly, so a message arriving at
+// no interface and can't hear one another directly, so a message arriving at
 // the far end is proof that this process forwarded it.
 //
 // WHY IT MATTERS MORE THAN THE OTHER FIVE
@@ -23,7 +23,7 @@
 // WHAT IT ASSERTS, AND WHY EACH IS NOT ENOUGH ALONE
 //
 //   1. Both peers learn each other. Necessary, but an announce could in
-//      principle reach them by some path we did not intend.
+//      principle reach them by some path we didn't intend.
 //   2. The far peer receives the originator's packet. Stronger, the two have
 //      no shared interface, but still says nothing about hop accounting.
 //   3. **The packet arrives with a hop count that proves it crossed us.** RNS
@@ -67,7 +67,7 @@ static int paths_held = 0;
 
 static void info(const char* what) { printf("[cpp] %s\n", what); }
 
-// We are a router, not a correspondent: we register no destination of our own
+// We're a router, not a correspondent: we register no destination of our own
 // and answer nothing. This handler exists only to report what the routing
 // tables learn, so a failure says which half is missing.
 class Watcher : public RNS::AnnounceHandler {
@@ -140,7 +140,7 @@ int main(int argc, char** argv) {
 	       announces_seen, paths_held);
 
 	// Deliberately weak, and the comment matters more than the check: this
-	// process cannot tell whether forwarding worked, only whether it was in a
+	// process can't tell whether forwarding worked, only whether it was in a
 	// position to forward. The verdict lives at the two Python ends, which is
 	// the honest place for it -- a router certifying its own delivery would be
 	// marking its own homework.
@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
 	// ⚠ An earlier version required TWO announces, one per peer, and failed a
 	// run in which the forwarding demonstrably worked. The originator is cold:
 	// it never announces, because it addresses the far end from an identity
-	// file so that a failure cannot be confused with a lost announce. Only the
+	// file so that a failure can't be confused with a lost announce. Only the
 	// far end announces, so one is the correct expectation.
 	if (announces_seen >= 1 && paths_held >= 1) {
 		printf("[cpp] SUCCESS transport enabled, %d announce(s) heard and a "

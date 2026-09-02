@@ -62,7 +62,7 @@ void Parser::parseLine(const char* line, size_t len, Renderer& out) {
     if (len == 0) return;
 
     // `= toggles literal mode. Exactly two characters, checked before anything
-    // else --- inside a literal block this is the ONLY markup that is honoured.
+    // else --- inside a literal block this is the ONLY markup that's honoured.
     if (len == 2 && line[0] == '`' && line[1] == '=') {
         _style.literal = !_style.literal;
         return;
@@ -84,7 +84,7 @@ void Parser::parseLine(const char* line, size_t len, Renderer& out) {
 
     // A heading line containing a field loses its heading status --- upstream
     // calls this "markup sanitization" and it exists because a heading style
-    // cannot wrap an editable widget.
+    // can't wrap an editable widget.
     if (first == '>') {
         bool has_field = false;
         for (size_t i = 0; i + 1 < len; i++) {
@@ -99,8 +99,8 @@ void Parser::parseLine(const char* line, size_t len, Renderer& out) {
 
     // A leading backslash makes the line's first character literal. Note that
     // `first` deliberately still holds the backslash, so none of the line-level
-    // branches below fire --- that is exactly how an escaped '>' or '-' stays
-    // text. Faithful to MicronParser, which does not re-read first_char here.
+    // branches below fire --- that's exactly how an escaped '>' or '-' stays
+    // text. Faithful to MicronParser, which doesn't re-read first_char here.
     if (first == '\\') {
         line++; len--;
         pre_escape = true;
@@ -110,7 +110,7 @@ void Parser::parseLine(const char* line, size_t len, Renderer& out) {
     }
 
     if (!pre_escape) {
-        // Tables and partials are not implemented. Skip the whole line rather
+        // Tables & partials aren't implemented. Skip the whole line rather
         // than emit its raw markup as text --- a visible "`t" would be worse
         // than a missing table, and silently dropping keeps the page readable.
         // TODO(not yet implemented): `t tables, `{ partials.
@@ -130,7 +130,7 @@ void Parser::parseLine(const char* line, size_t len, Renderer& out) {
             line += i; len -= i;
             if (len == 0) return;
             // Headings carry the section style; the renderer decides what a
-            // depth-N heading looks like. We do not fake bold here.
+            // depth-N heading looks like. We don't fake bold here.
             emitInline(line, len, out, false);
             out.onLineEnd(_style);
             return;
@@ -178,7 +178,7 @@ void Parser::emitInline(const char* line, size_t len, Renderer& out, bool pre_es
 
         if (c != '`') { i++; continue; }
 
-        // A backtick begins a formatting command. Everything before it is a
+        // A backtick begins a formatting command. Everything before it's a
         // text run in the CURRENT style; the command changes style for what
         // follows.
         flush(i);
@@ -213,7 +213,7 @@ void Parser::emitInline(const char* line, size_t len, Renderer& out, bool pre_es
                 if (ok) consumed = 4;           // 'F' + 3 nibbles
             }
             // A malformed colour consumes only the command char, matching
-            // upstream, which simply does not apply it.
+            // upstream, which doesn't apply it.
             if (ok) { if (cmd == 'F') _style.fg = parsed; else _style.bg = parsed; }
             break;
         }
@@ -290,7 +290,7 @@ void Parser::emitInline(const char* line, size_t len, Renderer& out, bool pre_es
         }
 
         default:
-            // Unknown command. Consume it so stray backticks do not leak into
+            // Unknown command. Consume it so stray backticks don't leak into
             // the text, which is what upstream effectively does.
             break;
         }

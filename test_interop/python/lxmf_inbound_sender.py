@@ -15,7 +15,7 @@ OPPORTUNISTIC inbound path). So a DELIVERED state on this side really does mean
 the C++ router decrypted, parsed and verified -- unlike a bare RNS PacketReceipt.
 
 Not a cold scenario: LXMF signature validation needs the source identity, so
-this side announces its own lxmf.delivery destination first. That is the
+this side announces its own lxmf.delivery destination first. That's the
 reference flow. Coldness is scenario 1's job.
 
 Exit codes:
@@ -165,7 +165,7 @@ def main():
         # it has heard us only from the next announce onward. Wait until we
         # have announced at least twice with the peer known to be up,
         # otherwise the message arrives before the identity does and the
-        # signature cannot be validated on receipt.
+        # signature can't be validated on receipt.
         if state["peer_hash"] is not None and send_after is None:
             router.announce(source.hash)
             last_announce = now

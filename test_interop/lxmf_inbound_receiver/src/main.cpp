@@ -9,7 +9,7 @@
 // and docs/parity-matrix.md cites it as `lxmf-conformance`. But that bridge
 // builds microLXMF against torlando-tech/microReticulum @ 6054f6ba -- a fork of
 // a different upstream base than the attermann 0.5.0-8 tree Thicket pins. It is
-// good evidence about the LXMF layer. It is not evidence about the LXMF layer
+// good evidence about the LXMF layer. It isn't evidence about the LXMF layer
 // running on OUR RNS layer, which is what we ship.
 //
 // This binary is microLXMF's LXMRouter on the microReticulum SHA in our
@@ -18,7 +18,7 @@
 //
 // NOT a cold test, and deliberately so. LXMF signature validation needs the
 // source identity, so the Python peer must announce its lxmf.delivery
-// destination first -- that is the reference flow, not a shortcut. Scenario 1
+// destination first -- that's the reference flow, not a shortcut. Scenario 1
 // (cold_inbound) is where coldness is tested.
 //
 // Exit 0 iff a message arrived and EVERY asserted field matched.

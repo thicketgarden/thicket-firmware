@@ -10,7 +10,7 @@
 // identity-vector scenario exists for, and the reason that one asserts against
 // reference output instead of its own.
 //
-// So the load-bearing check here is not our round trip. It is that we can read
+// So the load-bearing check here is not our round trip. It's that we can read
 // a 92-byte file WE DID NOT WRITE: `test/msgs/last.enc` from upstream's
 // identity_vault example, produced by the author's device, decrypted here with
 // an implementation sharing no code with theirs above the crypto primitives.
@@ -126,11 +126,11 @@ int main() {
 
 	// --- our own round trip ------------------------------------------------
 	// Weaker evidence than the above, but it covers the write path, which the
-	// reference vector cannot: upstream produced that file, not us.
+	// reference vector can't: upstream produced that file, not us.
 	const char* ours_path = "ours.enc";
 	const char* payload = "thicket round trip \xE2\x80\x94 non-ascii and 0x00 follow";
 	std::vector<uint8_t> plain(payload, payload + strlen(payload));
-	plain.push_back(0x00);          // a NUL mid-blob: this is not a C string
+	plain.push_back(0x00);          // a NUL mid-blob: this isn't a C string
 	plain.push_back(0xFF);
 
 	check_bool("write", encstore_write(ours_path, identity,
@@ -143,7 +143,7 @@ int main() {
 	check_bool("round trip", ours_ok && back == plain, true,
 	           "byte-identical, NUL and 0xFF included");
 
-	// Two writes of the same plaintext must differ, or the IV is not random
+	// Two writes of the same plaintext must differ, or the IV isn't random
 	// and the whole construction leaks equality of messages.
 	RNS::Bytes first, second;
 	encstore_write(ours_path, identity, plain.data(), plain.size());
@@ -167,7 +167,7 @@ int main() {
 	                                            VEC_PLAINTEXT_LEN), false,
 	           "one flipped bit in the body is refused");
 
-	// Flipping the version byte must fail too: it is inside the MAC.
+	// Flipping the version byte must fail too: it's inside the MAC.
 	std::vector<uint8_t> reversioned(VEC_CIPHERTEXT,
 	                                 VEC_CIPHERTEXT + VEC_CIPHERTEXT_LEN);
 	reversioned[0] = 0x02;

@@ -90,9 +90,9 @@ uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) 
 			for (uint8_t row = 0; row < FONT_H; ++row) {
 				const uint8_t bits = g[row];
 				if (!bits) continue;
-				// FONT_INK_W, not FONT_W: box and block glyphs are 7 wide
-				// against a 6px advance so neighbouring cells touch and rules
-				// join. Drawing only the advance clips that column and breaks
+				// FONT_INK_W, not FONT_W: box & block glyphs are 7 wide
+				// against a 6px advance so neighbouring cells touch & rules
+				// join. Drawing only the advance clips that column & breaks
 				// every rule into dashes.
 				for (uint8_t col = 0; col < FONT_INK_W; ++col) {
 					if (bits & (uint8_t)(0x80u >> col))
@@ -143,7 +143,7 @@ uint16_t SharpLcd::flush() {
 	if (n == 0) return 0;
 
 	// Multi-line update, 6-5-2: mode byte, then per line an address byte, 50
-	// data bytes and 8 trailing dummy clocks. The last line takes 16 instead.
+	// data bytes & 8 trailing dummy clocks. The last line takes 16 instead.
 	// The trailing byte of one line doubles as the gap before the next, so a
 	// single dummy byte per line is emitted and one extra at the end.
 	_bus.select(true);
@@ -172,7 +172,7 @@ uint16_t SharpLcd::flush() {
 void SharpLcd::toggle_vcom() {
 	_vcom = !_vcom;
 	// Display mode, 6-5-3: mode byte plus at least 13 dummy clocks. Sends no
-	// pixel data and leaves the image untouched.
+	// pixel data & leaves the image untouched.
 	uint8_t buf[2] = { (uint8_t)(_vcom ? LCD_M1_VCOM : 0x00), 0x00 };
 	_bus.select(true);
 	_bus.write(buf, 2);
@@ -186,7 +186,7 @@ void SharpLcd::clear() {
 	_bus.select(false);
 
 	memset(_fb, 0xFF, LCD_FB_BYTES);
-	memset(_dirty, 0, sizeof(_dirty));   // panel and buffer now agree
+	memset(_dirty, 0, sizeof(_dirty));   // panel & buffer now agree
 }
 
 }  // namespace thicket

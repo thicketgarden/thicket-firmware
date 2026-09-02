@@ -13,11 +13,11 @@
 #   1. UICR.APPROTECT programmed to HwDisabled  (hardware part)
 #   2. firmware writing APPROTECT.DISABLE = SwDisable  (software part)
 #
-# The 2020 LimitedResults DEC1 voltage glitch defeats (1). It cannot perform
+# The 2020 LimitedResults DEC1 voltage glitch defeats (1). It can't perform
 # (2). So the debug port on our device stays shut for exactly one reason:
 # **no code here performs the software write.**
 #
-# That is a property of an absence, and absences rot silently. A debug build, a
+# That's a property of an absence, and absences rot silently. A debug build, a
 # bump to MDK >= 8.45.0 (whose startup code performs the write by default so
 # developers can attach a debugger), or a differently-vendored system file all
 # remove the protection with no error and no diff anyone would notice. If
@@ -35,15 +35,15 @@ Import("env")  # noqa: F821  (injected by SCons/PlatformIO)
 
 # Tokens that would only appear if someone made the software-disable reachable.
 # The BSP's nrf52840.h defines UICR->APPROTECT and nothing else, so today none
-# of these exist anywhere - that is the state being defended.
+# of these exist anywhere - that's the state being defended.
 FORBIDDEN = [
     (r"\bNRF_APPROTECT\b",        "the APPROTECT peripheral (software disable)"),
     (r"APPROTECT\s*->\s*DISABLE", "a write to APPROTECT.DISABLE"),
     (r"\bAPPROTECT_DISABLE\b",    "the APPROTECT_DISABLE symbol"),
     (r"\bSwDisable\b",            "the SwDisable value"),
     (r"\bENABLE_APPROTECT\b",     "the MDK ENABLE_APPROTECT flag"),
-    # Any assignment to UICR.APPROTECT. Reading it is fine and we do, in the
-    # boot diagnostic; writing it is programming the hardware half.
+    # Any assignment to UICR.APPROTECT. Reading it's fine and we do, in the
+    # boot diagnostic; writing it's programming the hardware half.
     (r"APPROTECT\s*=(?!=)",       "an assignment to UICR.APPROTECT"),
 ]
 
@@ -91,7 +91,7 @@ scan(os.path.join(proj, "lib"), "lib", failures)
 
 # The BSP's startup file is the other place this can arrive from. MDK 8.45.0+
 # performs the software write in system_nrf52840.c unless ENABLE_APPROTECT is
-# defined; the version we pin does not contain the word at all.
+# defined; the version we pin doesn't contain the word at all.
 bsp_note = "not found (skipped)"
 pkg = env.PioPlatform().get_package_dir("framework-arduinoadafruitnrf52")  # noqa: F821
 if pkg:

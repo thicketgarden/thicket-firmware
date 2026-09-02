@@ -16,8 +16,8 @@ sits on. Not written here.
 
 ## Why vendored instead of a `lib_deps` entry
 
-It ships a `library.properties`, so it is a real Arduino library, but it lives
-in a subdirectory of the microReticulum repository, and PlatformIO cannot
+It ships a `library.properties`, so it's a real Arduino library, but it lives
+in a subdirectory of the microReticulum repository, and PlatformIO can't
 depend on a subdirectory of a git repo. Upstream's own examples reach it with
 `lora_interface=symlink://../common/lora_interface`, which only works from
 inside that tree. Copying it in is the honest option; the alternative is a
@@ -37,10 +37,10 @@ Apache-2.0 §4(b) requires modified files to say so. Changes 1–3 are in
    `SPI.setPins(MISO, SCK, MOSI); SPI.begin();`, repointing the single Arduino
    `SPI` instance at the SX1262. On the RAK4631 that instance is the WisBlock
    IO-slot bus, which is where the RAK15001 external flash lives, and Thicket
-   keeps identity, keys and messages there, never on the ~28 KB internal FS.
+   keeps identity, keys & messages there, never on the ~28 KB internal FS.
    Repointing the bus would break persistence the moment the radio started.
    `variants/rak4630/variant.h` now declares `SPI1` on the radio pins
-   (P1.11/P1.12/P1.13) and this file uses it. Upstream does not hit the problem
+   (P1.11/P1.12/P1.13) and this file uses it. Upstream doesn't hit the problem
    because its nRF52 examples fall back to microStore's `InternalFSFileSystem`.
 
 2. **TCXO reference voltage is a build flag,** `THICKET_SX1262_TCXO_VOLTAGE`,
@@ -53,7 +53,7 @@ Apache-2.0 §4(b) requires modified files to say so. Changes 1–3 are in
 
 3. **Over-current protection raised to 140 mA,** `THICKET_SX1262_OCP_MA`.
    RadioLib leaves OCP at the SX1262 reset default of 60 mA. RAK's datasheet
-   draws 92 mA at +17 dBm and 125 mA at +20 dBm in PA-boost, so the default
+   draws 92 mA at +17 dBm & 125 mA at +20 dBm in PA-boost, so the default
    folds back below the module's rated output. Semtech's high-power PA setting
    is ~140 mA. The OCP register is 2.5 mA/LSB (`0x28` = 100 mA, `0x38` =
    140 mA); RadioLib's `setCurrentLimit()` takes milliamps. This raises a
@@ -78,7 +78,7 @@ SF8 / CR4:5 parameters, `setDio2AsRfSwitch(true)`, DC-DC regulator mode
 
 ## Known upstream behaviour worth remembering
 
-- `loop()` polls `checkIrq(RADIOLIB_IRQ_RX_DONE)`; there is no ISR. Receive
+- `loop()` polls `checkIrq(RADIOLIB_IRQ_RX_DONE)`; there's no ISR. Receive
   latency is therefore bounded by how often the application calls
   `Reticulum::loop()`. That matters for the always-listening idle contract.
 - `send_outgoing()` calls `_radio->transmit()`, which **blocks** for the whole

@@ -28,7 +28,7 @@ bool InputLayer::track_down(uint8_t code) {
 	}
 	else {
 		// More keys than we track is already far past the ghost threshold;
-		// count it so the state is not silently wrong.
+		// count it so the state isn't silently wrong.
 		_down_count = MAX_TRACKED;
 	}
 	return true;
@@ -57,9 +57,9 @@ Event InputLayer::key_down(uint8_t code) {
 	// The guard. Three keys down at once is the condition under which a
 	// diode-less matrix produces phantom presses, so nothing is emitted while
 	// it holds -- not even for a key that would otherwise be valid, because we
-	// cannot tell whether this key IS the phantom.
+	// can't tell whether this key IS the phantom.
 	//
-	// This is the line that keeps the board honest. If it is ever relaxed to
+	// This is the line that keeps the board honest. If it's ever relaxed to
 	// let a chord through, the hardware needs 34 diodes and a respin.
 	// ---------------------------------------------------------------------
 	if (_down_count >= GHOST_THRESHOLD) {
@@ -79,8 +79,8 @@ Event InputLayer::key_down(uint8_t code) {
 	}
 
 	// An ordinary key consumes whatever is armed, whether or not the modifier
-	// is still physically held. That is what makes it one-shot rather than a
-	// held modifier, and it is the property the board depends on.
+	// is still physically held. That's what makes it one-shot rather than a
+	// held modifier, and it's the property the board depends on.
 	const uint8_t applied = _pending;
 	_pending = MOD_NONE;
 	ev.mods = applied;
@@ -106,7 +106,7 @@ void InputLayer::key_up(uint8_t code) {
 void InputLayer::reset() {
 	_pending = MOD_NONE;
 	_down_count = 0;
-	// _refused is not cleared: it is a diagnostic counter about the board, and
+	// _refused isn't cleared: it's a diagnostic counter about the board, and
 	// zeroing it on a UI transition would hide exactly what it exists to show.
 }
 

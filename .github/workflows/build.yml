@@ -1,11 +1,11 @@
 name: build
 
-# Both envs must build on every push. The no-BLE env is not optional here:
+# Both envs must build on every push. The no-BLE env isn't optional here:
 # it exists as the flash/compliance fallback and a fallback that has rotted
-# is not a fallback.
+# isn't a fallback.
 #
 # This job also exists to catch scripts/patch_deps.py failing. Those patches
-# are anchored to exact upstream text and sys.exit(1) when a pin moves,
+# are anchored to exact upstream text & sys.exit(1) when a pin moves,
 # which is correct, but until now the only place that alarm could fire was
 # someone's laptop, whenever they happened to build.
 
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Cheap and first. A pin that disagrees across build paths makes every job
+  # Cheap & first. A pin that disagrees across build paths makes every job
   # below it test a stack nobody ships, and the symptom is a compile error deep
   # in a dependency rather than anything that names the cause. Seconds here
   # against ten minutes of misleading red.
@@ -69,7 +69,7 @@ jobs:
         run: pio run -e ${{ matrix.env }}
 
       - name: Report size
-        # Informational. Flash and RAM numbers belong in the log so a jump is
+        # Informational. Flash & RAM numbers belong in the log so a jump is
         # visible in the diff of two runs rather than discovered at link time
         # on the day the image stops fitting.
         run: pio run -e ${{ matrix.env }} 2>&1 | grep -E "RAM:|Flash:" || true

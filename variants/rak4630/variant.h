@@ -123,7 +123,7 @@ extern "C"
  */
 /* Thicket modification, 2026-08-01. Upstream (attermann/microReticulum_Firmware,
  * and identically attermann/microReticulum examples/lora_announce) declares one
- * SPI interface, the WisBlock IO-slot bus, and its LoRaInterface then calls
+ * SPI interface (the WisBlock IO-slot bus) and its LoRaInterface then calls
  * SPI.setPins() at radio start to repoint that single instance at the SX1262's
  * pins (P1.10-P1.15). That works only because the upstream examples keep no
  * state on external SPI flash; on nRF52 they fall back to microStore's
@@ -137,12 +137,12 @@ extern "C"
  */
 #define SPI_INTERFACES_COUNT 2
 
-/* SPI, WisBlock IO slot. RAK15001 external flash (CS = WB_SPI_CS = 26). */
+/* SPI:  WisBlock IO slot. RAK15001 external flash (CS = WB_SPI_CS = 26). */
 #define PIN_SPI_MISO (29)
 #define PIN_SPI_MOSI (30)
 #define PIN_SPI_SCK (3)
 
-/* SPI1, SX1262 LoRa radio, nRF52840 P1.11/P1.12/P1.13. CS is P1.10 (42),
+/* SPI1: SX1262 LoRa radio, nRF52840 P1.11/P1.12/P1.13. CS is P1.10 (42),
  * BUSY P1.14 (46), DIO1 P1.15 (47), NRESET P1.06 (38); those are held by
  * LoRaInterface, not here, because RadioLib's Module owns them. */
 #define PIN_SPI1_MISO (45)

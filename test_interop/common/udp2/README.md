@@ -14,7 +14,7 @@ are constructor arguments instead of compile-time defines.
 | License | Apache-2.0, full text in `./LICENSE`, copied from the upstream repo root |
 | Copyright | © 2026 Chad Attermann |
 
-Same arrangement as `lib/LoRaInterface`, for the same reason: PlatformIO cannot
+Same arrangement as `lib/LoRaInterface`, for the same reason: PlatformIO can't
 depend on a subdirectory of a repository.
 
 ## Why a copy exists at all
@@ -23,8 +23,8 @@ Upstream initialises `_local_port` and `_remote_port` from `DEFAULT_UDP_*_PORT`,
 which are compile-time macros, and the constructor takes only a name. **That
 makes two UDP interfaces on different ports impossible in one process.**
 
-A forwarding node needs exactly that, one interface facing each neighbour, so
-the transport-forwarding interop scenario cannot be written against the upstream
+A forwarding node needs exactly that. One interface faces each neighbour, so
+the transport-forwarding interop scenario can't be written against the upstream
 class. Modifying our microReticulum fork was rejected for it: a patch there is a
 tax on every dependency bump, paid forever, for a change only a test needs.
 
@@ -44,8 +44,7 @@ the `InterfaceImpl` contract are upstream's, untouched.
 ## Scope
 
 **Test-only.** It lives under `test_interop/`, not `lib/`, and nothing on the
-firmware build path references it. The device has one LoRa interface and does
-not need this.
+firmware build path references it. The device has one LoRa interface. It doesn't need this.
 
 ⚠ **If upstream ever makes the ports settable, delete this.** Check on any
-dependency bump, the whole file is a workaround for one missing setter.
+dependency bump. The whole file is a workaround for one missing setter.

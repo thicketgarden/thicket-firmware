@@ -136,7 +136,7 @@ void test_three_simultaneous_keys_are_refused(void) {
 
 void test_a_refused_chord_emits_no_character(void) {
 	// Refusing must mean silence, not a best guess. With three keys down we
-	// cannot tell which reading is the phantom, so emitting anything at all
+	// can't tell which reading is the phantom, so emitting anything at all
 	// would be inventing input.
 	InputLayer in = make();
 	in.key_down(K_A);
@@ -147,7 +147,7 @@ void test_a_refused_chord_emits_no_character(void) {
 }
 
 void test_two_key_rollover_still_works(void) {
-	// Fast typing overlaps two keys. That is below the ghost threshold and
+	// Fast typing overlaps two keys. That's below the ghost threshold and
 	// must keep working, or the guard has been set too tight to type on.
 	InputLayer in = make();
 	in.key_down(K_A);          // still held...
@@ -173,7 +173,7 @@ void test_recovery_after_releasing_below_the_threshold(void) {
 
 void test_refused_count_survives_reset(void) {
 	// reset() is a UI-level operation. Zeroing the counter there would hide
-	// the one signal that says someone is chording on a board that cannot.
+	// the one signal that says someone is chording on a board that can't.
 	InputLayer in = make();
 	in.key_down(K_A);
 	in.key_down(K_B);

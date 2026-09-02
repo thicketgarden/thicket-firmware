@@ -13,7 +13,7 @@
 #
 #   1. A PlatformIO upload can print SUCCESS without programming anything.
 #      A real upload takes roughly 35-45 s and prints "Device programmed".
-#      A failed one warns that the target is not in DFU mode and still exits
+#      A failed one warns that the target isn't in DFU mode and still exits
 #      zero. `flash` keys on "Device programmed" rather than the exit code.
 #      Do NOT use elapsed time as the failure signal: this times the whole
 #      `pio run -t upload`, so a fresh env compiling from scratch legitimately
@@ -25,10 +25,10 @@
 #      which reads exactly like a dead board. `capture` polls for the port
 #      every 20 ms and opens it the instant it enumerates.
 #
-#   3. The 1200-baud touch does not reset this board, whatever the Adafruit
+#   3. The 1200-baud touch doesn't reset this board, whatever the Adafruit
 #      core documents. adafruit-nrfutil resets it fine on its own, so `flash`
 #      is the only reliable way to get a board from one state to another --
-#      there is no "just reset it" here.
+#      there's no "just reset it" here.
 #
 # Usage:
 #   python3 scripts/board.py capture [--seconds N] [--port P]
@@ -51,7 +51,7 @@ def port_serials():
 
     Port names are NOT stable identifiers. Flashing re-enumerates the device
     and macOS reassigns the name, so two boards can swap between one command
-    and the next. The serial number does not move.
+    and the next. The serial number doesn't move.
     """
     out = {}
     try:
@@ -236,13 +236,13 @@ def cmd_flash(args):
     # Do NOT hold the port open across the upload. nrfutil drives DFU over this
     # same port, and a second reader makes it fail with "device reports
     # readiness to read but returned no data (multiple access on port?)" --
-    # which looks like a bootloader mismatch and is not. Capture starts the
+    # which looks like a bootloader mismatch and isn't. Capture starts the
     # moment nrfutil exits and polls every 20 ms, which is fast enough to catch
     # the banner the board prints as it comes back up.
     print(f"[board] uploading {args.env}", flush=True)
     started = time.time()
     proc = subprocess.run(
-        # --upload-port is not optional here. Without it PlatformIO does its
+        # --upload-port isn't optional here. Without it PlatformIO does its
         # own port detection, which with two boards attached picks one of them
         # arbitrarily -- so the upload can land on a different board than the
         # one this command resolved and is about to read back from. The verify

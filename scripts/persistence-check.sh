@@ -4,11 +4,11 @@
 #
 # Does the identity survive a power cycle?
 #
-# This is the last milestone clause a demo cannot fake. The device must come
+# This is the last milestone clause a demo can't fake. The device must come
 # back as the SAME address after power is removed, not merely after a reset,
 # and the peer has to be able to reach it on that address afterwards.
 #
-# Two phases with a physical act between them, because a power cycle is not
+# Two phases with a physical act between them, because a power cycle isn't
 # something software can honestly perform on itself:
 #
 #   scripts/persistence-check.sh arm      # flash, boot, record the identity
@@ -27,7 +27,7 @@ cd "$(dirname "$0")/.."
 
 ENV="${ENV:-wiscore_rak4631}"
 
-# board.py needs pyserial. The python3 on PATH here does not have it, while the
+# board.py needs pyserial. The python3 on PATH here doesn't have it, while the
 # interpreter PlatformIO was installed into does; prefer that unless told
 # otherwise. Set PYTHON to override.
 if [ -z "${PYTHON:-}" ]; then

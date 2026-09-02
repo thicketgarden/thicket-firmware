@@ -6,7 +6,7 @@
 #
 # Owns a tools/uihost process, pipes key events to it, and serves the frame it
 # renders. The pixels come from the real SharpLcd driver through VirtualPanel,
-# so what is on screen is what the panel would show.
+# so what's on screen is what the panel would show.
 #
 #   python3 scripts/ui-serve.py          http://127.0.0.1:8770
 #   python3 scripts/ui-serve.py --lan
@@ -30,7 +30,7 @@ proc = None
 
 
 def start():
-    """Bring up the interactive host. Missing binary is not fatal: the
+    """Bring up the interactive host. Missing binary isn't fatal: the
     rendered proposals are still worth serving without it."""
     global proc
     if not os.path.exists(BIN):

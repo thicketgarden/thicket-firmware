@@ -9,7 +9,7 @@
 # Runs the reference implementation's own Examples/Echo.py as the peer.
 #
 # Echo.py is NOT modified & NOT reimplemented. This wrapper only does the two
-# things the script cannot do for itself in an unattended run: give it a config
+# things the script can't do for itself in an unattended run: give it a config
 # with a UDP interface that reaches our C++ side, & press enter for it, since
 # its server mode announces on input() rather than on a timer.
 #

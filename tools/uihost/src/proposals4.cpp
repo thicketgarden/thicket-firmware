@@ -182,7 +182,7 @@ static void d_messages_frame(SharpLcd& l, int sel) {
 		else   rrect_line(l, CARD_X, y, CARD_W, CONV_H, 6, true);
 		const bool ink = !s;
 
-		// Sender at 2x: it is the field the list is scanned by.
+		// Sender at 2x: it's the field the list is scanned by.
 		l.draw_text_scaled((uint16_t)(CARD_X + 12), (uint16_t)(y + 6),
 		                   CONVS[i].who, ink, 2);
 
@@ -426,7 +426,7 @@ static void gauge(SharpLcd& l, int x, int y, int w, int h, int filled, int cells
 }
 
 // The shell and the two count tiles, as they sit at rest. Each frame displaces
-// them slightly; the phases differ so the masses do not pulse in unison.
+// them slightly; the phases differ so the masses don't pulse in unison.
 static const Ball SHELL0[4] = {
 	{78.0f,  74.0f,  40.0f},
 	{108.0f, 120.0f, 52.0f},
@@ -473,7 +473,7 @@ static void rest_pulse(SharpLcd& l, int frame) {
 
 static void rest_compose(SharpLcd& l, int frame) {
 	Ball shell[4], t1[3], t2[3];
-	// Amplitude does not affect transfer cost: these shapes put a moved edge
+	// Amplitude doesn't affect transfer cost: these shapes put a moved edge
 	// on nearly every line they cross, so those lines are dirty either way.
 	morph(SHELL0,  shell, 4, frame, 0.0f, 5.0f);
 	morph(TILE1_0, t1,    3, frame, 2.1f, 3.5f);

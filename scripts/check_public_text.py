@@ -12,11 +12,11 @@
 # (A-numbers), tasks (T-numbers), open questions (Q-numbers) and milestones
 # (M1-M5). None of it means anything to a stranger reading this code, and a
 # reference to the private repo's paths tells them about a repository they
-# cannot open.
+# can't open.
 #
 # This runs from the push gate over both the staged content and the commit
 # messages about to go out. Messages are checked as well as content because
-# they are harder to correct afterwards: fixing a published message means
+# they're harder to correct afterwards: fixing a published message means
 # rewriting history.
 #
 # Usage:
@@ -43,7 +43,7 @@ PATTERNS = [
     (re.compile(r"\bbench-messenger\b", re.I), "internal milestone name"),
     (re.compile(r"\[V(?:-hw)?(?=[,\]])"), "internal provenance tag"),
     # Documents that exist only in the private repository. A path a reader
-    # cannot follow is worse than no citation at all.
+    # can't follow is worse than no citation at all.
     (re.compile(r"docs/(?:decisions|open-questions|work-queue|wire|wire-integrity"
                 r"|milestones|licenses|port-notes|upstream-digest|upstream-drafts"
                 r"|interop-results|power-budget|thumb-reach|ram-budget|competitors"
@@ -53,7 +53,7 @@ PATTERNS = [
      "names a document in the private repository"),
 ]
 
-# Things that look like shorthand and are not. Kept narrow and explained,
+# Things that look like shorthand and aren't. Kept narrow and explained,
 # because a permissive allow-list is how a control stops controlling.
 ALLOW = [
     re.compile(r"\bPIN_A\d\b"),                 # variant.h analogue pin names
@@ -114,8 +114,8 @@ def staged_files():
 def outgoing_messages():
     """Commit messages that a push would publish.
 
-    Falls back to the whole branch when there is no upstream yet, because a
-    first push publishes everything and that is exactly when it matters.
+    Falls back to the whole branch when there's no upstream yet, because a
+    first push publishes everything and that's exactly when it matters.
     """
     rng = subprocess.run(["git", "rev-list", "@{u}..HEAD"],
                          capture_output=True, text=True)

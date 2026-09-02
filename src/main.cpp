@@ -19,7 +19,7 @@
 // up, with a serial line at every step so a failure on a terminal says which
 // step failed instead of going quiet.
 //
-// What is real here: external-flash persistence, an identity that survives a
+// What's real here: external-flash persistence, an identity that survives a
 // power cycle, the SX1262 on air, Reticulum transport, an announce, a live LXMF
 // router with its delivery destination registered, and an on-device composed,
 // signed and encrypted reply sent back over LoRa to whoever wrote to us.
@@ -29,7 +29,7 @@
 // device. Send it a message from a T-Deck or a Sideband instance and a reply
 // appears there, composed here. No cable, no serial console, no host.
 //
-// What is NOT here yet, and is marked TODO(bring-up) at each site: a message store,
+// What's NOT here yet, and is marked TODO(bring-up) at each site: a message store,
 // a UI, input, and any conformance check against Python RNS. Nothing below
 // fakes those.
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@
 #define THICKET_HAVE_STORE 1
 #include <LXMF/MessageStore.h>
 // Encryption at rest for everything the store persists. Included with the
-// store, not separately: there is no build in which we want one without the
+// store, not separately: there's no build in which we want one without the
 // other.
 #include <encrypted_store.h>
 #endif
@@ -103,7 +103,7 @@
 // RNS::Identity::to_file writes them. Anyone holding this file is this device.
 static const char* IDENTITY_PATH = "/thicket_identity";
 
-// microLXMF's storage root. The router takes it now; it is only used once a
+// microLXMF's storage root. The router takes it now; it's only used once a
 // MessageStore is attached.
 //
 // ⚠ The old note here said upstream's 32 x 256 pool "will not link on this
@@ -116,7 +116,7 @@ static const char* IDENTITY_PATH = "/thicket_identity";
 //   32 x 256                                 ld returns 1
 // So attaching a store costs +10,656 B of RAM and +12,400 B of flash.
 //
-// It is still not attached, and now for a different and better reason: the
+// It's still not attached, and now for a different and better reason: the
 // first boot on real hardware should have as few moving parts as possible, so
 // that when something fails the failure is unambiguous. Attach it once the
 // board has come up clean once. Doing so also turns the storage questions
@@ -136,7 +136,7 @@ static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 // How often to re-announce, in seconds.
 //
 // This is shared airtime, not ours. One LXMF announce is about 150 bytes; at
-// SF8 over 125 kHz that is roughly 0.4 s on air, and every node in range pays
+// SF8 over 125 kHz that's roughly 0.4 s on air, and every node in range pays
 // the cost of hearing it. A device that announces every 2 minutes spends 0.33%
 // of the channel on saying nothing, forever, and a handful of them together is
 // a measurable share of a band that carries other people's traffic.
@@ -160,7 +160,7 @@ static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 static const double ANNOUNCE_INTERVAL_S = (double)(THICKET_ANNOUNCE_INTERVAL_S);
 
 // Auto-reply. The device answers anything delivered to it, addressed to the
-// source hash carried by the inbound message, nothing about the peer is
+// source hash carried by the inbound message. Nothing about the peer is
 // compiled in, so no reflash is needed when the far end's address changes or a
 // second peer appears. This is the bring-up proof: it needs no screen here and no
 // host, because the reply lands on the sender's screen.
@@ -179,7 +179,7 @@ static const uint32_t REPLY_DELAY_MS = 1500;
 // float64 timestamp 9, empty title bin 2, content bin header 2, empty field
 // map 1. 159 - 96 - 15 = 48 bytes of content.
 //
-// Over budget is not an error, the router just falls back to link delivery,
+// Over budget isn't an error, the router just falls back to link delivery,
 // which is slower and needs a path first. Under budget is worth staying.
 // The reply carries no title for the same reason: a title is 1-2 more bytes of
 // header plus its own text, and the peer already shows who sent it.
@@ -189,13 +189,13 @@ static const size_t REPLY_CONTENT_BUDGET = 48;
 // limit, and a body that overruns it should be visible rather than clipped.
 static const size_t BODY_BUF = 72;
 
-// Optional timed send, OFF unless both flags are compiled in.
+// Optional timed send: OFF unless both flags are compiled in.
 //
 //   -DTHICKET_AUTOSEND_INTERVAL_S=60
 //   -DTHICKET_AUTOSEND_DEST=<32 hex chars, the peer's lxmf.delivery hash>
 //
 // This is the fallback for the case where auto-reply misbehaves and you need
-// to know whether the transmit path works at all. It is deliberately not
+// to know whether the transmit path works at all. It's deliberately not
 // the default: a stock build transmits announces and replies, and never
 // unsolicited traffic. It also requires knowing the peer's destination hash at
 // build time, which is exactly the reflash-after-you-find-out problem that
@@ -232,14 +232,14 @@ static RNS::Interface g_lora_interface({RNS::Type::NONE});
 static RNS::Identity g_identity({RNS::Type::NONE});
 
 // How the identity in use was obtained. The on-demand restatement below has to
-// say this: an address alone does not tell you whether it will still be yours
-// after the power is pulled, and that is the whole question this build exists
+// say this: an address alone doesn't tell you whether it will still be yours
+// after the power is pulled, and that's the whole question this build exists
 // to answer.
 static const char* g_identity_source = "unknown";
 
 
-// sizeof(LXMF::LXMRouter) is 33,656 bytes. That is 14% of the 237,568 B SRAM
-// region and it is not wanted in .bss on top of the TLSF pool, so it is built
+// sizeof(LXMF::LXMRouter) is 33,656 bytes. That's 14% of the 237,568 B SRAM
+// region and it isn't wanted in .bss on top of the TLSF pool, so it's built
 // on the heap once the identity exists.
 static std::unique_ptr<LXMF::LXMRouter> g_router;
 #ifdef THICKET_HAVE_STORE
@@ -278,8 +278,8 @@ static void store_message(const LXMF::LXMessage& m, bool inbound) {
 	}
 	else {
 		// Loud, because a store that silently fails to save is
-		// indistinguishable from one that is working until someone looks for
-		// a message that is not there.
+		// indistinguishable from one that's working until someone looks for
+		// a message that's not there.
 		g_save_failures++;
 		Serial.print("STORE: save FAILED for ");
 		Serial.println(m.hash().toHex().c_str());
@@ -298,7 +298,7 @@ static bool g_stack_up = false;
 static double g_last_announce = 0.0;
 
 // Counts every message this device has composed since boot, replies and, if
-// compiled in, timed sends. It is the first field of the body precisely so a
+// compiled in, timed sends. It's the first field of the body precisely so a
 // missing number on the peer's screen means a dropped packet, unambiguously.
 static uint32_t g_send_counter = 0;
 
@@ -367,7 +367,7 @@ static void info_u32(const char* key, uint32_t value) {
 // ---------------------------------------------------------------------------
 // Silicon identity and debug-port protection state.
 //
-// Printed at boot because it cannot be inferred and needs no debugger to read.
+// Printed at boot because it can't be inferred and needs no debugger to read.
 //
 // nRF52840 revision 3 (build codes Fx0) carries Nordic's improved hardware
 // APPROTECT and SHIPS LOCKED FROM THE FACTORY. Earlier revisions ship open.
@@ -384,8 +384,8 @@ static void info_u32(const char* key, uint32_t value) {
 //
 // Why this matters: one option for at-rest encryption is to hold a "pepper" in
 // the MCU's internal flash, so that dumping the external SPI flash yields
-// ciphertext and no key. That is only worth anything if the debug port cannot
-// simply be used to read internal flash back out.
+// ciphertext and no key. That's only worth anything if the debug port can't
+// be used to read internal flash back out.
 // ---------------------------------------------------------------------------
 // Set by report_silicon_and_approtect(). False means the debug port is open,
 // or open-by-default, on this particular chip.
@@ -393,7 +393,7 @@ static void info_u32(const char* key, uint32_t value) {
 // This exists to be GATED ON, not merely printed. Anything that stores a secret
 // in internal flash (the "pepper" described above) must refuse when
 // this is false: a secret on a chip whose SWD is open is worse than no secret,
-// because it looks protected and is not.
+// because it looks protected and isn't.
 static bool g_debug_port_protected = false;
 
 static void report_silicon_and_approtect() {
@@ -415,9 +415,9 @@ static void report_silicon_and_approtect() {
 	         hw_approtect_part ? " (rev3+/Fx0, hardware APPROTECT)" : "");
 	info("silicon", line);
 
-	// ERASEALL over CTRL-AP is ALWAYS available and cannot be disabled on any
+	// ERASEALL over CTRL-AP is ALWAYS available and can't be disabled on any
 	// build code. An attacker with the device can therefore always wipe it to
-	// factory state. That is destruction, not disclosure: it costs us the data
+	// factory state. That's destruction, not disclosure: it costs us the data
 	// and gives them nothing. Stated here so nobody reads it later as a hole in
 	// the scheme, and so nobody tries to "fix" it.
 	const uint8_t approt_b = (uint8_t)(approt & 0xFF);
@@ -455,14 +455,14 @@ static void report_silicon_and_approtect() {
 	}
 
 	// Only Fxx+ silicon with the software half never disabled is protected.
-	// Hardware-only protection on an older part does not count: the 2020 DEC1
+	// Hardware-only protection on an older part doesn't count: the 2020 DEC1
 	// glitch defeats it for about $5.
 	g_debug_port_protected = hw_approtect_part && (approt_b != 0x5A);
 
 	// A STABLE, MACHINE-READABLE line. A flasher can reconnect after DFU, read
 	// this, and tell the user in the browser what their particular chip is,
 	// which matters because we intend to invite anyone with a RAK4631 to flash
-	// this, and their silicon is not ours. Serial prose warns only whoever is
+	// this, and their silicon isn't ours. Serial prose warns only whoever is
 	// already staring at a terminal.
 	//
 	// Format is contractual. Parsers depend on it; change it deliberately.
@@ -571,12 +571,12 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 	try {
 		// The destination is passed as NONE and the hash set afterwards: we
 		// know the peer's address but not necessarily its public key yet, and
-		// RNS::Destination cannot be built without an Identity. The router
+		// RNS::Destination can't be built without an Identity. The router
 		// resolves the identity at send time via Identity::recall(), and asks
-		// Transport for a path if it cannot.
+		// Transport for a path if it can't.
 		//
 		// The source, by contrast, must be a real Destination, LXMessage::pack
-		// signs with it and throws if it is absent. delivery_destination() is
+		// signs with it and throws if it's absent. delivery_destination() is
 		// ours, SINGLE, backed by the identity loaded from external flash.
 		//
 		// Heap, not stack, and not by preference: sizeof(LXMF::LXMessage) is
@@ -584,7 +584,7 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 		// RNS::Bytes each dominate it), and the Adafruit nRF52 core runs loop()
 		// on a FreeRTOS task with LOOP_STACK_SZ = 256*4 words = 4,096 bytes
 		// total. A 20%-of-stack local in front of pack(), which nests msgpack
-		// and SHA-256 and Ed25519, is not a margin worth having. The router
+		// and SHA-256 and Ed25519, isn't a margin worth having. The router
 		// copies the message into its own pool anyway, so this lives exactly as
 		// long as the call.
 		std::unique_ptr<LXMF::LXMessage> message(new LXMF::LXMessage(
@@ -603,13 +603,13 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 
 		// OPPORTUNISTIC and not DIRECT on purpose. DIRECT establishes an RNS
 		// link first, which is several round trips before any payload moves; on
-		// a half-duplex 125 kHz channel that is the most fragile thing we could
+		// a half-duplex 125 kHz channel that's the most fragile thing we could
 		// ask of an unproven radio. One encrypted packet either arrives or does
 		// not, and the answer is legible either way.
 		g_router->handle_outbound(*message);
 #ifdef THICKET_HAVE_STORE
 		// Save after handle_outbound, not before: the router packs the message
-		// and that is when its hash is final. Saving earlier would store a
+		// and that's when its hash is final. Saving earlier would store a
 		// record keyed on a hash the peer never sees.
 		store_message(*message, false);
 		report_store("after outbound");
@@ -621,7 +621,7 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 		return true;
 
 	} catch (const std::exception& e) {
-		// pack() throws if the source destination cannot sign. Catching here
+		// pack() throws if the source destination can't sign. Catching here
 		// keeps a composition failure from unwinding through the main loop and
 		// taking the radio down with it.
 		Serial.print("  FAILED : ");
@@ -644,13 +644,13 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 //
 // FlashFSFileSystem, never UniversalFileSystem: on nRF52 microStore aliases
 // UniversalFileSystem to InternalFSFileSystem, which is the ~28 KB internal
-// filesystem. That is far too small for a message store, and capacity alone
+// filesystem. That's far too small for a message store, and capacity alone
 // settles the choice.
 //
 // A second argument has been made upstream that an internal-flash erase masks
 // interrupts long enough to time out RadioLib's SPI to the SX1262. That figure
-// is unverified here and has not been measured on this hardware; the capacity
-// argument does not depend on it.
+// is unverified here and hasn't been measured on this hardware; the capacity
+// argument doesn't depend on it.
 static bool bringup_storage() {
 	step(1, "External SPI flash + microStore");
 
@@ -660,7 +660,7 @@ static bool bringup_storage() {
 	// changes with it. This exists to reach the radio on a board with no
 	// RAK15001 in the IO slot, and for nothing else.
 	//
-	// It cannot prove the half of the done-condition that matters, which is
+	// It can't prove the half of the done-condition that matters, which is
 	// that the hash a peer sees is the same after a power cycle. A green run
 	// under this flag is evidence about the radio and evidence about nothing
 	// else.
@@ -676,7 +676,7 @@ static bool bringup_storage() {
 	// initialised: the node announces, looks healthy, and can never reach a peer.
 #ifdef THICKET_INTERNAL_FS
 	// ⚠ The internal filesystem is far too small for a message store, which is
-	// why nothing ships on it. There is also an unverified claim that its erases
+	// why nothing ships on it. There's also an unverified claim that its erases
 	// stall the radio -- an interrupt hazard we have recorded but not measured.
 	// This env exists only to reach a round trip without a RAK15001.
 	g_filesystem = microStore::FileSystem{ microStore::Adapters::InternalFSFileSystem() };
@@ -685,7 +685,7 @@ static bool bringup_storage() {
 		return false;
 	}
 	// A full-but-valid filesystem never trips init()'s reformat-on-fail, so
-	// there is no way back from one except this. Build with
+	// there's no way back from one except this. Build with
 	// -DTHICKET_FORMAT_FS once, boot, then build without it.
 	//
 	// Earned the hard way on 2026-08-05: the ~28 KB internal filesystem filled
@@ -748,7 +748,7 @@ static bool bringup_storage() {
 
 // Step 2, identity, created once and loaded forever after.
 //
-// This is the half of the bring-up done-condition that a demo cannot fake: the
+// This is the half of the bring-up done-condition that a demo can't fake: the
 // hash the paired T-Deck sees must be the same after a power cycle. First boot
 // generates and writes; every later boot reads.
 static bool bringup_identity() {
@@ -756,7 +756,7 @@ static bool bringup_identity() {
 
 #ifdef THICKET_NO_PERSISTENCE
 	// No filesystem is registered, so file_exists would be answering about a
-	// store that is not there. Generate and keep it in RAM.
+	// store that's not there. Generate and keep it in RAM.
 	g_identity = RNS::Identity();
 	if (!g_identity) {
 		fail("key generation failed");
@@ -773,10 +773,10 @@ static bool bringup_identity() {
 			info("source", g_identity_source);
 			ok("identity restored across reboot");
 		} else {
-			// The file is there and unreadable. Do not silently mint a new
+			// The file is there and unreadable. Don't silently mint a new
 			// identity over the top: that would change the device's address
 			// without anyone noticing, which is exactly the failure a user
-			// cannot diagnose. Stop and say so.
+			// can't diagnose. Stop and say so.
 			fail("identity file present but unreadable - refusing to overwrite");
 			info("path", IDENTITY_PATH);
 			return false;
@@ -820,7 +820,7 @@ static bool bringup_radio() {
 	// MODE_GATEWAY, matching upstream's own example: this interface is a
 	// full participant, not a leaf or an access point.
 	// TODO(bring-up): revisit against the always-listening idle contract once
-	// there is a power measurement to argue with.
+	// there's a power measurement to argue with.
 	g_lora_interface.mode(RNS::Type::Interface::MODE_GATEWAY);
 	RNS::Transport::register_interface(g_lora_interface);
 
@@ -851,7 +851,7 @@ static bool bringup_reticulum() {
 	// people's traffic on battery. Relay (a separate product) is what carries
 	// transport_enabled(true).
 	//
-	// ⚠ This line is load-bearing in a way it does not look. Upstream
+	// ⚠ This line is load-bearing in a way it doesn't look. Upstream
 	// microReticulum initialises its path table, known-destinations and packet
 	// hashlist stores ONLY inside `if (Reticulum::transport_enabled())`
 	// (Transport.cpp:380). Against stock upstream, this correct setting makes
@@ -861,7 +861,7 @@ static bool bringup_reticulum() {
 	//
 	// We build against our fork's `thicket/integration`, which moves those store
 	// initialisations out of the gate. Do NOT re-point lib_deps at upstream
-	// without carrying that fix, and do not "simplify" this to
+	// without carrying that fix, and don't "simplify" this to
 	// transport_enabled(true) to make symptoms go away. That would turn a
 	// battery-powered handheld into a router.
 	g_reticulum.transport_enabled(false);
@@ -881,14 +881,14 @@ static bool bringup_reticulum() {
 //
 // Constructing the router is what creates and registers the
 // <identity>/lxmf/delivery destination, which is the address a Sideband peer
-// actually sends to. It is linked and live from here on: inbound messages will
-// reach the delivery callback below. Outbound composition is not wired.
+// actually sends to. It's linked and live from here on: inbound messages will
+// reach the delivery callback below. Outbound composition isn't wired.
 static bool bringup_lxmf() {
 	step(5, "LXMF router (microLXMF)");
 #ifdef THICKET_RAM_PROBE
 	// Straddle the router allocation. Whether its 34 KB lands in the TLSF pool
 	// or in the system heap decides which budget the message store competes
-	// with later, and the two have very different amounts left.
+	// with later, and the two have different amounts left.
 	info_u32("pool free BEFORE router (B)",
 	         (uint32_t)RNS::Utilities::Memory::heap_pool_free());
 	info_u32("heap in use BEFORE router (B)", (uint32_t)mallinfo().uordblks);
@@ -907,10 +907,10 @@ static bool bringup_lxmf() {
 	// Constructed here rather than earlier so a failure reports against the
 	// messaging step, which is what it belongs to.
 #ifdef THICKET_RAM_PROBE
-	// Straddle the allocation, because the obvious reasoning about it is wrong.
+	// Straddle the allocation, because the obvious reasoning about it's wrong.
 	// The store's index is a fixed array member rather than a heap container,
-	// which suggests it costs system heap and not the RNS pool. That is true of
-	// the INDEX. It is not true of the OBJECT: anything new'd goes wherever
+	// which suggests it costs system heap and not the RNS pool. That's true of
+	// the INDEX. It isn't true of the OBJECT: anything new'd goes wherever
 	// RNS_DEFAULT_ALLOCATOR points, which is the pool.
 	const uint32_t pool_before = (uint32_t)RNS::Utilities::Memory::heap_pool_free();
 	const uint32_t heap_before = (uint32_t)mallinfo().uordblks;
@@ -923,7 +923,7 @@ static bool bringup_lxmf() {
 	// the per-packet working memory it exists to serve.
 	//
 	// Static storage is what makes "the store does not cost pool" true. It was
-	// assumed to be true before it was measured, and it was not.
+	// assumed to be true before it was measured, and it wasn't.
 	static LXMF::MessageStore store_storage(LXMF_STORAGE_PATH);
 	g_store = &store_storage;
 #ifdef THICKET_RAM_PROBE
@@ -962,7 +962,7 @@ static bool bringup_lxmf() {
 	// Worth stating plainly, because the guarantee is narrower than
 	// "encrypted at rest" sounds. The identity itself is a plaintext file on
 	// the same flash, so whoever images the whole device reads it and derives
-	// these keys from it. What this buys is a message store that is useless on
+	// these keys from it. What this buys is a message store that's useless on
 	// its own, and crypto-erase: destroying the identity makes every stored
 	// message unreadable at once, with no wipe.
 	ok("message store encrypted (AES-256-CTR + HMAC, keyed from identity)");
@@ -979,11 +979,11 @@ static bool bringup_lxmf() {
 	// No archive filesystem is set, so the cull deletes rather than moves. That
 	// is deliberate: the device is allowed to forget silently rather than carry
 	// a patch to announce it. An archive tier would need a second filesystem
-	// this board does not have.
+	// this board doesn't have.
 	info("store archive", g_store->has_archive() ? "yes" : "none - cull deletes (ruled)");
 
 	// Prove the store can actually store, here, on this filesystem, before
-	// claiming it is attached.
+	// claiming it's attached.
 	//
 	// This exists because the device spent an afternoon reporting "message
 	// store attached" while every save failed. The internal-flash bring-up
@@ -995,10 +995,10 @@ static bool bringup_lxmf() {
 	// Deliberately NOT routed through LXMessage. Packing needs a real
 	// destination and can fail for reasons that have nothing to do with
 	// storage, which would make this probe report the wrong thing. What can
-	// fail silently is narrower and is exactly what is checked: the codec on
+	// fail silently is narrower and is exactly what's checked: the codec on
 	// this silicon, and whether this filesystem can hold one message-sized
-	// file. Static free-space arithmetic would not catch a codec bug, and a
-	// host codec test would not catch a full disk.
+	// file. Static free-space arithmetic wouldn't catch a codec bug, and a
+	// host codec test wouldn't catch a full disk.
 	{
 		// Sized like a real stored message: the JSON carries the packed
 		// message as hex, so a short "hi" still lands in the hundreds of bytes.
@@ -1011,7 +1011,7 @@ static bool bringup_lxmf() {
 		// directory that may not exist, and a probe that fails because it
 		// guessed wrong is worse than no probe. Root always exists,
 		// and the two things being tested (can this filesystem hold a
-		// message-sized file, does the codec survive this silicon) do not care
+		// message-sized file, does the codec survive this silicon) don't care
 		// which directory they happen in.
 		const char* probe_path = "/.thicket_selftest";
 		const char* why = nullptr;
@@ -1026,7 +1026,7 @@ static bool bringup_lxmf() {
 		else if (RNS::Utilities::OS::write_file(probe_path, sealed) != sealed.size()) {
 			// Deliberately does NOT claim the disk is full: a failed write to
 			// a missing directory looks identical here. Report only what is
-			// known -- the write did not complete -- and print the free space
+			// known -- the write didn't complete -- and print the free space
 			// beside it so the reader can draw their own conclusion.
 			why = "could not write a message-sized file (see free space below)";
 		}
@@ -1035,7 +1035,7 @@ static bool bringup_lxmf() {
 		}
 		else if (!encstore_decrypt(g_identity, read_back.data(),
 		                           read_back.size(), opened)) {
-			// The failure encryption introduces, and it is silent until a
+			// The failure encryption introduces, and it's silent until a
 			// reload: everything looks healthy right up to the first read.
 			why = "stored file failed authentication - decode path is broken";
 		}
@@ -1089,7 +1089,7 @@ static bool bringup_lxmf() {
 		Serial.println(message.signature_validated() ? "yes" : "NO - source identity not known yet");
 #ifdef THICKET_HAVE_STORE
 		// Save what arrived. Done here rather than deeper in the router
-		// because the router does not own a store -- this is the only place
+		// because the router doesn't own a store -- this is the only place
 		// an inbound message exists as an object we can persist.
 		store_message(message, true);
 		report_store("after inbound");
@@ -1101,7 +1101,7 @@ static bool bringup_lxmf() {
 		Serial.println("-----------------------------");
 
 		// Arm the reply. Deliberately does NOT send from inside this callback:
-		// we are being called from LXMRouter::process_inbound(), inside its
+		// we're being called from LXMRouter::process_inbound(), inside its
 		// try block, with the inbound queue head still live. handle_outbound()
 		// packs and can throw, and a throw here would be caught by the
 		// router's own handler and reported as a receive failure. Latch the
@@ -1116,14 +1116,14 @@ static bool bringup_lxmf() {
 			return;
 		}
 
-		// Someone we are actually corresponding with. Pin their path so an
-		// announce flood from strangers cannot evict it: the path table is
+		// Someone we're actually corresponding with. Pin their path so an
+		// announce flood from strangers can't evict it: the path table is
 		// bounded, and eviction is by age, which on a leaf node is a poor
 		// proxy for importance - a correspondent that announces rarely is
 		// more evictable than a stranger that announces constantly.
 		//
 		// Pinning is soft: the table still holds at its cap exactly, so this
-		// cannot grow memory and needs no failure path here. When the device
+		// can't grow memory and needs no failure path here. When the device
 		// grows a real contact list this call moves there; until then an
 		// inbound message is the only evidence of a conversation we have.
 #if RNS_PINNED_DESTINATIONS
@@ -1167,9 +1167,9 @@ static bool bringup_lxmf() {
 		Serial.println("      (no path to peer, or peer never announced - check both announce)");
 	});
 
-	// TODO(bring-up): no MessageStore is attached, and sending does not need one.
+	// TODO(bring-up): no MessageStore is attached, and sending doesn't need one.
 	// Verified against microLXMF at the pinned commit: LXMRouter never
-	// references MessageStore - it is application-owned - and handle_outbound()
+	// references MessageStore - it's application-owned - and handle_outbound()
 	// packs the message and copies it into the router's own fixed
 	// _pending_outbound_pool (16 slots). Construct, send, discard is the whole
 	// lifecycle; persistence of sent and received messages is a separate
@@ -1185,7 +1185,7 @@ static bool bringup_lxmf() {
 	// block when the cost is None, and microLXMF hard-codes packNil() for its
 	// own announced cost, so nothing on either side allocates LXStamper's
 	// 750 KiB workblock at the bring-up done-condition. If a peer ever demands a stamp
-	// this device cannot pay it; the fix is the streaming SHA-256 rewrite, not
+	// this device can't pay it; the fix is the streaming SHA-256 rewrite, not
 	// more heap.
 
 	info("delivery dest", g_router->delivery_destination().hash().toHex().c_str());
@@ -1207,7 +1207,7 @@ static void announce(const char* why) {
 //
 // Parsed and validated at boot rather than at first send, because a typo in a
 // -D reaching the radio as a mangled address is the kind of failure that looks
-// like broken RF. Bytes::assignHex() does not validate: it maps any character
+// like broken RF. Bytes::assignHex() doesn't validate: it maps any character
 // through arithmetic and produces garbage silently, so the check is ours.
 #ifdef THICKET_AUTOSEND_INTERVAL_S
 static void bringup_autosend() {
@@ -1289,7 +1289,7 @@ static void print_addresses() {
 //      disables both count eviction and the threshold compaction that reclaims
 //      expired records, so max_recs=0 and max_recs=100 should differ visibly.
 // Mirrors microStore BasicFileStore's IndexMap exactly: same key type, same
-// value, same allocator, and a hash that is not noexcept - which is what makes
+// value, same allocator, and a hash that's not noexcept - which is what makes
 // libstdc++ pick the hash-caching node. Reproducing the type rather than
 // driving a real store keeps the measurement independent of storage hardware,
 // which matters on a board with no external flash fitted.
@@ -1388,7 +1388,7 @@ static void probe_path_index() {
 #ifdef THICKET_RAM_PROBE
 // Turns the RAM budget from link-time arithmetic into measured fact.
 //
-// Three things here cannot be obtained any other way than on silicon:
+// Three things here can't be obtained any other way than on silicon:
 //   - newlib's mallinfo, which is the only honest answer to "how much of the
 //     .heap section is actually spent" once the TLSF pool and the LXMF router
 //     have been allocated out of it;
@@ -1418,7 +1418,7 @@ static void report_ram(const char* when) {
 	// Free words remaining at the shallowest point this task has ever reached.
 	// Multiply by 4 for bytes on this core.
 	// Name the task explicitly. Since the work moved off loop(), a stack figure
-	// with no task attached to it is ambiguous and easy to misread as the other
+	// with no task attached to it's ambiguous and easy to misread as the other
 	// one -- they differ by 4 KB of ceiling.
 	const uint32_t free_words = (uint32_t)uxTaskGetStackHighWaterMark(NULL);
 	info("stack reported for task", pcTaskGetName(NULL));
@@ -1515,7 +1515,7 @@ void setup() {
 	Serial.println();
 
 	// INFO is the right default here: TRACE is what upstream's examples use and
-	// it is both enormous and slow enough to change LoRa timing.
+	// it's both enormous and slow enough to change LoRa timing.
 	// TODO(bring-up): make this a build flag once bring-up is done.
 	// Raise with -DTHICKET_LOG_DEBUG when a link establishes and then nothing
 	// happens, which is the shape of an inbound DIRECT/Resource failure: at
@@ -1528,7 +1528,7 @@ void setup() {
 #endif
 
 	// Each step reports its own failure and we stop at the first one. A stack
-	// that is half up is worse than one that is plainly down, because it looks
+	// that's half up is worse than one that's plainly down, because it looks
 	// like a radio problem.
 	if (!bringup_storage())   { return; }
 	if (!bringup_identity())  { return; }
@@ -1577,11 +1577,11 @@ void setup() {
 static void thicket_work() {
 #ifdef THICKET_PATH_INDEX_PROBE
 	// Repeat the probe a few times after boot rather than once. A host that has
-	// just flashed the board cannot re-attach before bring-up finishes, so a
+	// just flashed the board can't re-attach before bring-up finishes, so a
 	// single boot-time run is unobservable in practice. Bounded at three runs
 	// because each one erases and rewrites the ring.
 	// On demand, from any serial input. A host that has just flashed the board
-	// cannot attach before bring-up finishes, and USB CDC discards writes made
+	// can't attach before bring-up finishes, and USB CDC discards writes made
 	// while no host is listening - so a boot-time or timer-driven run prints
 	// into a void and is never seen. Triggering on input is the only scheme
 	// that reliably produces output on an attached terminal.
@@ -1624,7 +1624,7 @@ static void thicket_work() {
 	}
 
 	// Drives Transport jobs and, through it, LoRaInterface::loop(), which polls
-	// the SX1262's RX_DONE IRQ. There is no ISR: receive latency is bounded by
+	// the SX1262's RX_DONE IRQ. There's no ISR: receive latency is bounded by
 	// how often this is called, so nothing in this loop may block.
 	g_reticulum.loop();
 
@@ -1639,7 +1639,7 @@ static void thicket_work() {
 	// nothing compiled in and nothing attached.
 	//
 	// Note what this sidesteps: sending to a peer we have NOT heard from still
-	// needs a way to pick a destination, and there is no way to enumerate known
+	// needs a way to pick a destination, and there's no way to enumerate known
 	// destinations - upstream is mid-migration to a microStore-backed path
 	// table with no enumeration API, so path_table() returns empty. Answering
 	// is possible because the source hash arrives with the message. Initiating
@@ -1654,7 +1654,7 @@ static void thicket_work() {
 #ifdef THICKET_RAM_PROBE
 		// Report here rather than on demand. This is the one moment the deep
 		// path has just run -- inbound decrypt, proof, compose, sign, pack --
-		// so it is the only stack figure worth having, and waiting for a serial
+		// so it's the only stack figure worth having, and waiting for a serial
 		// poke to ask for it has proved unreliable on this build.
 		report_ram("after inbound + auto-reply");
 #endif
@@ -1669,7 +1669,7 @@ static void thicket_work() {
 
 		// No inbound frame to attribute the signal figures to, so report the
 		// interface's most recent frame if it has ever seen one. On a silent
-		// channel these read "?" and that is the honest answer.
+		// channel these read "?" and that's the honest answer.
 		bool  sig  = (g_lora != nullptr) && g_lora->signal_valid();
 		float rssi = sig ? g_lora->last_rssi() : 0.0f;
 		float snr  = sig ? g_lora->last_snr()  : 0.0f;
@@ -1680,12 +1680,12 @@ static void thicket_work() {
 	}
 #endif
 
-	// TODO(bring-up): no sleep. The always-listening contract does not mean a busy
+	// TODO(bring-up): no sleep. The always-listening contract doesn't mean a busy
 	// loop; it means the receiver stays powered while the CPU idles. This spins
-	// the M4 at 64 MHz and will not meet any battery target.
+	// the M4 at 64 MHz and won't meet any battery target.
 }
 
-// Why this work does not run in loop().
+// Why this work doesn't run in loop().
 //
 // The Adafruit core runs loop() in a FreeRTOS task whose stack it fixes at
 // LOOP_STACK_SZ = 256*4 -- FreeRTOS counts words, so 4,096 bytes -- defined
@@ -1695,7 +1695,7 @@ static void thicket_work() {
 #ifdef THICKET_POOL_SOAK
 // Periodic pool sample, printed as CSV for scripts/pool-soak-analyse.py.
 //
-// The host soak (test_interop/pool_soak) cannot deliver a message to itself,
+// The host soak (test_interop/pool_soak) can't deliver a message to itself,
 // so it never exercises the inbound decrypt path -- which is the path the
 // board's worst fragmentation reading came from. This is that measurement,
 // taken where it counts, while a real peer sends real traffic.
@@ -1733,7 +1733,7 @@ static void pool_soak_sample() {
 }
 #endif
 
-// 4 KB is not enough for what this loop does. Measured on the board, the loop
+// 4 KB isn't enough for what this loop does. Measured on the board, the loop
 // task had been 2,280 B deep with 1,816 B spare, but that only covers paths that
 // had actually run, and the device had done nothing but announce and idle.
 // -fstack-usage on the linked image shows single frames on the INBOUND MESSAGE
@@ -1741,7 +1741,7 @@ static void pool_soak_sample() {
 // RNS::doLog(va_list) 1,032 B, handle_direct_proof 1,040 B,
 // static_proof_callback 1,088 B. on_packet plus doLog alone is 2,088 B of 4,096,
 // before any Transport, Fernet or msgpack frame in between. Receiving a message,
-// proving it and logging about it is the ordinary job of this device.
+// proving it and logging about it's the ordinary job of this device.
 //
 // A stack overflow here is a hard fault at a random address with no diagnostic.
 // It would present as "the board locks up when people message it", which is the
@@ -1795,7 +1795,7 @@ static void thicket_task(void* arg) {
 		ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(THICKET_TASK_TICK_MS));
 #else
 		// Yield to anything of equal or lower priority. Nothing here may block:
-		// there is no RX ISR, so receive latency is bounded by how often
+		// there's no RX ISR, so receive latency is bounded by how often
 		// Transport::loop() is called.
 		taskYIELD();
 #endif
@@ -1805,7 +1805,7 @@ static void thicket_task(void* arg) {
 void loop() {
 	// Deliberately empty of work. The core's loop task keeps its 4 KB stack and
 	// this must stay shallow. Sleeping here yields the CPU to the task above
-	// rather than spinning; it is not a power strategy, and the TODO about
+	// rather than spinning; it isn't a power strategy, and the TODO about
 	// actually idling the Cortex-M4 still stands in thicket_work().
 	delay(1000);
 }

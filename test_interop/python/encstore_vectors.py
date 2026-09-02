@@ -5,10 +5,10 @@
 # Scenario 7, Python half: READ WHAT THE C++ SIDE WROTE.
 #
 # The C++ half proves we can decrypt a file upstream's device produced. That is
-# the stronger direction, but it is only one direction. It says nothing about
-# our WRITE path, because we did not write that file -- and our own reader would
+# the stronger direction, but it's only one direction. It says nothing about
+# our WRITE path, because we didn't write that file -- and our own reader would
 # happily accept our own writer's output even if the two agreed on something
-# wrong. A round trip cannot detect a shared mistake; that is the whole reason
+# wrong. A round trip can't detect a shared mistake; that's the whole reason
 # this scenario exists rather than a unit test.
 #
 # So this half re-implements the on-disk format from the specification, in a
@@ -125,7 +125,7 @@ def wait_for(path: str, timeout: float) -> bool:
     deadline = time.time() + timeout
     while time.time() < deadline:
         # Wait for the size to settle as well as the file to exist, so a
-        # partially-flushed write is not read as corruption.
+        # partially-flushed write isn't read as corruption.
         if os.path.exists(path) and os.path.getsize(path) > FILE_OVERHEAD:
             return True
         time.sleep(0.1)

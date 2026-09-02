@@ -8,7 +8,7 @@
 #   14280 <---------------> 14281 | 14283 <---------------> 14282
 #            segment A                       segment B
 #
-# The two Python peers share no interface and cannot hear each other. A payload
+# The two Python peers share no interface and can't hear each other. A payload
 # arriving at the far end is therefore proof that the C++ node forwarded it, and
 # the hop count is proof of how: RNS counts a hop on ingress at every node, so a
 # packet that really crossed the router arrives counted twice.

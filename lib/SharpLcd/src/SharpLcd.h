@@ -13,7 +13,7 @@
 //     cell takes a DC bias.
 //
 // The panel is write-only, so the framebuffer is the only copy of the screen.
-// The caller supplies it; at 12,000 bytes it is the largest single RAM
+// The caller supplies it; at 12,000 bytes it's the largest single RAM
 // allocation in the device.
 
 #pragma once
@@ -29,7 +29,7 @@ static const uint16_t LCD_HEIGHT     = 240;
 static const uint16_t LCD_LINE_BYTES = LCD_WIDTH / 8;                         // 50
 static const uint32_t LCD_FB_BYTES   = (uint32_t)LCD_LINE_BYTES * LCD_HEIGHT; // 12000
 
-// Mode bits, 6-5-1..6-5-4. M0 is sent first, so it is bit 7 on an MSB-first bus.
+// Mode bits, 6-5-1..6-5-4. M0 is sent first, so it's bit 7 on an MSB-first bus.
 static const uint8_t LCD_M0_WRITE = 0x80;  // data update
 static const uint8_t LCD_M1_VCOM  = 0x40;  // frame inversion (EXTMODE low)
 static const uint8_t LCD_M2_CLEAR = 0x20;  // all clear, writes white

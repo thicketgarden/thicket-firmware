@@ -22,10 +22,10 @@ Two modes:
              and the committed ciphertext decrypts.
 
 The split matters. The deterministic vectors can be regenerated and diffed, so
-a moved pin shows up immediately. The ciphertext cannot: RNS's Identity.encrypt
+a moved pin shows up immediately. The ciphertext can't: RNS's Identity.encrypt
 draws an ephemeral X25519 key from the `cryptography` backend's RNG, which is
 not seedable from here, so a regenerated ciphertext would differ every run for
-reasons that mean nothing. It is therefore pinned once and checked for validity
+reasons that mean nothing. It's therefore pinned once and checked for validity
 rather than for equality -- which is the stronger check anyway.
 """
 
@@ -85,7 +85,7 @@ def deterministic_vectors():
         # packet actually uses (Identity.get_context() returns nothing on both
         # sides); the other two exist to find out whether the parameters that
         # are never exercised in production behave like the reference. One of
-        # them does not -- see identity_vectors/src/main.cpp.
+        # them doesn't -- see identity_vectors/src/main.cpp.
         "HKDF_OUTPUT": HKDF.hkdf(length=HKDF_LENGTH, derive_from=HKDF_SECRET,
                                  salt=HKDF_SALT, context=HKDF_CONTEXT).hex(),
         "HKDF_OUTPUT_NOCTX": HKDF.hkdf(length=HKDF_LENGTH,

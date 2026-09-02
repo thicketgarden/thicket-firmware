@@ -7,7 +7,7 @@
 # Two halves that check different things, and both must pass:
 #   C++    asserts microReticulum's Identity against fixed reference outputs.
 #   Python re-derives those same outputs under the RNS actually installed and
-#          diffs them, so the committed constants cannot rot when a pin moves.
+#          diffs them, so the committed constants can't rot when a pin moves.
 #
 #   PATH="/tmp/rnsvenv/bin:$PATH" bash test_interop/run_identity_vectors.sh
 #

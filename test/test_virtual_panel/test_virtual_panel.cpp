@@ -37,7 +37,7 @@ void test_every_pixel_round_trips(void) {
 	VirtualPanel panel;
 	SharpLcd lcd(panel, fb);
 	lcd.fill_white();
-	// A pattern that is asymmetric in x and y, so a transposed or reversed
+	// A pattern that's asymmetric in x and y, so a transposed or reversed
 	// address shows up rather than cancelling out.
 	for (uint16_t y = 0; y < LCD_HEIGHT; ++y)
 		for (uint16_t x = 0; x < LCD_WIDTH; ++x)

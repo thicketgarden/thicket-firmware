@@ -25,8 +25,8 @@ SCENARIO="two-node"
 CPP_PROJECT="$HERE/two_node"
 
 # Two C++ processes rather than one C++ and one Python -- see driver.sh. The
-# receiver comes up first because it is the one that announces; the originator
-# cannot do anything until it has heard that.
+# receiver comes up first because it's the one that announces; the originator
+# can't do anything until it has heard that.
 export PEER_CPP_ROLE="receiver"
 export CPP_ROLE="originator"
 

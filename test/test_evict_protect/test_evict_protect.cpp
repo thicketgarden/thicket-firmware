@@ -5,7 +5,7 @@
 // when none are left does eviction fall through to the oldest protected one.
 //
 // This is what keeps a contact's path alive under an announce flood from
-// strangers. It is load bearing rather than a nicety, because microStore
+// strangers. It's load bearing rather than a nicety, because microStore
 // timestamps have one-second granularity: inside a single second every stamp
 // ties and recency ordering degrades to hash-map order, so nothing else is
 // keeping that path in the table.

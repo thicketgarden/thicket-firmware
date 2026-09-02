@@ -7,7 +7,7 @@ Python originator for the COLD INBOUND and MULTI-HOP INBOUND interop scenarios.
 One script serves both because the difference between them is topology, not
 behaviour: with --relay it spawns a transport-enabled RNS node (multihop_relay)
 and binds the socket one segment further out, so the C++ leaf's own config is
-untouched and it cannot tell it is no longer being addressed directly. The leaf
+untouched and it can't tell it's no longer being addressed directly. The leaf
 then has to handle a path learned through a relay and a packet that arrived
 with a non-zero hop count. See run_multihop_inbound.sh for the topology
 diagram.
@@ -15,8 +15,8 @@ diagram.
 This is the half of the scenario that makes it cold. It:
 
   1. Brings up RNS on a loopback UDP interface.
-  2. **Never announces.** The C++ peer therefore cannot learn this side's
-     identity and cannot have transmitted to it. That is the whole point:
+  2. **Never announces.** The C++ peer therefore can't learn this side's
+     identity and can't have transmitted to it. That's the whole point:
      every existing microReticulum scenario has the C++ side speak first.
   3. Learns the C++ destination from the C++ side's announce.
   4. Originates a single encrypted DATA packet to it, at exactly
@@ -32,11 +32,11 @@ This is the half of the scenario that makes it cold. It:
         actually recovered the plaintext can produce the digest, so that is
         the assertion that the cold decrypt really happened; the trailing hop
         byte is what pins the topology, so a run that was supposed to be
-        relayed cannot pass by arriving directly.
+        relayed can't pass by arriving directly.
 
 Exit codes:
   0  packet sent AND proof validated AND plaintext digest confirmed
-  1  proof failed, or the digest never appeared / did not match
+  1  proof failed, or the digest never appeared / didn't match
   2  timeout waiting for the C++ announce
   3  setup error
 """
@@ -64,13 +64,13 @@ def _kill_relay(proc):
 
 
 def _install_relay_reaper(proc):
-    """atexit alone is not enough here.
+    """atexit alone isn't enough here.
 
     The driver ends every scenario by SIGTERM-ing this process, and Python's
     default SIGTERM disposition exits without running atexit handlers. That
     would orphan the relay still bound to the loopback ports, and the next
     scenario in run_all.sh would fail for a reason that has nothing to do with
-    what it is testing. Convert the signal into a normal exit so the handler
+    what it's testing. Convert the signal into a normal exit so the handler
     registered above actually runs.
     """
     atexit.register(_kill_relay, proc)
@@ -160,7 +160,7 @@ class _AnnounceHandler:
               flush=True)
         # Separate the two failure modes, because they mean opposite things:
         # a wrong digest is a crypto/parity bug, a wrong hop count means the
-        # packet did not travel the path this scenario claims to be testing.
+        # packet didn't travel the path this scenario claims to be testing.
         if not match and len(app_data) == len(state["expected_ack"]) == 17:
             if app_data[:16] == state["expected_ack"][:16]:
                 state["hops_wrong"] = (app_data[16], state["expected_ack"][16])
@@ -219,9 +219,9 @@ def main():
     ap.add_argument("--port", type=int, default=14262)
     ap.add_argument("--forward-port", type=int, default=14263)
     ap.add_argument("--timeout", type=float, default=40.0)
-    # MULTI-HOP mode. The C++ leaf's own config is untouched: the relay simply
+    # MULTI-HOP mode. The C++ leaf's own config is untouched: the relay
     # takes over the socket this script would otherwise have bound, so the leaf
-    # cannot tell it is no longer talking to the originator directly -- which
+    # can't tell it's no longer talking to the originator directly -- which
     # is the property being tested.
     ap.add_argument("--relay", action="store_true",
                     help="insert a transport-enabled Python relay between this "
@@ -231,9 +231,9 @@ def main():
     ap.add_argument("--expect-hops", type=int, default=None,
                     help="hop count the C++ side must report (default: 1 "
                          "direct, 2 relayed)")
-    # A test that has never been seen to fail is not evidence. These
+    # A test that has never been seen to fail isn't evidence. These
     # switches make the failure re-runnable by anyone, at any time, instead of
-    # living in a report someone has to trust. They are opt-in and default off.
+    # living in a report someone has to trust. They're opt-in and default off.
     #   payload   -- flip one byte of the payload on the wire; the C++ side
     #                must notice and refuse to ack.
     #   coldness  -- announce from this side, which is exactly the condition
@@ -341,9 +341,9 @@ def main():
     last_breaker_announce = 0.0
 
     while time.time() - start < args.timeout:
-        # A single announce at startup is not enough to exercise the guard:
-        # this side comes up first, so the C++ receiver is not yet listening.
-        # A peer whose presence would really warm this scenario up announces
+        # A single announce at startup isn't enough to exercise the guard:
+        # this side comes up first, so the C++ receiver isn't yet listening.
+        # A peer whose presence would warm this scenario up announces
         # repeatedly, so the break does too.
         if breaker is not None and time.time() - last_breaker_announce >= 2.0:
             breaker.announce()

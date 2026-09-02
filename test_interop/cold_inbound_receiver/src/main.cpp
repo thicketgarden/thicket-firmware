@@ -7,7 +7,7 @@
 // -------------------
 // Every microReticulum interop scenario has the C++ side speak first: it
 // announces, hears Python's announce, and transmits. Python only ever
-// answers. Nothing tested a Python peer originating to a device that has not
+// answers. Nothing tested a Python peer originating to a device that hasn't
 // just transmitted to it -- which is what a handheld does all day.
 //
 // This binary is therefore a pure receiver. It:
@@ -23,8 +23,8 @@
 //      independently rather than taking our word for it.
 //
 // Coldness is structural, not a comment: the Python side of this scenario
-// does not announce at all, so this process cannot learn its identity and
-// cannot address it. As a guard against the scenario silently decaying into
+// doesn't announce at all, so this process can't learn its identity and
+// can't address it. As a guard against the scenario silently decaying into
 // the warm case, we count foreign announces and fail if any arrives before
 // the packet does -- if Python ever starts announcing, this test stops
 // claiming to be cold.
@@ -92,7 +92,7 @@ static bool bytes_equal(const RNS::Bytes& a, const RNS::Bytes& b) {
 // emits, so this keeps the scenario cold while giving the reference
 // implementation something checkable.
 // The 17th byte is the hop count the packet carried when it reached us, and
-// it is what lets one binary serve both the direct and the relayed topology.
+// it's what lets one binary serve both the direct and the relayed topology.
 // Transport::inbound increments hops before dispatch (Transport.cpp), so a
 // directly-received packet reports 1 and each transport node adds one more.
 // The Python side pins the exact value it expects for its topology, so a
@@ -142,7 +142,7 @@ public:
 	                       const RNS::Bytes& app_data) override {
 		(void)announced_identity;
 		(void)app_data;
-		// Our own announce echoed back by the loopback path is not foreign.
+		// Our own announce echoed back by the loopback path isn't foreign.
 		if (destination_hash == local_destination.hash()) return;
 		foreign_announces++;
 		printf("[cpp] UNEXPECTED foreign announce from %s -- this scenario is "
@@ -175,7 +175,7 @@ int main() {
 	                                     APP_NAME, ASPECT);
 	local_destination.set_packet_callback(on_local_packet);
 	// PROVE_ALL: the proof we emit is the only thing we transmit besides
-	// announces, and it is what lets the Python side independently confirm
+	// announces, and it's what lets the Python side independently confirm
 	// delivery by validating our signature.
 	local_destination.set_proof_strategy(RNS::Type::Destination::PROVE_ALL);
 
@@ -254,8 +254,8 @@ int main() {
 	// the pool allocator and the device's own pool size, this answers "is
 	// 65536 the right number" from the wrong word size but in the safe
 	// direction: every pointer and size_t here is twice its width on the
-	// nRF52840, so a peak that fits at 64-bit cannot fail to fit at 32-bit.
-	// It is an upper bound, not the figure -- the real one needs the board.
+	// nRF52840, so a peak that fits at 64-bit can't fail to fit at 32-bit.
+	// It's an upper bound, not the figure -- the real one needs the board.
 	{
 		const size_t pool = RNS::Utilities::Memory::heap_pool_size();
 		const size_t freen = RNS::Utilities::Memory::heap_pool_free();

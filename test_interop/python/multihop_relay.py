@@ -4,7 +4,7 @@
 """
 Transport relay for the MULTI-HOP INBOUND interop scenario.
 
-This process is deliberately dumb. It is a stock Python RNS node with
+This process is deliberately dumb. It's a stock Python RNS node with
 `enable_transport = Yes` and two point-to-point UDP interfaces, one facing the
 C++ leaf and one facing the Python originator. It never announces, never
 originates, and holds no destination of its own -- it exists only to force

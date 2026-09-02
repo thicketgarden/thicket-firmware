@@ -9,11 +9,11 @@
 // version we pin.
 //
 // The Reticulum community's rules for LLM-assisted projects name this exact
-// bar: a port that cannot work with a script from the Examples folder is not
+// bar: a port that can't work with a script from the Examples folder isn't
 // compatible, whatever its README claims.
 //
 // Shape: Echo.py runs as the server. It announces
-// `example_utilities.echo.request` & sets PROVE_ALL on it. We are the client:
+// `example_utilities.echo.request` & sets PROVE_ALL on it. We're the client:
 // we learn the destination from its announce, send a payload, & require a
 // validated delivery proof.
 //
@@ -23,7 +23,7 @@
 // & nothing else. An earlier version of this scenario waited for a data reply
 // that the reference never sends, and failed against correct behaviour.
 //
-// What the proof establishes is not weak. The destination is SINGLE, so our
+// What the proof establishes isn't weak. The destination is SINGLE, so our
 // packet was encrypted to Echo.py's identity: it had to derive the shared key,
 // decrypt the payload, & return a signed proof that our stack then validated
 // against the identity we learned from its announce. Both directions of the
@@ -36,7 +36,7 @@
 // crosses. Verified so far: Echo.py binds 127.0.0.1:14286 & announces every
 // 5 s; this client binds 127.0.0.1:14287; the aspects match Echo.py's own
 // ("example_utilities" + "echo" + "request"); the Python config uses
-// `interface_enabled`, which the working scenarios require. What has not been
+// `interface_enabled`, which the working scenarios require. What hasn't been
 // checked is whether RNS's UDPInterface & our UDPInterface2 agree on framing,
 // which is the remaining suspect. Not wired into run_all.sh until it passes.
 
@@ -64,7 +64,7 @@ namespace {
 const char* APP_NAME = "example_utilities";
 const char* ASPECT   = "echo.request";
 
-// What we send. The content is not echoed back, so its only job is to be a
+// What we send. The content isn't echoed back, so its only job is to be a
 // realistic payload for Echo.py to decrypt.
 const char* PAYLOAD = "thicket echo probe";
 

@@ -19,7 +19,7 @@ and every correction below is a passing test in `test/test_micron/`.
 | `` `{ `` | in-page partial. **Not implemented** |
 
 **Heading sanitisation:** a `>` line containing a field (`` `< ``) loses its
-heading status, because a heading style cannot wrap an editable widget.
+heading status, because a heading style can't wrap an editable widget.
 
 ## Inline, after a backtick
 
@@ -32,7 +32,7 @@ heading status, because a heading style cannot wrap an editable widget.
 | `f` / `b` | foreground / background back to default |
 | `c` `l` `r` `a` | centre, left, right, default alignment |
 | `:name` | zero-width **anchor** for in-document links |
-| `` [label`target] `` | link; with no backtick the whole body is both label and target |
+| `` [label`target] `` | link; with no backtick the whole body is both label & target |
 | `<flags\|name`value>` | field. Flags: `^` radio, `?` checkbox, `!` masked, digits set width (default 24) |
 
 ## The five things the summary got wrong
@@ -51,7 +51,7 @@ Recorded because they are the reason this file exists, not as trivia.
 - **Malformed markup drops the marker and keeps the words.** An unterminated
   link or field emits its text rather than swallowing it. A page with a typo
   should lose its formatting, never its content.
-- **Unknown commands are consumed**, so a stray backtick does not leak.
+- **Unknown commands are consumed**, so a stray backtick doesn't leak.
 - **Colour is reported, never resolved.** The parser hands the renderer what
   the page asked for. Deciding what `` `F00f `` means on a two-ink panel is the
   renderer's problem, and on a two-ink panel it is still an open design

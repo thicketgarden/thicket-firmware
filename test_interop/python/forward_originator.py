@@ -9,14 +9,14 @@ is the router rather than the leaf.
     14280 <-----------> 14281 | 14283 <-----------> 14282
              segment A                  segment B
 
-The two Python peers share no interface and cannot reach each other directly.
+The two Python peers share no interface and can't reach each other directly.
 So a payload arriving at the far end is proof the C++ node forwarded it, and
 the hop count is proof of how.
 
 This process spawns the far end as a child, which keeps the interop driver's
 one-Python-one-C++ contract while still putting two independent RNS instances
 on opposite sides of the node under test. Its own exit code folds in the
-child's: the far end holds the assertions that matter, because a router cannot
+child's: the far end holds the assertions that matter, because a router can't
 credibly certify its own delivery.
 
 Exit codes:
@@ -139,7 +139,7 @@ def main():
 
     # Wait for the far end to write its identity. Addressing it from a file
     # rather than from an announce keeps this scenario about the DATA path: a
-    # failure then cannot be confused with a lost announce.
+    # failure then can't be confused with a lost announce.
     deadline = time.time() + 20
     while time.time() < deadline and not os.path.exists(idfile):
         if far.poll() is not None:
@@ -174,7 +174,7 @@ def main():
           f"sha256={hashlib.sha256(payload).hexdigest()}", flush=True)
 
     # Give the router time to hear the far end's announce and build a path.
-    # Without a path it cannot forward, and the failure would look like a
+    # Without a path it can't forward, and the failure would look like a
     # forwarding bug rather than a timing one.
     sent = False
     start = time.time()

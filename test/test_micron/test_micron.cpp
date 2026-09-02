@@ -124,7 +124,7 @@ void test_background_and_reset(void) {
 }
 
 void test_malformed_colour_is_dropped_not_printed(void) {
-    // "zz" is not hex; the command is consumed and no colour applied.
+    // "zz" isn't hex; the command is consumed and no colour applied.
     TEST_ASSERT_EQUAL_STRING("TEXT[zzq] EOL", run("`Fzzq").c_str());
 }
 

@@ -144,7 +144,7 @@ def report(sizes, sections, title, top_objects):
     for (section, obj), size in sizes.items():
         # Sections arrive as -ffunction-sections subsections
         # (".text._ZN3RNS9Transport...", ".ARM.extab.text._ZN..."), so match on
-        # prefix. Longest prefix first so .ARM.extab is not eaten by .ARM.exidx.
+        # prefix. Longest prefix first so .ARM.extab isn't eaten by .ARM.exidx.
         if not any(section == s or section.startswith(s + ".")
                    for s in sections):
             continue

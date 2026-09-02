@@ -11,17 +11,17 @@
 // WHY THIS SHAPE
 //
 // This is a SAX-style parser: you feed it a line, it calls back with styled
-// spans. It builds no document tree and allocates nothing per element.
+// spans. It builds no document tree & allocates nothing per element.
 //
-// That is not a stylistic preference, it is the constraint. Our own estimate
-// budgets roughly 113-146 KB of SRAM for everything the display and page
+// That's not a stylistic preference, it's the constraint. Our own estimate
+// budgets roughly 113-146 KB of SRAM for everything the display & page
 // browsing layer adds, against 256 KB total. The nearest comparable
 // renderer (reticulous/nomad's Micron->LVGL) caps itself at 600 retained LVGL
 // objects and still requires 8 MB of PSRAM, because it holds an object tree
-// per page. We cannot, so we do not: parse and draw straight into the
+// per page. We can't, so we don't: parse & draw straight into the
 // framebuffer, keep the source bytes and a scroll offset, re-render on change.
 // A Sharp memory LCD holds its own image with the CPU asleep, so the panel IS
-// the retained model and re-rendering is rare.
+// the retained model & re-rendering is rare.
 //
 // GRAMMAR OF RECORD
 //
@@ -32,7 +32,7 @@
 // reset, not the literal toggle; tables exist; and the `FT/`BT true-colour
 // forms exist. See MICRON.md for the full delta.
 //
-// NOT YET IMPLEMENTED, deliberately, each a no-op that does not corrupt the
+// NOT YET IMPLEMENTED, deliberately, each a no-op that doesn't corrupt the
 // rest of the line:  `t tables  ·  `{ partials
 // ---------------------------------------------------------------------------
 
@@ -133,7 +133,7 @@ public:
     void parseLine(const char* line, size_t len, Renderer& out);
 
     // Reset to document-start state. Call between pages --- style, section
-    // depth and literal mode all persist across lines by design.
+    // depth & literal mode all persist across lines by design.
     void reset() { _style = Style{}; }
 
     const Style& style() const { return _style; }

@@ -71,7 +71,7 @@ UDPInterface2::UDPInterface2(const char* name, int local_port, int remote_port,
 		_local_host = local_host;
 	}
 	// _local_port / _remote_port already initialised from
-	// DEFAULT_UDP_LOCAL_PORT / DEFAULT_UDP_REMOTE_PORT, see UDPInterface2.h.
+	// DEFAULT_UDP_LOCAL_PORT / DEFAULT_UDP_REMOTE_PORT: see UDPInterface2.h.
 	TRACEF("UDPInterface2: local host: %s", _local_host.c_str());
 	TRACEF("UDPInterface2: local port: %d", _local_port);
 	TRACEF("UDPInterface2: remote host: %s", _remote_host.c_str());
@@ -230,7 +230,7 @@ UDPInterface2::UDPInterface2(const char* name, int local_port, int remote_port,
 		// ioctl(FIONREAD)+read pattern returned a stale/zero `available`
 		// count on macOS for a UDP socket carrying back-to-back datagrams,
 		// which caused larger packets (~470B resource parts) to appear
-		// "lost", they'd sit in the kernel queue while smaller follow-up
+		// "lost" — they'd sit in the kernel queue while smaller follow-up
 		// packets were drained instead. recvfrom() with MSG_DONTWAIT reads
 		// exactly one datagram per call, sized to fit any link-layer MTU,
 		// and lets us loop until the queue is empty.

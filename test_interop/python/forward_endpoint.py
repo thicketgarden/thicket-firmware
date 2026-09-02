@@ -5,17 +5,17 @@
 The far end of the TRANSPORT FORWARDING scenario.
 
 It sits on the other side of our C++ router from the originator, on a UDP
-segment the originator is not a member of. It announces, waits, and reports,
+segment the originator isn't a member of. It announces, waits, and reports,
 verbatim, on stdout, what it receives and at what hop count.
 
-It is a separate process because the two Python peers must not share an
+It's a separate process because the two Python peers must not share an
 interface: if they did, they could reach each other directly and the scenario
 would pass without our router doing anything. The originator spawns this one,
 so the interop driver still sees one Python process and one C++ process.
 
 Exit codes:
   0  received the expected payload at the expected hop count
-  1  received something wrong, or the hop count says it did not cross the router
+  1  received something wrong, or the hop count says it didn't cross the router
   2  received nothing
   3  setup error
 """
@@ -41,7 +41,7 @@ state = {"got": None, "hops": None}
 
 def write_config(config_dir, port, forward_port):
     # enable_transport = No: this is an endpoint, not a second router. If it
-    # routed too, a delivery would not prove our node did anything.
+    # routed too, a delivery wouldn't prove our node did anything.
     cfg = f"""
 [reticulum]
   enable_transport = No
@@ -102,7 +102,7 @@ def main():
     dest.set_proof_strategy(RNS.Destination.PROVE_ALL)
 
     # Hand our identity to the originator on disk rather than over the air.
-    # Learning it from an announce would work, but then a failure could not be
+    # Learning it from an announce would work, but then a failure couldn't be
     # told apart from "the announce did not arrive", and this scenario is about
     # the DATA path.
     identity.to_file(args.identity_file)
@@ -110,7 +110,7 @@ def main():
     print(f"[far] destination {dest.hash.hex()}", flush=True)
 
     # Announce anyway: the router needs a path to us, and this is how it gets
-    # one. It is also what the C++ side counts.
+    # one. It's also what the C++ side counts.
     dest.announce()
     print("[far] announced", flush=True)
 

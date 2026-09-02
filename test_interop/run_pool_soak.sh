@@ -22,7 +22,7 @@ CPP_PROJECT="$HERE/pool_soak"
 CPP_BIN="$CPP_PROJECT/.pio/build/native17/program"
 CSV="${CSV:-${TMPDIR:-/tmp}/thicket-pool-soak.csv}"
 
-# A plateau is not "perfectly flat" -- allocators breathe. These bound what
+# A plateau isn't "perfectly flat" -- allocators breathe. These bound what
 # counts as flat: the second half of the run must not use materially more than
 # the first, and fragmentation must not trend upward across it.
 MAX_USED_GROWTH_PCT="${MAX_USED_GROWTH_PCT:-5}"

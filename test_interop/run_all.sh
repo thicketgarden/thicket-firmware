@@ -22,11 +22,11 @@ SCENARIOS=(
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
   "wire-oracle|wire_oracle|run_wire_oracle.sh"
   # Upstream's own Examples/Echo.py, unmodified. Every other scenario talks to
-  # a script we wrote, which cannot catch a misreading of the protocol we share.
+  # a script we wrote, which can't catch a misreading of the protocol we share.
   "examples-echo|examples_echo|run_examples_echo.sh"
   "pool-soak|pool_soak|run_pool_soak.sh"
   "link-inbound|link_inbound_responder|run_link_inbound.sh"
-  # The only scenario where we are the router rather than the leaf. Slowest of
+  # The only scenario where we're the router rather than the leaf. Slowest of
   # the six: three processes, and a path has to be learned before anything can
   # be sent.
   "transport-forward|transport_forwarder|run_transport_forward.sh"
@@ -65,7 +65,7 @@ done
 echo
 # The versions the result is about. A pin bump invalidates the interop claim
 # until the suite is re-run AND the version it passed against is recorded -- and until 2026-08-04 nothing recorded it, so a green run was a
-# claim about unnamed code. Printing it here means the record cannot be
+# claim about unnamed code. Printing it here means the record can't be
 # forgotten separately from the run.
 pin_of() { grep -oE "$1\.git#[a-f0-9]{40}" "$HERE/../platformio.ini" | head -1 | cut -d'#' -f2; }
 RNS_VER=$(python3 -c 'import RNS; print(RNS.__version__)' 2>/dev/null || echo "unknown")

@@ -11,14 +11,14 @@
 #
 # It exists because `arm-none-eabi-size` is actively misleading on this target:
 # it reports the linker's .heap section inside `bss`, so a build with 22 KB of
-# real static RAM reads as 232 KB and looks like it is about to overflow a
+# real static RAM reads as 232 KB and looks like it's about to overflow a
 # 237 KB part. The section table tells the truth and this script reads that.
 #
 # The distinction that matters on nRF52840:
 #
 #   .data + .bss   RAM the image actually consumes before main() runs.
 #   .heap          NOT consumption. The linker sizes it to fill whatever is
-#                  left, so it is the BUDGET malloc draws from, and it grows
+#                  left, so it's the BUDGET malloc draws from, and it grows
 #                  when static RAM shrinks. Reporting it as "used" hides the
 #                  only number that matters, which is what remains inside it.
 #
@@ -96,7 +96,7 @@ def main():
     region = SRAM_TOP - ram_origin
     static = data_sz + bss_sz
     # Whatever the linker left above the heap is the main stack. On this BSP
-    # that is the ISR/startup stack; FreeRTOS task stacks are allocated out of
+    # that's the ISR/startup stack; FreeRTOS task stacks are allocated out of
     # .bss or the heap and are counted there instead.
     stack = SRAM_TOP - (heap_addr + heap_sz) if heap_sz else 0
 

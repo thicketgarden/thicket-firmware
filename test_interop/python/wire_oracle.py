@@ -15,15 +15,15 @@
 # Two distinct things are checked per case, and they fail differently:
 #
 #   1. The reference reads back the same field values we packed. A mismatch
-#      means our encoding places a field where the reference does not look for
-#      it, or does not write it at all.
+#      means our encoding places a field where the reference doesn't look for
+#      it, or doesn't write it at all.
 #   2. The numeric constant we used equals the reference's constant of the same
 #      name. A mismatch here means the two implementations have drifted apart
-#      on what a name means -- our DATA is not the reference's DATA -- which
+#      on what a name means -- our DATA isn't the reference's DATA -- which
 #      would still round-trip perfectly between two of our own nodes.
 #
 # The second check is the reason this file exists. An end-to-end scenario
-# cannot see it: both ends agree with each other and disagree with everyone.
+# can't see it: both ends agree with each other and disagree with everyone.
 #
 # Usage: wire_oracle.py REPORT.json
 
@@ -95,8 +95,8 @@ def check(case):
             f"transport_id: we packed none, the reference read "
             f"{packet.transport_id.hex()}")
 
-    # Only meaningful where the payload is not encrypted; the emitter leaves
-    # data_hex empty for cases whose body the reference cannot read.
+    # Only meaningful where the payload isn't encrypted; the emitter leaves
+    # data_hex empty for cases whose body the reference can't read.
     if case["data_hex"]:
         got = packet.data.hex()
         if case["data_hex"] != got:

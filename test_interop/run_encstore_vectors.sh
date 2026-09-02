@@ -12,8 +12,8 @@
 #          crypto library, and opens a file the C++ side just wrote. Proves
 #          something other than us can read what we WRITE.
 #
-# The second half is not redundant. Our reader would accept our writer's output
-# even if both were wrong the same way -- a round trip cannot detect a shared
+# The second half isn't redundant. Our reader would accept our writer's output
+# even if both were wrong the same way -- a round trip can't detect a shared
 # mistake, which is the whole reason this is an interop scenario and not a unit
 # test.
 #

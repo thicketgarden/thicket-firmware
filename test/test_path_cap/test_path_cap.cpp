@@ -6,10 +6,10 @@
 // threshold-triggered compaction that reclaims expired records are gated on
 // policy_max_recs > 0. microReticulum's Transport::start() applies the cap to
 // the known-destinations and packet-hashlist stores but not to the path store,
-// so a library consumer that does not set it itself runs uncapped.
+// so a library consumer that doesn't set it itself runs uncapped.
 //
 // This runs on the host against a real BasicFileStore over StdioFileSystem, so
-// it is evidence rather than a reading of the source. It needs no hardware.
+// it's evidence rather than a reading of the source. It needs no hardware.
 
 #include <unity.h>
 
@@ -51,7 +51,7 @@ void fill(Store& store, uint32_t from, uint32_t to, uint32_t ts_base = 0) {
 	}
 }
 
-// Each test gets its own directory so a leftover index cannot leak between
+// Each test gets its own directory so a leftover index can't leak between
 // them; StdioFileSystem writes real files.
 microStore::Adapters::StdioFileSystem g_fs("./");
 
@@ -121,10 +121,10 @@ void test_capped_store_evicts_oldest_first(void) {
 //
 // So the only thing assertable here is the guarantee: the cap holds exactly.
 // The absence of any assertion about *which* records remain is the point of
-// the test, not an omission - do not add one.
+// the test, not an omission - don't add one.
 //
 // The consequence for callers is the reason this matters: under an announce
-// burst nothing keeps a wanted path in the table. That is what pinning is for.
+// burst nothing keeps a wanted path in the table. That's what pinning is for.
 void test_same_second_inserts_hold_the_cap_but_order_is_unspecified(void) {
 	Store store(65536, 4);
 	TEST_ASSERT_TRUE(open_store(store, "./.pio/test_store_ties/"));

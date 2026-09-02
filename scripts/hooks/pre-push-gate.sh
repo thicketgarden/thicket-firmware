@@ -52,7 +52,7 @@ fi
 # Private-repo shorthand, in the content AND in the messages about to go out.
 # Added 2026-08-04 after the rule was swept for three times in one day and
 # broken three times in the same day, ending in fifteen rewritten commit
-# messages. Messages are checked because they are the half that cannot be fixed
+# messages. Messages are checked because they're the half that can't be fixed
 # afterwards without rewriting published history.
 if ! out=$(python3 scripts/check_public_text.py --outgoing 2>&1); then
 	echo "push gate: BLOCKED, a commit message about to be published carries" >&2

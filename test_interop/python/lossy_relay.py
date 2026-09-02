@@ -6,7 +6,7 @@ An in-process UDP relay that can be told to drop traffic.
 
 Both sides of an interop scenario speak UDP to a fixed peer port on loopback,
 so putting a forwarder in the middle gives a channel whose loss rate the test
-controls, without patching either implementation. That is what "under loss"
+controls, without patching either implementation. That's what "under loss"
 requires: the RNS and microReticulum interfaces have no lossy mode of their
 own, and simulating loss inside one of them would be testing the simulation.
 
@@ -15,7 +15,7 @@ Wiring (scenario 4):
     C++ RNS  listen 14293  --send--> 14290  [relay]  --send--> 14292  Python RNS
     Python   listen 14292  --send--> 14291  [relay]  --send--> 14293  C++ RNS
 
-Set `cut = True` and nothing crosses in either direction until it is cleared.
+Set `cut = True` and nothing crosses in either direction until it's cleared.
 """
 
 import socket

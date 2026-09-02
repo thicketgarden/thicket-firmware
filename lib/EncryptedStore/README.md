@@ -16,7 +16,7 @@ identity's own X25519 private key. Not written here.
 
 The same code is also proposed upstream as
 [attermann/microReticulum#44](https://github.com/attermann/microReticulum/pull/44)
-(`lib/encrypted_store/`), open since 2026-04-07 and unmerged. We take the
+(`lib/encrypted_store/`), open since 2026-04-07 & unmerged. We take the
 standalone repository rather than the PR, so nothing here waits on that review.
 
 > **The upstream licence is stated twice and the two statements disagree. This
@@ -26,10 +26,10 @@ standalone repository rather than the PR, so nothing here waits on that review.
 > (checked with `gh api repos/konsumer/arduino-rns-encrypted-store`, 2026-08-05). The
 > same commit's `library.json` carries `"license": "Apache-2.0"`.
 >
-> MIT is the deliberate statement and Apache-2.0 is the leftover. The `LICENSE`
+> MIT is the deliberate statement & Apache-2.0 is the leftover. The `LICENSE`
 > file was added on 2026-08-02 in response to a question raised on the PR
 > thread; the repositories carried no licence at all before that.
-> `library.json` was not touched in that
+> `library.json` wasn't touched in that
 > change and still reflects the file's origin inside the Apache-2.0
 > microReticulum tree, where this code was first proposed.
 >
@@ -58,13 +58,13 @@ hurry, that property is arguably worth more than the encryption itself.
 then derives these message keys from it. This defends a message store that
 leaks *without* the identity, and it buys crypto-erase. Whole-flash compromise
 needs the other half of the upstream work, the passphrase-protected identity
-vault, which is not adopted here because it needs a passphrase-entry design
-this device does not have yet.
+vault, which isn't adopted here because it needs a passphrase-entry design
+this device doesn't have yet.
 
 ## Why vendored rather than a `lib_deps` entry
 
 Unlike `lib/LoRaInterface`, the "PlatformIO cannot depend on a subdirectory"
-argument does not apply, upstream publishes this as a whole repository, so a
+argument doesn't apply, upstream publishes this as a whole repository, so a
 `lib_deps` URL would have been structurally fine. Three other things decided it.
 
 **1. The includes are stale, and no fetch method fixes that.** Upstream was
@@ -72,7 +72,7 @@ written against microReticulum at `54c934e`, the base of PR #44, where `src/`
 was flat: `src/Identity.h`, `src/Cryptography/HKDF.h`. Those includes were
 correct on 2026-04-07. microReticulum has since restructured to
 `src/microReticulum/…`, including attermann's own HEAD (checked 2026-08-05), so
-this is not a peculiarity of our fork. The library as published no longer
+this isn't a peculiarity of our fork. The library as published no longer
 compiles against the dependency its own `library.json` declares. Its PR has had
 no maintainer action since 2026-05-05, so nothing ever forced a rebase.
 
@@ -88,7 +88,7 @@ drift.
 the same library.
 
 Not a reason: `attermann/Crypto` was **already** pinned in our build, so the
-AES-256-CTR and HMAC primitives added no new dependency surface.
+AES-256-CTR & HMAC primitives added no new dependency surface.
 
 ## Local changes
 
@@ -96,8 +96,8 @@ Kept to the minimum, each marked in place with `THICKET:`.
 
 1. **`#include <Arduino.h>` dropped from the header.** The library targets
    Arduino only; we also build this on the host for the conformance scenario,
-   where that header does not exist. Nothing in the file used it, the Arduino
-   types it would supply are not referenced.
+   where that header doesn't exist. Nothing in the file used it, the Arduino
+   types it would supply aren't referenced.
 
 Nothing else is changed. The key derivation, the file layout, the constant-time
 compare and the HMAC-before-decrypt ordering are upstream's, untouched, because

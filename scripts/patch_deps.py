@@ -15,7 +15,7 @@
 # upstream visible in one file.
 #
 # Every patch is anchored to exact upstream text and calls sys.exit(1) if that
-# text is not found. A silently-skipped patch is worse than a red build: it
+# text isn't found. A silently-skipped patch is worse than a red build: it
 # produces a binary that compiles and misbehaves. If a pin moves, this file is
 # where the build tells you.
 #
@@ -59,9 +59,9 @@ def targets(lib, relpath):
     PlatformIO installs a library twice when a dependency is requested both by
     us (as a pinned git URL, giving `MsgPack/`) and by an upstream
     `library.json` (as a name + version range, giving `MsgPack@src-<hash>/`).
-    It cannot tell that they are the same package. Only one copy ends up on the
-    include path, and it is not reliably ours, so every copy has to be
-    patched or the build fails in a way that looks like the patch did not run.
+    It can't tell that they're the same package. Only one copy ends up on the
+    include path, and it isn't reliably ours, so every copy has to be
+    patched or the build fails in a way that looks like the patch didn't run.
     """
     found = glob.glob(os.path.join(LIBDEPS, lib + "*", relpath))
     if not found:
@@ -115,7 +115,7 @@ def patch(lib, relpath, patch_id, replacements, why, insert_at_top=None):
 # The Adafruit nRF52 core's Arduino.h defines abs(x) and round(x) as
 # function-like macros. Any libstdc++ header pulled in afterwards that names
 # std::abs / std::round: <chrono>, reached via <mutex>, via MsgPack, via
-# ArduinoJson: fails to parse. The ESP32 Arduino core does not hit this in the
+# ArduinoJson: fails to parse. The ESP32 Arduino core doesn't hit this in the
 # same include order, which is why upstream never saw it.
 #
 # Fix: include Arduino.h first, then #undef the two macros for the whole
@@ -210,7 +210,7 @@ patch(
 # through without knowing their type.
 #
 # Upstream microLXMF applies exactly this private:->public: rewrite, but ONLY in
-# conformance-bridge/CMakeLists.txt (lines 120-188 at 9876dff). There is no
+# conformance-bridge/CMakeLists.txt (lines 120-188 at 9876dff). There's no
 # PlatformIO equivalent, so every PIO consumer has to reimplement it. The
 # anchors below are the same two the CMake patch uses.
 # ---------------------------------------------------------------------------
