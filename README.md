@@ -7,8 +7,9 @@ run on the microcontroller, built on
 [microReticulum](https://github.com/attermann/microReticulum) and
 [microLXMF](https://github.com/torlando-tech/microLXMF).
 
-Thicket is the firmware. A handheld is its first target, and that hardware does
-not exist yet.
+Thicket is the firmware. A handheld is its first target, and that hardware
+doesn't exist yet, so every number below comes from a RAK4631 development
+board or from a host, never from a product.
 
 ## Status
 
@@ -142,7 +143,9 @@ The target is a custom carrier board around a **socketed RAK4631**, which stays
 a module rather than a redesign because it carries the FCC modular grant. A
 915 MHz antenna leaves through a bulkhead SMA. On SPI: a Sharp 400×240 1-bit
 memory LCD, which is write-only, so its 13.5 KB framebuffer has to live in MCU
-RAM, and external flash for identity and the message store. On I2C: a keypad
+RAM, and external flash for identity and the message store.
+
+On I2C: a keypad
 scanner, a haptic driver & LRA, a magnetic encoder reading the thumbwheel
 through a sealed wall, a fuel gauge, and an LED driver for the bargraph. Hall
 sensors, the piezo and the backlight sit on GPIO & PWM. Power is a single
@@ -167,8 +170,8 @@ vendored variant is what the current firmware actually builds against.
 the pins in `platformio.ini`, against the Python reference, module by module,
 with an evidence column.
 
-Of the eleven Reticulum rows, six carry evidence, one is unassessed, and four
-have no counterpart on our side to compare at all. The page exists because the
+Eleven Reticulum rows. Six carry evidence, one is unassessed, and four have no
+counterpart on our side to compare at all. The page exists because the
 manual defines Reticulum as full interoperability & sufficient functional
 parity with the reference, so a coverage map that names its gaps is worth more
 than a claim that can't be checked. Read the Evidence column, not the Present
@@ -249,8 +252,8 @@ Flash figure omits `.ARM.extab`, which isn't small on a stack that throws):
 | `wiscore_rak4631` | 434,688 B | 815,104 B | 53.33% | 380,416 B |
 | `wiscore_rak4631-noble` | 434,832 B | 966,656 B | 44.98% | 531,824 B |
 
-Static RAM is 19,156 B (`.data` + `.bss`) in both envs, against a linker RAM
-region of 262,136 B.
+Static RAM is 19,156 B in both envs. That's `.data` plus `.bss`, against a
+linker RAM region of 262,136 B.
 
 Two notes on reading those numbers, both of which have caused wrong conclusions
 here:
@@ -263,8 +266,8 @@ here:
 - **`.heap` is a budget, not consumption.** The linker sizes it to fill
   whatever is left, so it grows when static RAM shrinks. It's 240,932 B here.
 
-The Reticulum allocator pool is a further 98,304 B taken from that heap at
-runtime, so it appears in no static size report. It was 65,536 B during
+The Reticulum allocator pool takes a further 98,304 B from that heap at
+runtime. No static size report shows it. It was 65,536 B during
 bring-up; it was raised once there was a board to measure on, because
 fragmentation tracks message traffic rather than uptime. At 64 KiB the pool
 went from 2% fragmented at boot to 16% after a single inbound message and

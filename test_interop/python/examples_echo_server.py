@@ -98,8 +98,8 @@ def main():
 
         # The server half asserts something of its own rather than reporting
         # success for having started. Echo.py logs this line only after it has
-        # decrypted a packet addressed to it and returned a proof, so seeing it
-        # is evidence the reference accepted our crypto.
+        # decrypted a packet addressed to it and returned a proof, so seeing
+        # it's evidence the reference accepted our crypto.
         seen = {"echo_request": False}
 
         def pump():

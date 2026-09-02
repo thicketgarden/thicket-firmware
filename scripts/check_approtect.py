@@ -58,8 +58,8 @@ def strip_comments(text):
 
     Without this the check fires on its own documentation - the explanation of
     WHY the software disable must not appear necessarily names the things it
-    forbids. A guard that cries wolf at prose gets silenced, and then it is
-    not a guard.
+    forbids. A guard that cries wolf at prose gets silenced, and then it
+    isn't a guard.
     """
     def blank(m):
         return re.sub(r"[^\n]", " ", m.group(0))

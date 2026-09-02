@@ -104,8 +104,8 @@ int main(int argc, char** argv) {
 	filesystem.init();
 	RNS::Utilities::OS::register_filesystem(filesystem);
 
-	// Two interfaces, one per neighbour. MODE_GATEWAY on both: this node is
-	// not an edge and must be willing to carry traffic in either direction.
+	// Two interfaces, one per neighbour. MODE_GATEWAY on both: this node
+	// isn't an edge and must be willing to carry traffic in either direction.
 	iface_a = new UDPInterface2("segA", A_LOCAL, A_REMOTE);
 	iface_a.mode(RNS::Type::Interface::MODE_GATEWAY);
 	RNS::Transport::register_interface(iface_a);

@@ -50,8 +50,8 @@ if len(rows) < 200:
     print(f"[pool-soak] only {len(rows)} cycles; too few to call a trend.")
     sys.exit(0)
 
-# Discard the opening ramp: caches fill to their bound early and that rise is
-# not the thing under test.
+# Discard the opening ramp: caches fill to their bound early and that rise
+# isn't the thing under test.
 warm = rows[len(rows) // 10:]
 half = len(warm) // 2
 first, second = warm[:half], warm[half:]

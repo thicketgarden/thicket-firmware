@@ -97,7 +97,7 @@ relicensing grant ever changes this, it arrives as an explicit ruling, not as
 an inference from a maintainer's friendly comment.
 
 The messenger layer is written against **microReticulum's Apache-2.0 API** and
-the LXMF spec. That's the plan of record, not a fallback; nothing in this repo
+the LXMF spec. That's the plan of record, not a fallback. Nothing in this repo
 waits on an upstream licensing answer.
 
 Note that `ratspeak/microReticulum` (their fork) is Apache-2.0 & isn't

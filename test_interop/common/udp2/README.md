@@ -1,7 +1,7 @@
 # UDPInterface2 (vendored, test-only)
 
-A copy of microReticulum's example UDP interface with **one change**: the ports
-are constructor arguments instead of compile-time defines.
+A copy of microReticulum's example UDP interface, with **one change**. The
+ports are constructor arguments instead of compile-time defines.
 
 ## Origin
 
@@ -15,7 +15,8 @@ are constructor arguments instead of compile-time defines.
 | Copyright | © 2026 Chad Attermann |
 
 Same arrangement as `lib/LoRaInterface`, for the same reason: PlatformIO can't
-depend on a subdirectory of a repository.
+depend on a subdirectory of a repository, so a file that lives inside upstream's
+`examples/common/udp_interface/` tree has to be copied to be used at all.
 
 ## Why a copy exists at all
 

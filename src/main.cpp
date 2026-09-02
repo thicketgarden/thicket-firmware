@@ -604,8 +604,8 @@ static bool send_lxmf(const RNS::Bytes& destination_hash,
 		// OPPORTUNISTIC and not DIRECT on purpose. DIRECT establishes an RNS
 		// link first, which is several round trips before any payload moves; on
 		// a half-duplex 125 kHz channel that's the most fragile thing we could
-		// ask of an unproven radio. One encrypted packet either arrives or does
-		// not, and the answer is legible either way.
+		// ask of an unproven radio. One encrypted packet either arrives or
+		// doesn't, and the answer is legible either way.
 		g_router->handle_outbound(*message);
 #ifdef THICKET_HAVE_STORE
 		// Save after handle_outbound, not before: the router packs the message
@@ -1175,8 +1175,8 @@ static bool bringup_lxmf() {
 	// lifecycle; persistence of sent and received messages is a separate
 	// feature, not a precondition for either direction.
 	//
-	// When we do attach one, its pool constants must be overridden first: they
-	// are `static constexpr` in MessageStore.h with no #ifndef guard, and at
+	// When we do attach one, its pool constants must be overridden first:
+	// they're `static constexpr` in MessageStore.h with no #ifndef guard, and at
 	// upstream's 32x256 the object is 266,896 bytes and the link fails
 	// outright. Guarding them is a six-line upstream patch.
 

@@ -23,8 +23,8 @@ Two modes:
 
 The split matters. The deterministic vectors can be regenerated and diffed, so
 a moved pin shows up immediately. The ciphertext can't: RNS's Identity.encrypt
-draws an ephemeral X25519 key from the `cryptography` backend's RNG, which is
-not seedable from here, so a regenerated ciphertext would differ every run for
+draws an ephemeral X25519 key from the `cryptography` backend's RNG, which
+isn't seedable from here, so a regenerated ciphertext would differ every run for
 reasons that mean nothing. It's therefore pinned once and checked for validity
 rather than for equality -- which is the stronger check anyway.
 """

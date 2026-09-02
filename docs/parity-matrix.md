@@ -28,6 +28,7 @@ table comes from CI on x86 Linux hosts.
 
 ⚠ **Corrected 2026-08-03.** This section previously read "A RAK4631 has not yet
 executed any of it", which is no longer true and was understating the project.
+
 The stack has run on a RAK4631, and a message composed on the device has
 reached a peer over LoRa. That doesn't populate any row below. Those rows are
 about parity against the *reference* implementation, which is a different
@@ -130,7 +131,7 @@ into `LXMRouter` and adds a `MessageStore` with no Python counterpart.
 
 ## Where we know we diverge
 
-Stated because an unexplained divergence is indistinguishable from a bug.
+An unexplained divergence is indistinguishable from a bug.
 
 1. **Transport store initialisation.** We initialise the path table, known
    destinations & packet hashlist regardless of `enable_transport`. Python
@@ -161,8 +162,8 @@ Stated because an unexplained divergence is indistinguishable from a bug.
 places the stack diverges from the reference that nobody had written down.**
 
 6. **No Link watchdog.** `Link::start_watchdog()` (Link.cpp:884) has an empty
-   body; `Link::__watchdog_job()` is inside a `/*p TODO */` comment block and is
-   not compiled. `Link::send_keepalive()` is compiled but has no caller. So a
+   body; `Link::__watchdog_job()` is inside a `/*p TODO */` comment block and
+   isn't compiled. `Link::send_keepalive()` is compiled but has no caller. So a
    C++ link initiator never sends keepalives, a PENDING link never times out,
    and an ACTIVE link never goes STALE, a link survives the peer vanishing for
    as long as the process runs. Answering an inbound keepalive *does* work
@@ -239,8 +240,9 @@ own lineage. Versions read on the Pi at run time, not copied from a document.
 | Link | RSSI −73 dBm, SNR 12.75 dB, 914.875 MHz, BW 125 kHz, SF8, CR4:5, +17 dBm |
 | Board | RAK4631, internal-flash bring-up environment, USB power **(not battery)** |
 
-Both LXMF delivery methods therefore work against the reference, in the
-direction that matters for a handheld, being reached.
+Both LXMF delivery methods, DIRECT inbound and OPPORTUNISTIC outbound,
+therefore work against the reference in the direction that matters for a
+handheld, being reached.
 
 **Repeated on battery, untethered, 2026-08-05, reported rather than captured.** The same exchange with
 NomadNet on the Pi, with the board disconnected from USB & running from its
@@ -265,8 +267,8 @@ above.)*
 minutes the reference established links to us & abandoned each one after ~14
 seconds without sending anything. It looked exactly like a broken inbound Link
 path, and this page already warned that DIRECT was the one delivery method we
-had never exercised, which made the wrong explanation the attractive one. It was
-not that. The sending side had **loaded a path entry for our destination from
+had never exercised, which made the wrong explanation the attractive one. It
+wasn't that. The sending side had **loaded a path entry for our destination from
 storage** and kept answering its own client's path requests from that cache while
 the radio path wasn't usable; it recovered only when a fresh announce arrived
 directly over LoRa & replaced the entry. Its own log named it:
@@ -304,8 +306,8 @@ happens on the device.
 - **Whether identity survived a power cycle.** Both bring-up environments
   regenerate the identity every boot, so this run can't have shown it. Persistence across a
   power cycle is untouched by it and still needs external flash.
-- **Which pins.** The run predates the 2026-08-03 path-table pin bumps, so it
-  is evidence about the earlier microReticulum & microStore pins rather than
+- **Which pins.** The run predates the 2026-08-03 path-table pin bumps, so
+  it's evidence about the earlier microReticulum & microStore pins rather than
   what's shipping now.
 
 ### What this doesn't show
