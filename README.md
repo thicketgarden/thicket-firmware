@@ -129,13 +129,19 @@ input, and sleep.
 
 ### One finding from first boot
 
-**This part cannot be locked.** The silicon reports `variant=AAD0`, a
-Dxx-class part, and `UICR.APPROTECT` reads `0xFFFFFFFF`, erased. The debug port
-is open and internal flash is readable over SWD with no attack required. That is
-a property of the part, not of this firmware, and no firmware change can alter
-it. Anything that depends on a secret in internal flash needs Fxx+ silicon.
-`scripts/check_approtect.py` refuses to build firmware that writes
-`APPROTECT.DISABLE`, which remains correct & isn't sufficient on its own.
+**Check the silicon on your own board.** nRF52840 modules ship in several build
+codes, and the firmware prints its own at boot as `part=` and `variant=`. One of
+ours reads `variant=AAD0`, a Dxx-class part with `UICR.APPROTECT` erased to
+`0xFFFFFFFF`, so on that board the debug port is open and internal flash reads
+out over SWD with no attack required.
+
+On Fxx and later, lifting protection takes two independent actions:
+`UICR.APPROTECT` programmed to HwDisabled, and firmware writing
+`APPROTECT.DISABLE`. The 2020 LimitedResults voltage glitch defeats the first
+and can't perform the second, so the port stays shut for exactly one reason,
+which is that no code here does the software write.
+`scripts/check_approtect.py` asserts that at build time, because an absence
+rots silently.
 
 ## Hardware
 
@@ -271,11 +277,23 @@ here:
   whatever is left, so it grows when static RAM shrinks. It's 240,932 B here.
 
 The Reticulum allocator pool takes a further 98,304 B from that heap at
-runtime. No static size report shows it. It was 65,536 B during
-bring-up; it was raised once there was a board to measure on, because
-fragmentation tracks message traffic rather than uptime. At 64 KiB the pool
-went from 2% fragmented at boot to 16% after a single inbound message and
-reply, and at 96 KiB the same load produces 8%.
+runtime, & no static size report shows it. It was 65,536 B during bring-up,
+raised once there was a board to measure on, because fragmentation tracks
+message traffic rather than uptime. At 64 KiB the pool went from 2% fragmented
+at boot to 16% after one inbound message & reply.
+
+**That 16% is where it settles, not a point on a climb.** A 1,194 s soak on the
+board, with 94 inbound messages arriving over LoRa from a second RAK4631, held
+fragmentation between 15.99% & 15.92% and peaked at 19.64%. High-water use was
+60,308 B of the 98,304 B pool, 61%, leaving 37,996 B free. Idle over the same
+window sat at 1.7%.
+
+`test_interop/run_pool_soak.sh` runs the same measurement on a host & returns a
+plateau-or-climb verdict against stated thresholds. Over 2,000 message cycles
+mean use moves from 24,167 B to 24,164 B and fragmentation from 2.13% to 2.13%,
+peaking at 2.59%. It exercises the outbound path only, & prints that as a
+coverage warning at the end of every run, because with no peer nothing is
+delivered.
 
 **Measured on the board** after full bring-up, with the radio in continuous
 receive and the messaging layer live: 120,964 B of heap in use, 48,360 B of
@@ -285,11 +303,14 @@ hard-faults before USB enumerates, and the board then looks dead.
 
 The application's work runs in a task the firmware creates with an 8,192 B
 stack rather than in `loop()`, whose stack the Arduino core fixes at 4,096 B
-and doesn't expose to a build flag. That's not a precaution: receiving a
-message & composing a reply has been measured on the board at up to 4,704 B
-of stack, which the 4,096 B ceiling couldn't have survived. `scripts/stackusage.py`
-reports worst-case frames from the compiler & cross-checks them against the
-linked image, so garbage-collected code isn't mistaken for a live hazard.
+& doesn't expose to a build flag. That's not a precaution. After 51 inbound
+messages the task reported 3,324 B free at its low-water mark, so peak depth
+was 4,868 B, and the 4,096 B ceiling would have been gone before the deepest
+frame ran.
+
+`scripts/stackusage.py` reports worst-case frames from the compiler &
+cross-checks them against the linked image, so garbage-collected code isn't
+mistaken for a live hazard.
 
 Board definition & variant for the RAK4631 are vendored in `boards/` and
 `variants/` (mirrored from
