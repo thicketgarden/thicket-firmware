@@ -761,12 +761,56 @@ static bool bringup_storage() {
 // are derived from it on load.
 static const size_t IDENTITY_PRV_BYTES = 64;
 
+// Attempt limiting, in the spirit of a phone lockscreen but WITHOUT a phone's
+// hardware. A Secure Enclave counts attempts in silicon and never releases the
+// key, so imaging the storage yields nothing and six digits is enough there.
+// Nothing on this board does that. This counter lives in the same filesystem as
+// the vault, so anyone who images the flash resets it by restoring their copy,
+// and can attack the vault offline anyway. What it does stop is the person who
+// picks the device up and starts guessing, which is a real and different threat.
+static const char* VAULT_TRIES_PATH = "/thicket_vault_tries";
+static const uint8_t VAULT_MAX_TRIES = 10;
+
+static uint8_t vault_tries_read() {
+	if (!RNS::Utilities::OS::file_exists(VAULT_TRIES_PATH)) return 0;
+	RNS::Bytes b;
+	if (RNS::Utilities::OS::read_file(VAULT_TRIES_PATH, b) < 1) return 0;
+	return b.data()[0];
+}
+
+static void vault_tries_write(uint8_t n) {
+	RNS::Utilities::OS::write_file(VAULT_TRIES_PATH, RNS::Bytes(&n, 1));
+}
+
 static bool vault_open(const char* code) {
+	const uint8_t tried = vault_tries_read();
+	if (tried >= VAULT_MAX_TRIES) {
+		fail("vault locked out - attempt limit reached");
+		info("attempts", "10 of 10 used");
+		return false;
+	}
+
+	// Persist the increment BEFORE testing the code. Pulling power mid-attempt
+	// must not hand back a free guess, so this fails closed.
+	vault_tries_write((uint8_t)(tried + 1));
+
 	uint8_t prv[IDENTITY_PRV_BYTES];
-	if (!password_open(IDENTITY_PATH, code, prv, sizeof(prv))) return false;
+	if (!password_open(IDENTITY_PATH, code, prv, sizeof(prv))) {
+		const uint8_t left = (uint8_t)(VAULT_MAX_TRIES - tried - 1);
+		if (left == 0) {
+			// Crypto-erase rather than a wipe: deleting the vault destroys the
+			// only copy of the key, so every stored message goes with it. That
+			// is the property the encrypted store was chosen for.
+			RNS::Utilities::OS::remove_file(IDENTITY_PATH);
+			fail("attempt limit reached - identity vault destroyed");
+		}
+		return false;
+	}
+
 	g_identity = RNS::Identity(false);
 	const bool loaded = g_identity.load_private_key(RNS::Bytes(prv, sizeof(prv)));
 	memset(prv, 0, sizeof(prv));
+	if (loaded) RNS::Utilities::OS::remove_file(VAULT_TRIES_PATH);
 	return loaded;
 }
 

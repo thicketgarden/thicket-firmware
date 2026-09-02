@@ -111,6 +111,45 @@ int main() {
 		      "a truncated vault is refused");
 	}
 
+
+	// 5. attempt limiting, modelled on the firmware's own counter. The point
+	//    of the test is the fail-closed order: the counter is persisted before
+	//    the code is checked, so pulling power mid-attempt cannot buy a free
+	//    guess. A counter written only after a failure would give an attacker
+	//    unlimited tries by resetting the board each time.
+	{
+		const char* TRIES = "vault_tries";
+		const uint8_t LIMIT = 10;
+		auto tries_read = [&]() -> uint8_t {
+			if (!RNS::Utilities::OS::file_exists(TRIES)) return 0;
+			RNS::Bytes b;
+			if (RNS::Utilities::OS::read_file(TRIES, b) < 1) return 0;
+			return b.data()[0];
+		};
+		auto attempt = [&](const char* code) -> bool {
+			const uint8_t tried = tries_read();
+			if (tried >= LIMIT) return false;                 // locked out
+			uint8_t next = (uint8_t)(tried + 1);
+			RNS::Utilities::OS::write_file(TRIES, RNS::Bytes(&next, 1));
+			uint8_t out[PRV];
+			if (!password_open(PATH, code, out, sizeof(out))) return false;
+			RNS::Utilities::OS::remove_file(TRIES);           // cleared on success
+			return true;
+		};
+
+		RNS::Utilities::OS::remove_file(TRIES);
+		for (int i = 0; i < 9; ++i) attempt("000000");
+		check(tries_read() == 9, "nine wrong codes leave the counter at nine");
+		check(attempt(CODE), "the correct code still opens on the tenth attempt");
+		check(tries_read() == 0, "a success clears the counter");
+
+		// now exhaust it
+		RNS::Utilities::OS::remove_file(TRIES);
+		for (int i = 0; i < LIMIT; ++i) attempt("000000");
+		check(tries_read() == LIMIT, "ten wrong codes reach the limit");
+		check(!attempt(CODE), "the CORRECT code is refused once locked out");
+	}
+
 	printf("\n%s: %d failure(s)\n", failures ? "FAILED" : "PASSED", failures);
 	return failures ? 1 : 0;
 }

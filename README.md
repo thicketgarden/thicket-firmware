@@ -239,6 +239,20 @@ images the flash. Only a longer secret moves it: reaching a day of GPU time at
 this iteration count would need 950,400,000 iterations, which this part cannot
 run.
 
+Ten wrong codes destroy the vault. That's the phone-lockscreen shape, and it's
+worth being exact about why it isn't the phone's guarantee. A Secure Enclave
+counts attempts in silicon and never releases the key, so imaging the storage
+yields nothing and six digits is genuinely enough there. This counter is a file
+in the same filesystem as the vault, so anyone who images the flash restores
+their copy and the count with it, then attacks the vault offline at the 9
+seconds above.
+
+It stops guessing on the device, and that is all it stops. The counter is one
+byte in `/thicket_vault_tries`, written before the code is checked, so pulling
+power mid-attempt costs a try rather than granting a free one, and the tenth
+failure deletes the vault, which deletes the only copy of the key & every
+stored message with it.
+
 The code is a build flag rather than something anyone types, because the input
 design isn't settled. `wiscore_rak4631-vault` carries it & the stock env is
 untouched. The handheld's thumbwheel is the intended way to enter one, and none
