@@ -182,10 +182,12 @@ places the stack diverges from the reference that nobody had written down.**
    public function. Pinned as a strict expected failure in
    `run_identity_vectors.sh`.
 
-**Also worth recording: `platformio.ini` understates our microReticulum fork.**
-Its comment says the fork "carries exactly one change" (divergence 1). It
-carries four: `git log 40fa6288..0fb6151` also shows a PKCS#7 padding fix, an
-HMAC double-feed fix, and X25519 clamping on key import. The last of these is
+**Also worth recording: `platformio.ini` still understates the microReticulum
+fork, though less than it did.** *(corrected 2026-09-02)* The comment used to
+say the fork carried "exactly one change"; it now lists four, and all four are
+Transport and path-store work. It names none of the crypto fixes. X25519
+clamping on key import sits in the pinned tree at
+`Cryptography/X25519.h`, carrying a comment that explains it, and it is
 load-bearing. Reverting it makes `run_identity_vectors.sh` fail four checks
 including decryption of a reference ciphertext, while `run_cold_inbound.sh`
 still passes, because a *generated* key is clamped by `Curve25519::dh1()` and
