@@ -13,9 +13,21 @@
 // compatible, whatever its README claims.
 //
 // Shape: Echo.py runs as the server. It announces
-// `example_utilities.echo.request` & echoes any packet back, proving each one.
-// We are the client. We learn the destination from its announce, send a
-// payload, & require both the echo and a validated delivery proof.
+// `example_utilities.echo.request` & sets PROVE_ALL on it. We are the client:
+// we learn the destination from its announce, send a payload, & require a
+// validated delivery proof.
+//
+// THE PROOF *IS* THE ECHO. Echo.py's server_callback only logs; it sends no
+// data packet back, because the destination proves every packet automatically.
+// Its own client measures round-trip time from `receipt.status == DELIVERED`
+// & nothing else. An earlier version of this scenario waited for a data reply
+// that the reference never sends, and failed against correct behaviour.
+//
+// What the proof establishes is not weak. The destination is SINGLE, so our
+// packet was encrypted to Echo.py's identity: it had to derive the shared key,
+// decrypt the payload, & return a signed proof that our stack then validated
+// against the identity we learned from its announce. Both directions of the
+// crypto agreed with the reference implementation.
 //
 // Nothing about the destination is compiled in. The app name & aspect below
 // are Echo.py's own, & the hash is learned over the wire.
@@ -52,8 +64,8 @@ namespace {
 const char* APP_NAME = "example_utilities";
 const char* ASPECT   = "echo.request";
 
-// What we send. Echo.py returns the packet's data verbatim, so the reply must
-// match byte for byte.
+// What we send. The content is not echoed back, so its only job is to be a
+// realistic payload for Echo.py to decrypt.
 const char* PAYLOAD = "thicket echo probe";
 
 // File scope, matching the working scenarios. A local Interface goes out of
@@ -63,11 +75,12 @@ Interface iface({Type::NONE});
 
 Bytes peer_dest_hash;
 bool  peer_known    = false;
-bool  echo_received = false;
 
 class Hearer : public AnnounceHandler {
 public:
-	Hearer() : AnnounceHandler("example_utilities.echo.request") {}
+	Hearer() : AnnounceHandler(getenv("THICKET_SELF_TEST_BREAK")
+	                           ? "example_utilities.echo.wrong"
+	                           : "example_utilities.echo.request") {}
 	void received_announce(const Bytes& destination_hash,
 	                       const Identity& announced_identity,
 	                       const Bytes& app_data) {
@@ -85,22 +98,18 @@ public:
 };
 HAnnounceHandler hearer(new Hearer());
 
-void on_reply(const Bytes& data, const Packet& packet) {
-	(void)packet;
-	const std::string got((const char*)data.data(), data.size());
-	if (got == PAYLOAD) {
-		echo_received = true;
-		printf("[echo-client] echo matched: \"%s\"\n", got.c_str());
-	} else {
-		printf("[echo-client] echo MISMATCH: sent \"%s\", got \"%s\"\n",
-		       PAYLOAD, got.c_str());
-	}
-	fflush(stdout);
-}
-
 }   // namespace
 
 int main() {
+	// Prove the assertions can fail. With the aspect mangled the announce no
+	// longer matches, nothing is learned, and the run must FAIL. A scenario
+	// that has only ever passed is an assumption.
+	const bool self_test_break = getenv("THICKET_SELF_TEST_BREAK") != nullptr;
+	if (self_test_break) {
+		printf("[echo-client] --self-test-break: listening on the wrong aspect\n");
+		fflush(stdout);
+	}
+
 	const char* t = getenv("THICKET_INTEROP_TIMEOUT_S");
 	const double timeout_s = t ? atof(t) : 90.0;
 
@@ -131,13 +140,17 @@ int main() {
 
 	while (Utilities::OS::time() - t0 < timeout_s) {
 		Transport::loop();
+		// Reticulum::loop() is what walks the registered interfaces and calls
+		// each one's loop(), which is where the UDP socket is actually read.
+		// Transport::loop() alone leaves datagrams sitting unread in the kernel
+		// buffer: the peer announces, the bytes arrive, and nothing consumes them.
+		reticulum.loop();
 
 		if (peer_known && !sent) {
 			Identity peer = Identity::recall(peer_dest_hash);
 			if (!peer) continue;
 			Destination to(peer, Type::Destination::OUT,
 			               Type::Destination::SINGLE, APP_NAME, ASPECT);
-			to.set_packet_callback(on_reply);
 			outbound = Packet(to, Bytes((const uint8_t*)PAYLOAD, strlen(PAYLOAD)));
 			outbound.send();
 			sent = true;
@@ -155,7 +168,7 @@ int main() {
 			}
 		}
 
-		if (proved && echo_received) break;
+		if (proved) break;
 		Utilities::OS::sleep(0.05);
 	}
 
@@ -163,10 +176,9 @@ int main() {
 	printf("[echo-client] heard the announce : %s\n", peer_known ? "yes" : "NO");
 	printf("[echo-client] sent a packet      : %s\n", sent ? "yes" : "NO");
 	printf("[echo-client] proof validated    : %s\n", proved ? "yes" : "NO");
-	printf("[echo-client] echo matched       : %s\n", echo_received ? "yes" : "NO");
 
-	if (peer_known && sent && proved && echo_received) {
-		printf("[echo-client] PASS: interoperated with the reference's own "
+	if (peer_known && sent && proved) {
+		printf("[echo-client] SUCCESS: interoperated with the reference's own "
 		       "example, unmodified\n");
 		return 0;
 	}

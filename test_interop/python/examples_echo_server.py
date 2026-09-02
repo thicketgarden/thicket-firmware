@@ -96,9 +96,17 @@ def main():
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, text=True, bufsize=1)
 
+        # The server half asserts something of its own rather than reporting
+        # success for having started. Echo.py logs this line only after it has
+        # decrypted a packet addressed to it and returned a proof, so seeing it
+        # is evidence the reference accepted our crypto.
+        seen = {"echo_request": False}
+
         def pump():
             for line in proc.stdout:
                 print("[Echo.py] " + line.rstrip(), flush=True)
+                if "Received packet from echo client" in line:
+                    seen["echo_request"] = True
         threading.Thread(target=pump, daemon=True).start()
 
         # Echo.py announces when the user presses enter. Do that on a timer so
@@ -117,7 +125,14 @@ def main():
             proc.wait(timeout=10)
         except subprocess.TimeoutExpired:
             proc.kill()
-        return 0
+
+        if seen["echo_request"]:
+            print("[echo-server] SUCCESS: the reference decrypted a packet from "
+                  "us and returned a proof", flush=True)
+            return 0
+        print("[echo-server] FAIL: Echo.py never reported receiving a packet "
+              "from the client", flush=True)
+        return 1
     finally:
         shutil.rmtree(workdir, ignore_errors=True)
 

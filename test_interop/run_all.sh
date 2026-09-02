@@ -21,6 +21,9 @@ SCENARIOS=(
   "lxmf-inbound|lxmf_inbound_receiver|run_lxmf_inbound.sh"
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
   "wire-oracle|wire_oracle|run_wire_oracle.sh"
+  # Upstream's own Examples/Echo.py, unmodified. Every other scenario talks to
+  # a script we wrote, which cannot catch a misreading of the protocol we share.
+  "examples-echo|examples_echo|run_examples_echo.sh"
   "pool-soak|pool_soak|run_pool_soak.sh"
   "link-inbound|link_inbound_responder|run_link_inbound.sh"
   # The only scenario where we are the router rather than the leaf. Slowest of

@@ -22,4 +22,12 @@ PY_SCRIPT="$HERE/python/examples_echo_server.py"
 CPP_PROJECT="$HERE/examples_echo"
 : "${TIMEOUT_S:=90}"
 
+for a in "$@"; do
+	if [ "$a" = "--self-test-break" ]; then
+		export THICKET_SELF_TEST_BREAK=1
+		echo "[examples-echo] --self-test-break: the client will listen on an"
+		echo "[examples-echo] aspect the reference never announces. Expect FAIL."
+	fi
+done
+
 source "$HERE/scripts/driver.sh"
