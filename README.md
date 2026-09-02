@@ -181,7 +181,7 @@ implementation can misread the protocol identically and agree perfectly, so
 with the reference standing as the specification, agreement with it is the only
 compatibility claim worth making.
 
-`test_interop/` holds eleven scenarios. In five the Python side originates and
+`test_interop/` holds twelve scenarios. In five the Python side originates and
 this stack has to receive, which is the direction a handheld lives in: a cold
 inbound packet, an LXMF delivery, a Python-initiated link, a packet relayed
 through a transport node, and two reference peers reaching each other through
@@ -192,7 +192,7 @@ upstream's own `Examples/Echo.py` run unmodified.
 PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
 ```
 
-All eleven run in CI on every push against pinned `rns==1.4.2` and
+All twelve run in CI on every push against pinned `rns==1.4.2` and
 `lxmf==1.1.1`, and each runner takes `--self-test-break` to corrupt an input
 and prove its assertions fail, because an assertion nobody has ever watched
 fail isn't evidence.
@@ -225,8 +225,24 @@ The identity itself is still a plaintext file on the same flash, so anyone who
 images the whole device reads it and derives the AES-256-CTR message keys from
 it. What the encryption buys is a store that stays unreadable to anyone who
 gets the flash without that identity file. Closing the rest needs a passphrase-
-protected identity. The handheld's thumbwheel is the intended way to enter one,
-though that design isn't settled and none of it is built.
+protected identity, and `wiscore_rak4631-vault` is a first cut at one. It seals
+the 64 private key bytes with AES-256-CTR under a key from PBKDF2-HMAC-SHA256
+at 100,000 iterations, and refuses to open on a wrong code & a single flipped
+bit. It costs 1,448 B of flash and no RAM.
+
+Read the number before trusting it. A 6-digit code is 1,000,000 possibilities,
+and at two SHA-256 compressions per iteration a full sweep is 2.0e11
+compressions, about 9 seconds on one 22 GH/s GPU.
+
+That defends against someone picking the device up, not against someone who
+images the flash. Only a longer secret moves it: reaching a day of GPU time at
+this iteration count would need 950,400,000 iterations, which this part cannot
+run.
+
+The code is a build flag rather than something anyone types, because the input
+design isn't settled. `wiscore_rak4631-vault` carries it & the stock env is
+untouched. The handheld's thumbwheel is the intended way to enter one, and none
+of that hardware is built.
 
 Check your own silicon before trusting internal flash. nRF52840 modules ship in
 several build codes and the firmware prints its own at boot, as `part=` and

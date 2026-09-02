@@ -31,6 +31,9 @@ SCENARIOS=(
   # be sent.
   "transport-forward|transport_forwarder|run_transport_forward.sh"
   "encstore-vectors|encstore_vectors|run_encstore_vectors.sh"
+  # The identity sealed under a code. Negative cases carry this one: a vault
+  # that opened for any code would still log "identity restored".
+  "vault-vectors|vault_vectors|run_vault_vectors.sh"
   "two-node|two_node|run_two_node.sh"
 )
 

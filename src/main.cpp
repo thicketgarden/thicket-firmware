@@ -83,6 +83,9 @@
 // store, not separately: there's no build in which we want one without the
 // other.
 #include <encrypted_store.h>
+#ifdef THICKET_IDENTITY_CODE
+#include <password.h>
+#endif
 #endif
 #ifdef THICKET_RAM_PROBE
 #include <LXMF/MessageStore.h>
@@ -751,6 +754,29 @@ static bool bringup_storage() {
 // This is the half of the bring-up done-condition that a demo can't fake: the
 // hash the paired T-Deck sees must be the same after a power cycle. First boot
 // generates and writes; every later boot reads.
+#ifdef THICKET_IDENTITY_CODE
+// The vault stores the 64 private key bytes rather than the RNS identity file
+// format. password_open() needs the plaintext length up front, and the private
+// key is the only part that has to stay secret; the public half and the hash
+// are derived from it on load.
+static const size_t IDENTITY_PRV_BYTES = 64;
+
+static bool vault_open(const char* code) {
+	uint8_t prv[IDENTITY_PRV_BYTES];
+	if (!password_open(IDENTITY_PATH, code, prv, sizeof(prv))) return false;
+	g_identity = RNS::Identity(false);
+	const bool loaded = g_identity.load_private_key(RNS::Bytes(prv, sizeof(prv)));
+	memset(prv, 0, sizeof(prv));
+	return loaded;
+}
+
+static bool vault_seal(const char* code) {
+	const RNS::Bytes prv = g_identity.get_private_key();
+	if (prv.size() != IDENTITY_PRV_BYTES) return false;
+	return password_protect(IDENTITY_PATH, code, prv.data(), prv.size());
+}
+#endif
+
 static bool bringup_identity() {
 	step(2, "Identity (create or load)");
 
@@ -767,6 +793,23 @@ static bool bringup_identity() {
 	return true;
 #else
 	if (RNS::Utilities::OS::file_exists(IDENTITY_PATH)) {
+#ifdef THICKET_IDENTITY_CODE
+		// PBKDF2 at 100,000 iterations. Seconds on this part, once per boot.
+		info("identity", "sealed; deriving key with PBKDF2");
+		if (!vault_open(THICKET_IDENTITY_CODE)) {
+			// A wrong code and a corrupt file fail identically here, by design:
+			// the HMAC is checked before any plaintext is produced, so there is
+			// no oracle telling an attacker which of the two happened.
+			fail("could not open identity vault - wrong code or damaged file");
+			info("path", IDENTITY_PATH);
+			return false;
+		}
+		g_identity_source = "opened from sealed vault on external flash";
+		info("source", g_identity_source);
+		ok("identity restored across reboot");
+		info("identity hash", g_identity.hash().toHex().c_str());
+		return true;
+#endif
 		g_identity = RNS::Identity::from_file(IDENTITY_PATH);
 		if (g_identity) {
 			g_identity_source = "loaded from external flash";
@@ -787,11 +830,19 @@ static bool bringup_identity() {
 			fail("key generation failed");
 			return false;
 		}
+#ifdef THICKET_IDENTITY_CODE
+		if (!vault_seal(THICKET_IDENTITY_CODE)) {
+			fail("could not seal identity to external flash");
+			return false;
+		}
+		g_identity_source = "generated and sealed (first boot)";
+#else
 		if (!g_identity.to_file(IDENTITY_PATH)) {
 			fail("could not persist identity to external flash");
 			return false;
 		}
 		g_identity_source = "generated and written (first boot)";
+#endif
 		info("source", g_identity_source);
 		ok("identity created and persisted");
 	}

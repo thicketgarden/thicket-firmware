@@ -1,0 +1,8 @@
+{
+  "name": "Password",
+  "version": "1.0.0",
+  "license": "MIT",
+  "description": "PBKDF2 password-protected encryption at rest, vendored from konsumer/arduino-rns-password",
+  "frameworks": "*",
+  "platforms": "*"
+}
