@@ -133,11 +133,31 @@ static const char* DISPLAY_NAME = "Thicket";
 // than 104 MHz quad.
 static const SPIFlash_Device_t FLASH_DEVICE = RAK15001;
 
-// How often to re-announce, seconds. Reticulum's own guidance is sparing;
-// this is a bring-up value chosen so testing does not involve waiting at the
-// bench. TODO(bring-up): drive announces from user action plus a much longer
-// timer once there is a UI.
-static const double ANNOUNCE_INTERVAL_S = 120.0;
+// How often to re-announce, in seconds.
+//
+// This is shared airtime, not ours. One LXMF announce is about 150 bytes; at
+// SF8 over 125 kHz that is roughly 0.4 s on air, and every node in range pays
+// the cost of hearing it. A device that announces every 2 minutes spends 0.33%
+// of the channel on saying nothing, forever, and a handful of them together is
+// a measurable share of a band that carries other people's traffic.
+//
+// The Reticulum community's rules for LLM-assisted projects name frequent
+// announces as a marker of software written without regard for the network it
+// joins. This firmware announces on boot, when the address changes, and
+// otherwise on this timer.
+//
+// 1800 s is the shipping default. Override it at build time for bench work,
+// where a peer has to learn the address before a test can start:
+//
+//   -DTHICKET_ANNOUNCE_INTERVAL_S=60
+//
+// TODO(ui): drive announces from user action once there is a UI, and lengthen
+// this further. A device in someone's bag has no reason to announce on a timer
+// at all.
+#ifndef THICKET_ANNOUNCE_INTERVAL_S
+#define THICKET_ANNOUNCE_INTERVAL_S 1800
+#endif
+static const double ANNOUNCE_INTERVAL_S = (double)(THICKET_ANNOUNCE_INTERVAL_S);
 
 // Auto-reply. The device answers anything delivered to it, addressed to the
 // source hash carried by the inbound message — nothing about the peer is

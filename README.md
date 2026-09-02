@@ -56,7 +56,7 @@ traffic.
 ### It interoperates with the reference implementation
 
 On 2026-08-05 this firmware exchanged messages with **Python RNS 1.4.2 and
-LXMF** — `rnsd` on a Raspberry Pi with an RNode as its radio — over LoRa at
+LXMF**, running `rnsd` on a Raspberry Pi with an RNode as its radio, over LoRa at
 914.875 MHz. That matters more than the earlier round trip, which was with a
 client built on the same C++ stack we are: a successful exchange there shows
 agreement with our own lineage, not with the specification.
@@ -69,18 +69,26 @@ SNR 12.75 dB.
 
 Since the reference implementation is the specification, this is the strongest
 compatibility claim available, and it is the direction that matters for a
-handheld — being reached rather than transmitting.
+handheld: being reached rather than transmitting.
 
 The exchange was then repeated with the board **running from its battery, with
-nothing attached** — message delivered, reply returned. That run was
+nothing attached**. The message was delivered & the reply came back. That run was
 observed at the bench rather than captured to a log: running untethered means
 there is no serial connection to record it, and it is reported as such.
 
-**Still unproven:** the bring-up environment regenerates its identity every
-boot, so nothing is shown about state surviving a power cycle, and the peer was
-a Pi rather than a phone. No battery life figure is claimed — the board was
-carrying a diagnostic build, and a runtime number needs a profiler, not an
-anecdote.
+**Identity now survives a power cycle, & the peer still reaches it.** On
+2026-09-01, with a RAK15001 external flash fitted, the board came back from a
+cable-out power cycle as `157c0f2c759d0b6acbd22034c0db0413` & reported the
+identity as loaded from external flash rather than minted fresh. A hash that
+merely matched wouldn't have been enough, so the firmware states where the
+identity came from. A second board kept sending throughout & was never
+restarted: after the cycle it delivered 6 messages to the same address with 0
+failures, having relearned nothing. Keeping an identity & remaining reachable
+are two claims, so both were tested.
+
+**Still unproven:** the peer was another board rather than a phone, & no
+battery life figure is claimed. The board was carrying a diagnostic build, & a
+runtime number needs a profiler, not an anecdote.
 
 ### What that run did not prove
 
@@ -99,7 +107,7 @@ encrypted with AES-256-CTR and authenticated with HMAC-SHA256, under keys
 derived from the device's own X25519 private key. No passphrase is involved, so
 nothing waits on a user-interface decision. Because the keys derive from the
 identity, destroying the identity makes every stored message unreadable at
-once — no wipe, no overwrite passes.
+once, with no wipe & no overwrite passes.
 
 The guarantee is narrower than "encrypted at rest" usually implies, and the
 difference matters: **the identity itself is still a plaintext file on the same
@@ -111,7 +119,7 @@ identity, which this device has no way to enter yet.
 Bring-up refuses to report the store attached unless it has just encrypted,
 written, read back and decrypted a file on the actual filesystem. That check
 exists because the device once reported a healthy store while every save
-failed — the internal-flash bring-up filesystem was full, and three messages
+failed. The internal-flash bring-up filesystem was full, & three messages
 were received, answered correctly, and dropped.
 
 **Not yet wired**, and marked with a TODO at each site in the source:
@@ -162,7 +170,7 @@ with an evidence column.
 Of the eleven Reticulum rows, six carry evidence, one is unassessed, and four
 have no counterpart on our side to compare at all. The page exists because the
 manual defines Reticulum as full interoperability and sufficient functional
-parity with the reference — so a coverage map that names its gaps is worth more
+parity with the reference, so a coverage map that names its gaps is worth more
 than a claim that cannot be checked. Read the Evidence column, not the Present
 column: a populated row is not a passing row.
 
@@ -182,7 +190,7 @@ PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
 These run on hosts. **No conformance scenario has yet executed on a RAK4631**,
 and that is still true after the reference interoperation described above: that
 run was a real exchange with a live Python node, not this suite executing on the
-device. The two are separate claims and are kept separate deliberately — the
+device. The two are separate claims & are kept separate deliberately. The
 suite asserts specific behaviours against fixed expectations, which a
 conversation between two nodes does not.
 
@@ -217,7 +225,7 @@ python3 scripts/board.py capture --seconds 20
 ```
 
 It exists because two failure modes here look like something else. **A
-PlatformIO upload can print SUCCESS without programming anything** — it keys on
+PlatformIO upload can print SUCCESS without programming anything**. It keys on
 `Device programmed` instead of the exit code, so a board still running the
 previous image cannot be mistaken for a firmware bug. And **the boot banner is
 gone before a terminal can attach**: USB-CDC discards writes with no host
@@ -250,7 +258,7 @@ here:
 - **`arm-none-eabi-size` is misleading on this target.** It reports the
   linker's `.heap` section inside `bss`, so this firmware reads as roughly
   232 KB of static RAM and looks about to overflow. It is not. Read the ELF
-  section table — `scripts/ramreport.py` does, and attributes `.data`/`.bss`
+  section table. `scripts/ramreport.py` does, & attributes `.data`/`.bss`
   per origin the way `scripts/mapsize.py` does for flash.
 - **`.heap` is a budget, not consumption.** The linker sizes it to fill
   whatever is left, so it grows when static RAM shrinks. It is 240,932 B here.
@@ -258,14 +266,14 @@ here:
 The Reticulum allocator pool is a further 98,304 B taken from that heap at
 runtime, so it appears in no static size report. It was 65,536 B during
 bring-up; it was raised once there was a board to measure on, because
-fragmentation tracks message traffic rather than uptime — at 64 KiB the pool
+fragmentation tracks message traffic rather than uptime. At 64 KiB the pool
 went from 2% fragmented at boot to 16% after a single inbound message and
 reply, and at 96 KiB the same load produces 8%.
 
 **Measured on the board** after full bring-up, with the radio in continuous
 receive and the messaging layer live: 120,964 B of heap in use, 48,360 B of
 allocator pool free, and 116,040 B of system heap still spare. Do not raise the
-pool further without a board on the bench — a pool above roughly 75% of SRAM
+pool further without a board on the bench. A pool above roughly 75% of SRAM
 hard-faults before USB enumerates, and the board then simply looks dead.
 
 The application's work runs in a task the firmware creates with an 8,192 B
@@ -306,3 +314,30 @@ are in `lib/LoRaInterface/README.md`.
 ## License
 
 GPL-3.0-or-later. See `LICENSE`.
+
+## AI use
+
+Most of this code, and most of this README, was written by an LLM working under
+a human maintainer who reviews and rules on every commit. Saying so is a
+recommendation of the Reticulum community's rules for LLM-assisted projects, &
+withholding it while writing this much prose this fast would be dishonest.
+
+The reason to state it here rather than bury it: an LLM will produce something
+that compiles, passes its own tests, and does not interoperate. That failure is
+silent. The controls in this repository exist because of it, & they are the
+part worth judging:
+
+- Every interop scenario runs against a pinned Python RNS, currently 1.4.2, in
+  CI on every push. The reference implementation is the specification, so
+  agreement with ourselves proves nothing.
+- `test_interop/wire_oracle` decodes packets we pack using the reference's own
+  `RNS.Packet` & compares field by field, including whether a named constant
+  means the same number on both sides. Two nodes of the same implementation can
+  misread the protocol identically & agree perfectly; that scenario exists to
+  catch what an end-to-end delivery test cannot see.
+- Runners take `--self-test-break` to corrupt an input & prove the assertions
+  fail. An assertion nobody has watched fail is not evidence.
+- Claims here carry the measurement behind them. Where a figure is calculated
+  rather than measured, it says so.
+
+If something in this repository looks wrong, it probably is. Open an issue.
