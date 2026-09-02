@@ -1,24 +1,51 @@
 # thicket-firmware
 
-A standalone [Reticulum](https://github.com/markqvist/Reticulum) & LXMF node
-on an nRF52840 with an SX1262, running at 915 MHz on a RAK4631. No daemon on a
-laptop and no app on a phone. Identity, encryption, routing & messaging all
-run on the microcontroller, built on
-[microReticulum](https://github.com/attermann/microReticulum) and
-[microLXMF](https://github.com/torlando-tech/microLXMF).
+Reticulum and LXMF running entirely on an nRF52840. No daemon on a laptop, no
+app on a phone: the identity, the encryption, the routing & the message store
+all live on the microcontroller. It runs today on a RAK4631, which is an
+nRF52840 with an SX1262 radio, and it has held a two-way conversation with the
+Python reference implementation over LoRa.
 
-Thicket is the firmware. A handheld is its first target, and that hardware
-doesn't exist yet, so every number below comes from a RAK4631 development
-board or from a host, never from a product.
+This is a development repository. First commit 2026-07-31, no release, no
+tagged version, and the handheld it's aimed at doesn't exist as hardware yet.
 
-## Status
+## What works today
 
-**It runs on hardware.** On 2026-08-03 a RAK4631 booted this firmware, brought
-up the SX1262 at 914.875 MHz, announced an LXMF delivery destination, received a
-message from a peer, decrypted it, and answered. The peer returned a delivery
-proof, so the reply arrived. Nothing was tethered.
+Every row below was run on a RAK4631 unless it says otherwise, and the date is
+when it last ran rather than when it was written.
 
-The log of that run:
+| capability | state | evidence, or what's missing | date |
+|---|---|---|---|
+| boots, brings up the SX1262, announces | works | serial capture | 2026-08-03 |
+| receives an LXMF message, decrypts, auto-replies | works | serial capture | 2026-08-03 |
+| talks to Python RNS 1.4.2 over LoRa | works | live exchange with `rnsd` on a Pi | 2026-08-05 |
+| stores messages encrypted at rest | works | write-then-read-back on the device | 2026-08-05 |
+| identity survives a power cycle | works | came back as `157c0f2c759d0b6acbd22034c0db0413`, loaded from external flash | 2026-09-01 |
+| stays reachable across that cycle | works | second board, 6 delivered, 0 failed | 2026-09-01 |
+| allocator pool stays bounded under load | works | 1,194 s soak, 94 inbound messages | 2026-09-01 |
+| starts a conversation with a silent peer | not built | TODO at the site in `src/main.cpp` | |
+| display, input, sleep | not built | TODO at each site | |
+| battery life | unmeasured | needs a profiler, not an anecdote | |
+| conformance suite on real hardware | unmeasured | every scenario runs on a host | |
+| talks to a phone client | untested | every peer so far was a board or a Pi | |
+
+## Running it on a RAK4631
+
+You need a RAK4631 and a data-capable USB cable. With an RAK15001 flash module
+in the IO slot, build `wiscore_rak4631` and the identity survives a power cycle.
+Without one, build `wiscore_rak4631-internalfs`, which keeps state in about
+28 KB of internal flash and mints a fresh identity on every boot.
+
+```
+pio run -e wiscore_rak4631-internalfs
+python3 scripts/board.py flash wiscore_rak4631-internalfs
+python3 scripts/board.py capture --seconds 20
+```
+
+A healthy boot prints six numbered stages, `[1/6]` through `[6/6]`, then its own
+address. If the radio
+comes up you'll see the band line, and once something messages that address the
+device answers by itself:
 
 ```
 [3/6] SX1262 radio (LoRaInterface)
@@ -38,306 +65,233 @@ The log of that run:
 LXMF: DELIVERED (proof received) b2715d15d4a106f9...
 ```
 
-`src/main.cpp` is the application. It brings up the SX1262, mounts storage,
-creates or loads a Reticulum identity, announces, runs an LXMF router, and
-answers messages sent to its `lxmf.delivery` address. The reply is composed,
-signed & encrypted on the device. The address it goes to is learned from the
-inbound message, never compiled in.
+The reply is composed, signed & encrypted on the device, and the address it goes
+back to is learned from the inbound message rather than compiled in. A stock
+build sends announces & replies and nothing else. Timed sending exists but
+needs both `-DTHICKET_AUTOSEND_INTERVAL_S=<n>` and `-DTHICKET_AUTOSEND_DEST=<32
+hex>` at build time, so you can't turn it on by accident.
 
-The reply body is diagnostic: a counter, uptime, the RSSI & SNR of the frame
-that arrived, and the first bytes of this device's identity hash, sized to fit
-one LoRa packet. The board has no screen and no buttons, so the peer's screen is
-the output device.
+`platformio.ini` defines nine environments, and four of them are the ones to
+build. `wiscore_rak4631` is the real one, with SoftDevice S140 and an 815,104 B
+app region; `-noble` drops BLE for 966,656 B; `-internalfs` swaps external
+flash for roughly 28 KB of internal flash; `-noflash` has no filesystem at all.
+The remaining five are `native` for the host tests and four instrumentation
+rigs. The last two regenerate the identity every boot, so neither says anything
+about persistence.
 
-A timed send exists as a fallback and is **off by default**. It requires both
-`-DTHICKET_AUTOSEND_INTERVAL_S=<n>` and `-DTHICKET_AUTOSEND_DEST=<32 hex chars>`
-at build time. A stock build transmits announces & replies, never unsolicited
-traffic.
+## Failure modes that look like something else
 
-### It interoperates with the reference implementation
+These four have each cost an afternoon. They're the reason `scripts/board.py`
+exists rather than a bare `pio run -t upload`.
 
-On 2026-08-05 this firmware exchanged messages with **Python RNS 1.4.2 and
-LXMF**, running `rnsd` on a Raspberry Pi with an RNode as its radio, over LoRa at
-914.875 MHz. That matters more than the earlier round trip, which was with a
-client built on the same C++ stack we are: a successful exchange there shows
-agreement with our own lineage, not with the specification.
+**A PlatformIO upload prints SUCCESS without programming anything.** The exit
+code is not the signal.
 
-Inbound arrived **DIRECT, over an RNS Link**: unpacked, source identity
-resolved, signature validated, delivery proof returned over the link. The reply
-went back **OPPORTUNISTIC** and was confirmed with `DELIVERED (proof received)`.
-Both messages were stored encrypted on the device. Link quality was −73 dBm at
-SNR 12.75 dB.
+`board.py` keys on `Device programmed` instead, so a
+board still running yesterday's image can't be mistaken for a firmware bug, and
+if you flash by hand it's the tool's output you want rather than its status.
 
-Since the reference implementation is the specification, this is the strongest
-compatibility claim available, and it's the direction that matters for a
-handheld: being reached rather than transmitting.
+**The boot banner is gone before a terminal can attach.** USB-CDC discards
+writes when no host is listening and the firmware prints its banner once, so
+`board.py` polls for the port every 20 ms to win that race, and attaching a
+second late captures nothing at all, which looks exactly like a dead board.
 
-The exchange was then repeated with the board **running from its battery, with
-nothing attached**. The message was delivered & the reply came back. That run was
-observed at the bench rather than captured to a log: running untethered means
-there's no serial connection to record it, and it's reported as such.
+**Do not hold the serial port open across an upload.** The DFU tool needs it,
+and a second reader makes the upload fail with a message about multiple access
+that reads like a bootloader version mismatch. It isn't one.
 
-**Identity now survives a power cycle, & the peer still reaches it.** On
-2026-09-01, with a RAK15001 external flash fitted, the board came back from a
-cable-out power cycle as `157c0f2c759d0b6acbd22034c0db0413` & reported the
-identity as loaded from external flash rather than minted fresh. A hash that
-merely matched wouldn't have been enough, so the firmware states where the
-identity came from. A second board kept sending throughout & was never
-restarted: after the cycle it delivered 6 messages to the same address with 0
-failures, having relearned nothing. Keeping an identity & remaining reachable
-are two claims, so both were tested.
+**Do not raise the allocator pool without a board on the bench.** Upstream's
+own RAK4631 environment ships 204,800 B, about 78% of the nRF52840's 262,144 B
+of SRAM, and that sits in a zone where the part hard-faults before USB
+enumerates. The board just looks dead.
 
-**Still unproven:** the peer was another board rather than a phone, & no
-battery life figure is claimed. The board was carrying a diagnostic build, & a
-runtime number needs a profiler, not an anecdote.
+Thicket sets 98,304 B. The reasoning behind that number is written out in
+`platformio.ini`, and it's worth reading before anyone changes it.
 
-### What that run didn't prove
+## The numbers, and what measures them
 
-**Persistence.** The round trip above ran under `wiscore_rak4631-internalfs`,
-a bring-up environment that keeps state in internal flash & regenerates the
-identity every boot, so that run said nothing about surviving a power cycle.
-That gap closed separately on 2026-09-01, with a RAK15001 fitted, recorded
-above.
-
-**Power.** The current firmware busy-loops the CPU. No battery figure is
-claimed, and none will be until a board and a profiler produce one.
-
-**Messages are now stored, and stored encrypted.** On 2026-08-05 a RAK4631
-received a message & kept it: both the inbound message and the reply were
-encrypted with AES-256-CTR & authenticated with HMAC-SHA256, under keys
-derived from the device's own X25519 private key. No passphrase is involved, so
-nothing waits on a user-interface decision. Because the keys derive from the
-identity, destroying the identity makes every stored message unreadable at
-once, with no wipe & no overwrite passes.
-
-The guarantee is narrower than "encrypted at rest" usually implies, and the
-difference matters: **the identity itself is still a plaintext file on the same
-flash.** Anyone who images the whole device reads it and derives these keys from
-it. What this defends is a message store that leaks *without* the identity, and
-it buys the erase property above. Closing the rest needs a passphrase-protected
-identity, which this device has no way to enter yet.
-
-Bring-up refuses to report the store attached unless it has just encrypted,
-written, read back & decrypted a file on the actual filesystem. That check
-exists because the device once reported a healthy store while every save
-failed. The internal-flash bring-up filesystem was full, & three messages
-were received, answered correctly, and dropped.
-
-**Not yet wired**, and marked with a TODO at each site in the source:
-initiating a conversation with a peer that hasn't written first, display,
-input, and sleep.
-
-### One finding from first boot
-
-**Check the silicon on your own board.** nRF52840 modules ship in several build
-codes, and the firmware prints its own at boot as `part=` and `variant=`. One of
-ours reads `variant=AAD0`, a Dxx-class part with `UICR.APPROTECT` erased to
-`0xFFFFFFFF`, so on that board the debug port is open and internal flash reads
-out over SWD with no attack required.
-
-On Fxx and later, lifting protection takes two independent actions:
-`UICR.APPROTECT` programmed to HwDisabled, and firmware writing
-`APPROTECT.DISABLE`. The 2020 LimitedResults voltage glitch defeats the first
-and can't perform the second, so the port stays shut for exactly one reason,
-which is that no code here does the software write.
-`scripts/check_approtect.py` asserts that at build time, because an absence
-rots silently.
-
-## Hardware
-
-The target is a custom carrier board around a **socketed RAK4631**, which stays
-a module rather than a redesign because it carries the FCC modular grant. A
-915 MHz antenna leaves through a bulkhead SMA. On SPI: a Sharp 400×240 1-bit
-memory LCD, which is write-only, so its 12,000 B framebuffer has to live in MCU
-RAM, and external flash for identity and the message store.
-
-On I2C: a keypad scanner, a haptic driver & LRA, a magnetic encoder reading
-the thumbwheel through a sealed wall, a fuel gauge, and an LED driver for the
-bargraph. Hall
-sensors, the piezo and the backlight sit on GPIO & PWM. Power is a single
-18650 behind a charger with two inputs, a sealed IP67 USB-C service port and a
-pogo dock for daily charging. NFC coil pads are reserved & unpopulated.
-
-**Nothing here has been fabricated.** No schematic exists, no board has been
-laid out, and most part choices are unvalidated against datasheets. The full
-block diagram and its caveats live in the mechanical & electrical repo, at
-`thicket-hardware/docs/architecture.md`.
-
-> That repository is **not published yet**, so the path above isn't a link.
-> This section will point at it once it is.
-
-The board definition & variant vendored in `boards/` and `variants/` describe
-the **development rig**, not that carrier board. Where the two disagree, the
-vendored variant is what the current firmware actually builds against.
-
-## Conformance
-
-`docs/parity-matrix.md` maps the stack we ship, microReticulum & microLXMF at
-the pins in `platformio.ini`, against the Python reference, module by module,
-with an evidence column.
-
-Eleven Reticulum rows. Six carry evidence, one is unassessed, and four have no
-counterpart on our side to compare at all. The page exists because the
-manual defines Reticulum as full interoperability & sufficient functional
-parity with the reference, so a coverage map that names its gaps is worth more
-than a claim that can't be checked. Read the Evidence column, not the Present
-column: a populated row isn't a passing row.
-
-`test_interop/` holds eleven scenarios. In five the **Python side originates**
-and this stack has to receive: a cold inbound packet, an LXMF delivery, a
-Python-initiated link, a packet relayed to us through a transport node, and two
-reference peers reaching each other *through* us. That's the direction that
-matters for a handheld, which spends its day being reached rather than
-transmitting.
-
-The other six check the stack against the reference without that shape:
-identity vectors, the wire oracle, encrypted-store vectors, upstream's own
-`Examples/Echo.py` run unmodified, a pool soak, and a two-node exchange. All
-eleven run in CI against pinned `rns==1.4.2` and `lxmf==1.1.1`, and each has
-been shown to fail when the behaviour it tests is broken.
-
-```
-PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
-```
-
-These run on hosts. **No conformance scenario has yet executed on a RAK4631**,
-and that's still true after the reference interoperation described above: that
-run was a real exchange with a live Python node, not this suite executing on the
-device. The two are separate claims & are kept separate deliberately. The
-suite asserts specific behaviours against fixed expectations, which a
-conversation between two nodes doesn't.
-
-## Building
-
-```
-pio run -e wiscore_rak4631          # SoftDevice S140, 815,104 B app region
-pio run -e wiscore_rak4631-noble    # no BLE, 966,656 B app region
-```
-
-Both must stay green. Two further environments exist for bring-up on a board
-with no RAK15001 in the IO slot. Neither persists anything & neither should
-be used for anything else:
-
-```
-pio run -e wiscore_rak4631-noflash      # no filesystem at all
-pio run -e wiscore_rak4631-internalfs   # ~28 KB internal flash instead
-```
-
-`-noflash` reaches the radio & announces, but `Identity::remember()` has
-nowhere to write, so no path is ever stored and a reply can be composed and
-never sent. `-internalfs` gives it somewhere real to write, which is what the
-round trip above needed. Both regenerate the identity every boot.
-
-### Flashing
-
-Use `scripts/board.py`, not `pio run -t upload` directly:
-
-```
-python3 scripts/board.py flash wiscore_rak4631-internalfs
-python3 scripts/board.py capture --seconds 20
-```
-
-It exists because two failure modes here look like something else. **A
-PlatformIO upload can print SUCCESS without programming anything**. It keys on
-`Device programmed` instead of the exit code, so a board still running the
-previous image can't be mistaken for a firmware bug. And **the boot banner is
-gone before a terminal can attach**: USB-CDC discards writes with no host
-listening and the firmware prints once, so it polls for the port every 20 ms to
-win that race. Attaching a second later captures nothing, which reads exactly
-like a dead board.
-
-Don't hold the serial port open across an upload. The DFU tool needs it, and a
-second reader makes it fail with a message about multiple access that reads like
-a bootloader version mismatch & isn't.
-
-Dependencies are pinned to explicit commits in
-`platformio.ini`; `scripts/patch_deps.py` applies portability patches to the
-fetched sources at build time & fails loudly if a pin moves under it.
-
-Size, measured from the Intel HEX by `scripts/hexsize.py` (`pio run`'s own
-Flash figure omits `.ARM.extab`, which isn't small on a stack that throws):
+Flash comes from the Intel HEX rather than from `pio run`, whose Flash figure
+omits `.ARM.extab`. That section isn't small on a stack that throws.
 
 | env | image | app region | used | free |
 |---|---|---|---|---|
 | `wiscore_rak4631` | 467,980 B | 815,104 B | 57.41% | 347,124 B |
 | `wiscore_rak4631-noble` | 468,124 B | 966,656 B | 48.43% | 498,532 B |
 
-Static RAM is 56,620 B in both envs. That's `.data` plus `.bss`, against a
-linker RAM region of 262,136 B.
+Static RAM is 56,620 B, `.data` plus `.bss`, against a linker region of
+262,136 B. Run `scripts/ramreport.py` for the breakdown and `scripts/hexsize.py`
+for the table above.
 
-Two notes on reading those numbers, both of which have caused wrong conclusions
-here:
+Read static RAM from the ELF section table rather than from
+`arm-none-eabi-size`, which reports the linker's `.heap` inside `bss` and so
+makes this firmware look like 232 KB of static RAM about to overflow. It isn't.
 
-- **`arm-none-eabi-size` is misleading on this target.** It reports the
-  linker's `.heap` section inside `bss`, so this firmware reads as roughly
-  232 KB of static RAM & looks about to overflow. It isn't. Read the ELF
-  section table. `scripts/ramreport.py` does, & attributes `.data`/`.bss`
-  per origin the way `scripts/mapsize.py` does for flash.
-- **`.heap` is a budget, not consumption.** The linker sizes it to fill
-  whatever is left, so it grows when static RAM shrinks. It's 240,932 B here.
+`.heap` is a budget the
+linker sizes to fill whatever is left, currently 203,468 B, so it grows when
+static RAM shrinks.
 
-The Reticulum allocator pool takes a further 98,304 B from that heap at
-runtime, & no static size report shows it. It was 65,536 B during bring-up,
-raised once there was a board to measure on, because fragmentation tracks
-message traffic rather than uptime. At 64 KiB the pool went from 2% fragmented
-at boot to 16% after one inbound message & reply.
+The Reticulum allocator pool takes a further 98,304 B out of that heap at
+runtime. No static size report shows it. It was 65,536 B during bring-up and
+got raised once there was a board to measure on, because fragmentation tracks
+message traffic rather than uptime, and at 64 KiB it went from 2% at boot to
+16% after a single inbound message and reply.
 
-**That 16% is where it settles, not a point on a climb.** A 1,194 s soak on the
-board, with 94 inbound messages arriving over LoRa from a second RAK4631, held
-fragmentation between 15.99% & 15.92% and peaked at 19.64%. High-water use was
-60,308 B of the 98,304 B pool, 61%, leaving 37,996 B free. Idle over the same
+That 16% is where it settles, not a point on a climb. A 1,194 s soak with 94
+inbound messages arriving over LoRa from a second RAK4631 held fragmentation
+flat, 15.99% at the start against 15.92% at the end, with a 19.64% worst sample
+and a high-water mark of 60,308 B of the 98,304 B pool. Idle over the same
 window sat at 1.7%.
 
-`test_interop/run_pool_soak.sh` runs the same measurement on a host & returns a
-plateau-or-climb verdict against stated thresholds. Over 2,000 message cycles
-mean use moves from 24,167 B to 24,164 B and fragmentation from 2.13% to 2.13%,
-peaking at 2.59%. It exercises the outbound path only, & prints that as a
-coverage warning at the end of every run, because with no peer nothing is
-delivered.
+`test_interop/run_pool_soak.sh` runs the same measurement on a host and returns
+a plateau-or-climb verdict against stated thresholds, and over 2,000 cycles mean
+use moves from 24,167 B to 24,164 B while fragmentation holds flat at 2.13%. It
+covers the outbound path only, and prints that as a coverage warning at the end
+of every run, because with no peer nothing is ever delivered.
 
-**Measured on the board** after full bring-up, with the radio in continuous
-receive and the messaging layer live: 120,964 B of heap in use, 48,360 B of
-allocator pool free, and 116,040 B of system heap still spare. Don't raise the
-pool further without a board on the bench. A pool above roughly 75% of SRAM
-hard-faults before USB enumerates, and the board then looks dead.
+Pool sizing isn't settled. The 61% high-water mark suggests headroom to
+reclaim, but shrinking it needs a board attached and a second traffic profile
+first, since one peer every 20 seconds isn't the same load as several peers
+holding concurrent links.
 
-The application's work runs in a task the firmware creates with an 8,192 B
-stack rather than in `loop()`, whose stack the Arduino core fixes at 4,096 B
-& doesn't expose to a build flag. That's not a precaution. After 51 inbound
-messages the task reported 3,324 B free at its low-water mark, so peak depth
-was 4,868 B, and the 4,096 B ceiling would have been gone before the deepest
-frame ran.
+Application work runs in a task with an 8,192 B stack rather than in `loop()`,
+whose stack the Arduino core fixes at 4,096 B and doesn't expose to a build
+flag.
 
-`scripts/stackusage.py` reports worst-case frames from the compiler &
-cross-checks them against the linked image, so garbage-collected code isn't
-mistaken for a live hazard.
+That's not a precaution. After 51 inbound messages the task reported
+3,324 B free at its low-water mark, so peak depth was 4,868 B, and the 4,096 B
+ceiling would have been gone before the deepest frame ran.
+`scripts/stackusage.py` cross-checks compiler frame sizes against the linked
+image.
 
-Board definition & variant for the RAK4631 are vendored in `boards/` and
-`variants/` (mirrored from
-[microReticulum_Firmware](https://github.com/attermann/microReticulum_Firmware);
-`variants/rak4630/variant.h` carries one local change, marked in place, giving
-the radio its own SPI instance so it can't steal the external-flash bus).
+## Talking to the reference implementation
 
-## Standing on
+On 2026-08-05 this firmware exchanged messages with Python RNS 1.4.2 and LXMF,
+running `rnsd` on a Raspberry Pi with an RNode as its radio. Inbound arrived
+DIRECT over an RNS Link and was unpacked, source identity resolved, signature
+validated & delivery proof returned, and the reply went back OPPORTUNISTIC to
+come home as `DELIVERED (proof received)` at -73 dBm and SNR 12.75 dB.
 
-- [microReticulum](https://github.com/attermann/microReticulum), C++ RNS (Apache-2.0)
-- [microLXMF](https://github.com/torlando-tech/microLXMF), C++ LXMF messenger layer (GPL-3.0)
-- [microStore](https://github.com/attermann/microStore), embedded key-value persistence (Apache-2.0)
-- [RadioLib](https://github.com/jgromes/RadioLib), SX1262 driver (MIT)
-- [microReticulum_Firmware](https://github.com/attermann/microReticulum_Firmware), RNode-style firmware w/ RAK4631 target (GPL-3.0)
-- [Reticulum](https://github.com/markqvist/Reticulum), the protocol and its reference
-  implementation, under the custom
-  [Reticulum License](https://github.com/markqvist/Reticulum/blob/master/LICENSE):
-  MIT terms plus two restrictions, no use in systems able to purposefully harm
-  people, and no use contributing to AI or machine-learning training. Not an
-  OSI-approved licence, and GitHub doesn't classify it. We ship none of this
-  code: it's the specification we conform to, and CI installs it to run as the
-  peer our interop tests are checked against.
+The same exchange was repeated on 2026-08-05 with the board on its own battery,
+nothing attached. The message went out and the reply came back. That run was
+watched at the bench rather than captured, because untethered means no serial
+line to record it, so it's reported here rather than shown.
+
+That matters more than the earlier round trip, which ran against a client built
+on the same microReticulum pin in `platformio.ini`. Two nodes of one
+implementation can misread the protocol identically and agree perfectly, so
+with the reference standing as the specification, agreement with it is the only
+compatibility claim worth making.
+
+`test_interop/` holds eleven scenarios. In five the Python side originates and
+this stack has to receive, which is the direction a handheld lives in: a cold
+inbound packet, an LXMF delivery, a Python-initiated link, a packet relayed
+through a transport node, and two reference peers reaching each other through
+this stack. The other six check encoding and behaviour directly, including
+upstream's own `Examples/Echo.py` run unmodified.
+
+```
+PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
+```
+
+All eleven run in CI on every push against pinned `rns==1.4.2` and
+`lxmf==1.1.1`, and each runner takes `--self-test-break` to corrupt an input
+and prove its assertions fail, because an assertion nobody has ever watched
+fail isn't evidence.
+
+`docs/parity-matrix.md` maps the stack module by module against the Python
+reference. Eleven Reticulum rows: six carry evidence, one is unassessed, and
+four have no counterpart on the C++ side to compare against, which is a
+different statement from untested, and the table keeps the two apart. Read the
+Evidence column, not the Present column.
+
+## What the encryption protects
+
+Messages are stored encrypted with AES-256-CTR and authenticated with
+HMAC-SHA256, under keys derived from the device's own X25519 private key. No
+passphrase is involved. Nothing waits on a user-interface decision.
+
+Because those keys derive from the identity, deleting the identity makes every
+stored message unreadable at once. That's crypto-erase. One key, deleted, with
+no wipe & no overwrite passes. On a sealed handheld with no wipe button, that's
+the difference between destroying one key and overwriting the 37,384 B the
+message store occupies.
+
+Bring-up refuses to report the store attached until it has encrypted, written,
+read back and decrypted a file on the real filesystem. All four steps. That
+check exists because the device once reported a healthy store while every save
+into its 28 KB internal-flash filesystem was failing. That filesystem was full,
+and three messages arrived, were answered correctly, and went nowhere.
+
+The identity itself is still a plaintext file on the same flash, so anyone who
+images the whole device reads it and derives the AES-256-CTR message keys from
+it. What the encryption buys is a store that stays unreadable to anyone who
+gets the flash without that identity file. Closing the rest needs a passphrase-
+protected identity, and this device has nowhere to type one.
+
+Check your own silicon before trusting internal flash. nRF52840 modules ship in
+several build codes and the firmware prints its own at boot, as `part=` and
+`variant=`. One RAK4631 on this bench reads `variant=AAD0`, a Dxx-class part
+with `UICR.APPROTECT` erased to `0xFFFFFFFF`, so on that board the debug port
+is open and internal flash reads out over SWD with no attack required.
+
+On Fxx and later, lifting protection takes two independent actions,
+`UICR.APPROTECT` programmed to HwDisabled & firmware writing
+`APPROTECT.DISABLE`, and the 2020 LimitedResults voltage glitch defeats the
+first while it can't perform the second, so the port stays shut for exactly
+one reason, which is that no code here does the software write.
+`scripts/check_approtect.py` asserts that at build time, because an absence
+rots silently.
+
+## The handheld this is aimed at
+
+None of this exists. No schematic, no layout, and most part choices unvalidated
+against datasheets. The RAK4631 module is the only part here that has been
+bought and run.
+
+The target is a custom carrier board around a socketed RAK4631, kept as a
+module rather than a redesign because the module carries the FCC modular grant.
+A 915 MHz antenna leaves through a bulkhead SMA. SPI carries a Sharp 400×240
+1-bit memory LCD, write-only, so its 12,000 B framebuffer has to live in MCU
+RAM, plus external flash for the identity & the message store.
+
+I2C carries a keypad scanner, a haptic driver & LRA, a magnetic encoder reading
+the thumbwheel through a sealed wall, a fuel gauge, and an LED driver for the
+bargraph. Hall sensors, the piezo & the backlight sit on GPIO and PWM, and
+power is a single 18650 behind a two-input charger, with a sealed IP67 USB-C
+service port and a pogo dock for daily charging. NFC coil pads are reserved and
+unpopulated.
+
+The board definition in `boards/` and the variant in `variants/` describe the
+development rig rather than that carrier board, and where the two disagree the
+vendored variant is what the firmware builds against.
+
+## What this is built on
+
+- [microReticulum](https://github.com/attermann/microReticulum), C++ RNS, Apache-2.0
+- [microLXMF](https://github.com/torlando-tech/microLXMF), C++ LXMF, GPL-3.0
+- [microStore](https://github.com/attermann/microStore), embedded key-value persistence, Apache-2.0
+- [RadioLib](https://github.com/jgromes/RadioLib), SX1262 driver, MIT
+- [microReticulum_Firmware](https://github.com/attermann/microReticulum_Firmware), RNode-style firmware with a RAK4631 target, GPL-3.0
+- [Reticulum](https://github.com/markqvist/Reticulum), the protocol & its reference implementation
+
+Reticulum ships under the [Reticulum
+License](https://github.com/markqvist/Reticulum/blob/master/LICENSE), MIT terms
+plus two restrictions: no use in systems able to purposefully harm people, and
+no use contributing to AI or machine-learning training. It isn't OSI-approved
+and GitHub doesn't classify it.
+
+Thicket ships none of that code. It's the specification this firmware conforms
+to, and CI installs `rns==1.4.2` to act as the peer those tests are checked
+against.
 
 `lib/LoRaInterface/` is vendored from microReticulum's
-`examples/common/lora_interface/` (Apache-2.0) because PlatformIO can't depend
-on a subdirectory of a repository. Origin commit and local changes are in
+`examples/common/lora_interface/`, Apache-2.0, because PlatformIO can't depend
+on a subdirectory of a repository. Origin commit & local changes are listed in
 `lib/LoRaInterface/README.md`.
+
+Dependencies are pinned to explicit commits in `platformio.ini`, and
+`scripts/patch_deps.py` applies portability patches at build time and fails
+loudly if a pin moves underneath it.
 
 ## License
 
@@ -346,26 +300,16 @@ GPL-3.0-or-later. See `LICENSE`.
 ## AI use
 
 Most of this code, and most of this README, was written by an LLM working under
-a human maintainer who reviews & rules on every commit. Saying so is a
-recommendation of the Reticulum community's rules for LLM-assisted projects, &
-withholding it while writing this much prose this fast would be dishonest.
+a human maintainer who reviews and rules on every commit.
 
-The reason to state it here rather than bury it: an LLM will produce something
-that compiles, passes its own tests, and doesn't interoperate. That failure is
-silent. The controls in this repository exist because of it, & they're the
-part worth judging:
+It belongs at the top of your judgement rather than in a footnote, because an
+LLM will produce something that compiles, passes its own tests, and doesn't
+interoperate. That failure is silent. The controls above exist because of it,
+and they're the part worth judging: pinned reference versions in CI, a wire
+oracle that decodes this stack's packets with the reference's own `RNS.Packet`
+and compares field by field, runners that can be told to break themselves, and
+a parity page that names its own gaps.
 
-- Every interop scenario runs against a pinned Python RNS, currently 1.4.2, in
-  CI on every push. The reference implementation is the specification, so
-  agreement with ourselves proves nothing.
-- `test_interop/wire_oracle` decodes packets we pack using the reference's own
-  `RNS.Packet` & compares field by field, including whether a named constant
-  means the same number on both sides. Two nodes of the same implementation can
-  misread the protocol identically & agree perfectly; that scenario exists to
-  catch what an end-to-end delivery test can't see.
-- Runners take `--self-test-break` to corrupt an input & prove the assertions
-  fail. An assertion nobody has watched fail isn't evidence.
-- Claims here carry the measurement behind them. Where a figure is calculated
-  rather than measured, it says so.
-
-If something in this repository looks wrong, it probably is. Open an issue.
+If something in this repository looks wrong, it is. `docs/parity-matrix.md`
+lists four Reticulum modules with no counterpart on this side, and that page is
+the honest one. Open an issue.
