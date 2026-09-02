@@ -95,9 +95,9 @@ runtime number needs a profiler, not an anecdote.
 
 **Persistence.** The round trip above ran under `wiscore_rak4631-internalfs`,
 a bring-up environment that keeps state in internal flash & regenerates the
-identity every boot. The identity surviving a power cycle is the other half of
-the done-condition and it needs a RAK15001 in the IO slot, which hasn't been
-tested.
+identity every boot, so that run said nothing about surviving a power cycle.
+That gap closed separately on 2026-09-01, with a RAK15001 fitted, recorded
+above.
 
 **Power.** The current firmware busy-loops the CPU. No battery figure is
 claimed, and none will be until a board and a profiler produce one.
@@ -142,12 +142,12 @@ it. Anything that depends on a secret in internal flash needs Fxx+ silicon.
 The target is a custom carrier board around a **socketed RAK4631**, which stays
 a module rather than a redesign because it carries the FCC modular grant. A
 915 MHz antenna leaves through a bulkhead SMA. On SPI: a Sharp 400×240 1-bit
-memory LCD, which is write-only, so its 13.5 KB framebuffer has to live in MCU
+memory LCD, which is write-only, so its 12,000 B framebuffer has to live in MCU
 RAM, and external flash for identity and the message store.
 
-On I2C: a keypad
-scanner, a haptic driver & LRA, a magnetic encoder reading the thumbwheel
-through a sealed wall, a fuel gauge, and an LED driver for the bargraph. Hall
+On I2C: a keypad scanner, a haptic driver & LRA, a magnetic encoder reading
+the thumbwheel through a sealed wall, a fuel gauge, and an LED driver for the
+bargraph. Hall
 sensors, the piezo and the backlight sit on GPIO & PWM. Power is a single
 18650 behind a charger with two inputs, a sealed IP67 USB-C service port and a
 pogo dock for daily charging. NFC coil pads are reserved & unpopulated.
@@ -177,14 +177,18 @@ parity with the reference, so a coverage map that names its gaps is worth more
 than a claim that can't be checked. Read the Evidence column, not the Present
 column: a populated row isn't a passing row.
 
-`test_interop/` holds six scenarios in which the **Python side originates** and
-this stack has to receive: a cold inbound packet, an LXMF delivery, identity
-vectors, a Python-initiated link, a packet relayed to us through a transport
-node, and two reference peers reaching each other *through* us. That direction
-is the one that matters for a handheld, which spends its day being reached
-rather than transmitting. They run in CI against pinned `rns==1.4.2` and
-`lxmf==1.1.1`, and each has been shown to fail when the behaviour it tests is
-broken.
+`test_interop/` holds eleven scenarios. In five the **Python side originates**
+and this stack has to receive: a cold inbound packet, an LXMF delivery, a
+Python-initiated link, a packet relayed to us through a transport node, and two
+reference peers reaching each other *through* us. That's the direction that
+matters for a handheld, which spends its day being reached rather than
+transmitting.
+
+The other six check the stack against the reference without that shape:
+identity vectors, the wire oracle, encrypted-store vectors, upstream's own
+`Examples/Echo.py` run unmodified, a pool soak, and a two-node exchange. All
+eleven run in CI against pinned `rns==1.4.2` and `lxmf==1.1.1`, and each has
+been shown to fail when the behaviour it tests is broken.
 
 ```
 PATH="/path/to/venv/bin:$PATH" bash test_interop/run_all.sh
@@ -249,10 +253,10 @@ Flash figure omits `.ARM.extab`, which isn't small on a stack that throws):
 
 | env | image | app region | used | free |
 |---|---|---|---|---|
-| `wiscore_rak4631` | 434,688 B | 815,104 B | 53.33% | 380,416 B |
-| `wiscore_rak4631-noble` | 434,832 B | 966,656 B | 44.98% | 531,824 B |
+| `wiscore_rak4631` | 467,980 B | 815,104 B | 57.41% | 347,124 B |
+| `wiscore_rak4631-noble` | 468,124 B | 966,656 B | 48.43% | 498,532 B |
 
-Static RAM is 19,156 B in both envs. That's `.data` plus `.bss`, against a
+Static RAM is 56,620 B in both envs. That's `.data` plus `.bss`, against a
 linker RAM region of 262,136 B.
 
 Two notes on reading those numbers, both of which have caused wrong conclusions
@@ -311,8 +315,8 @@ the radio its own SPI instance so it can't steal the external-flash bus).
 
 `lib/LoRaInterface/` is vendored from microReticulum's
 `examples/common/lora_interface/` (Apache-2.0) because PlatformIO can't depend
-on a subdirectory of a repository. Origin commit and the list of local changes
-are in `lib/LoRaInterface/README.md`.
+on a subdirectory of a repository. Origin commit and local changes are in
+`lib/LoRaInterface/README.md`.
 
 ## License
 

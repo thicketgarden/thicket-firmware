@@ -139,46 +139,23 @@ the firmware does.
 
 ## Known divergences this suite has found
 
-1. **`RNS::Cryptography::hkdf()` ignores its `context` argument.**
-   `Cryptography/HKDF.cpp` calls `HKDFCommon::extract(out, len)` and never
-   passes `context`, though the underlying `attermann/Crypto` API accepts
-   `extract(out, outLen, info, infoLen)`. The reference mixes context into
-   every expansion block. No packet is affected today, `get_context()` returns
-   empty on both sides, but it's a silently wrong public function. Pinned as
-   a strict expected-failure in `identity_vectors/src/main.cpp`: if it's ever
-   fixed, that check goes red and forces the exemption to be deleted.
+The register lives in `docs/parity-matrix.md`, under "Where we know we
+diverge", and its numbering is what the rest of the repo cites. Repeating the
+detail here gave the same divergences two different numberings, which is how
+"divergence 4" comes to mean two things. So this section carries only the half
+that belongs to the suite: which scenario pins which divergence.
 
-2. **The microReticulum fork carries three crypto fixes that
-   `platformio.ini` does not mention.** Its comment says the fork "carries
-   exactly one change" (the Transport store init). `git log 40fa6288..HEAD`
-   shows four: the store init, PKCS#7 padding, an HMAC double-feed, and X25519
-   clamping on key import. The X25519 one is load-bearing and is demonstrated
-   above.
+A pin is a strict expected failure. Fix the watchdog upstream and
+`run_link_inbound.sh` goes red, forcing the exemption to be deleted on purpose.
+That's the only arrangement in which an upstream fix can't slip past
+unnoticed: a scenario that still passes once the bug is gone has quietly
+stopped testing anything.
 
-3. **There is no Link watchdog.** `Link::start_watchdog()` (Link.cpp:884) has an
-   empty body and `Link::__watchdog_job()` sits inside a `/*p TODO */` comment
-   block, so `Link::send_keepalive()`, which is compiled, has no caller.
-   Consequences: a C++ link initiator never sends keepalives, a PENDING link
-   never times out, and an ACTIVE link never goes STALE. Answering an inbound
-   keepalive does work (Link.cpp:1455-1460 is live), which is what the link
-   scenario exercises. Pinned as a strict expected failure in
-   `link_inbound_responder/src/main.cpp`.
-
-4. **Link proof validation is disabled.** `PacketReceipt::validate_link_proof`
-   (Packet.cpp:907) reads `//z if (link.validate(signature, _object->_hash)) {`
-   followed by `if (false) {`, so a receipt for a packet sent over a Link never
-   reaches DELIVERED and its delivery callback never fires. Not covered by a
-   scenario yet, the LXMF scenario uses OPPORTUNISTIC delivery, which proves
-   through the Destination rather than the Link. This is the same bug
-   microLXMF's conformance work found and fixed in *torlando-tech's*
-   microReticulum fork; our fork descends from attermann's and doesn't have
-   that fix.
-
-5. **IFAC is still pseudocode** on the transmit path (Transport.cpp:1111-1145,
-   inside `/*p ... */`).
-
-6. **`Channel` has no implementation.** `Channel.cpp` is 26 lines of includes
-   and nothing else, `Link::get_channel()` is commented out (Link.cpp:1136), and
-   the `Type::Packet::CHANNEL` branch of `Link::receive` is commented out
-   (Link.cpp:1489). There's no API to open a channel, so a Channel
-   scenario can't be written against this pin.
+| divergence | pinned in |
+|---|---|
+| `Cryptography::hkdf()` ignores its `context` argument | `identity_vectors/src/main.cpp` |
+| no Link watchdog, so a C++ initiator never sends keepalives | `link_inbound_responder/src/main.cpp` |
+| Link proof validation disabled (`if (false)`, Packet.cpp:907) | not pinned; no scenario reaches it |
+| IFAC still pseudocode on the transmit path (Transport.cpp:1111-1145) | not pinned; no scenario reaches it |
+| `Channel` has no implementation | not pinned; there's no API to open a channel |
+| the fork carries four changes, not the one `platformio.ini` names | not pinned; see the register |
