@@ -21,3 +21,9 @@ path_store/
 
 # Local state from scripts/persistence-check.sh
 .persistence-check*
+
+# vault_vectors writes these when it runs
+test_interop/vault_vectors/vault_test
+test_interop/vault_vectors/vault_short
+test_interop/vault_vectors/vault_tampered
+test_interop/vault_vectors/vault_tries
