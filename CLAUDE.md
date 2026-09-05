@@ -6,13 +6,36 @@ Goal: the full RNS/LXMF stack running ON the device, identity, encryption,
 message composition & delivery on-device (this isn't an RNode; the host is
 the device).
 
+## Commands
+
+```sh
+pio run -e wiscore_rak4631          # THE gate. Must be green for every change.
+pio test -e native                  # 106 host unit tests, seconds
+python3 scripts/check_pins.py       # deps agree across root + scenarios + inside the dep
+python3 scripts/check_public_text.py --all   # rule 11; a pre-push hook also runs it
+
+PATH="/path/to/rnsvenv/bin:$PATH" bash test_interop/run_all.sh   # 12 scenarios
+                                    # needs rns==1.4.2 lxmf==1.1.1; uv venv works
+
+python3 scripts/board.py boards     # serial numbers; NEVER trust port names
+python3 scripts/board.py flash wiscore_rak4631-internalfs --seconds 20
+python3 scripts/ramreport.py [env]  # real static RAM; arm-none-eabi-size lies here
+python3 scripts/hexsize.py .pio/build/<env>/firmware.hex 815104   # real flash
+```
+
+Envs: `wiscore_rak4631` (real), `-noble` (no BLE), `-internalfs` and `-noflash`
+(bring-up, identity regenerated every boot), `-vault` (identity sealed under a
+code), `-soak`, `-bench`, `-traffic`, `-traffic-format` (instrumentation).
+
 ## Build
 
-- PlatformIO. The gate for every change: `pio run -e wiscore_rak4631` green.
 - Board def + variant live in `boards/` and `variants/` (mirrored from
   attermann/microReticulum_Firmware; stock nordicnrf52 has no RAK4630/4631).
 - `#include <Adafruit_TinyUSB.h>` is required wherever USB-CDC Serial is used,
   or the link fails with undefined `Adafruit_USBD_CDC` references.
+- Bumping a dependency SHA means re-running the interop suite and recording the
+  reference version it passed against, in the pin comment. Scenario
+  `platformio.ini` files pin independently; `check_pins.py` catches drift.
 
 ## Architecture conventions
 
