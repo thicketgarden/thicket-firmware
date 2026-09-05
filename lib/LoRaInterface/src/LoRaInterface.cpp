@@ -55,6 +55,15 @@
 #ifndef THICKET_SX1262_TCXO_VOLTAGE
 #define THICKET_SX1262_TCXO_VOLTAGE 1.8
 #endif
+// --- Thicket modification 4: SX1262 regulator mode is a build flag ---------
+// false selects the DC-DC buck, true the LDO. Upstream hard-codes false. The
+// power budget's whole DC-DC story rests on the LDO costing ~4.2 mA more, and
+// that has never been measured on this board. A flag makes the falsification
+// test a build rather than an edit to vendored code.
+#ifndef THICKET_SX1262_USE_LDO
+#define THICKET_SX1262_USE_LDO false
+#endif
+
 #ifndef THICKET_SX1262_OCP_MA
 #define THICKET_SX1262_OCP_MA 140.0
 #endif
@@ -175,7 +184,7 @@ bool LoRaInterface::start() {
 	// TODO(bring-up): settle this on the bench and record the answer.
 	int state = chip->begin(frequency, bandwidth, spreading, coding,
 	                        RADIOLIB_SX126X_SYNC_WORD_PRIVATE, power, 20,
-	                        THICKET_SX1262_TCXO_VOLTAGE, false);
+	                        THICKET_SX1262_TCXO_VOLTAGE, THICKET_SX1262_USE_LDO);
 	// --- Thicket modification 3: over-current protection ceiling --------------
 	// RadioLib's SX126x::begin() leaves OCP at the reset default (60 mA).
 	// RAK's datasheet draws 92 mA at +17 dBm and 125 mA at +20 dBm in PA-boost,
