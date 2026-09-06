@@ -95,6 +95,17 @@ code), `-soak`, `-bench`, `-traffic`, `-traffic-format` (instrumentation).
   grant's* tested level, not a hardware limit.
 - Determinism: scripts build/flash; changes are judged by build + on-target
   behavior, not by reading tea leaves.
+- **Network citizenship: `docs/network-citizenship.md` binds every packet this
+  firmware emits.** Links are shared and slow, and the budget is the LoRa link
+  rather than the bench. Rate-limit every outbound class with exponential
+  backoff and no tight retry loops; bound concurrency and per-link resources,
+  and fail closed at a bound; never poll on a timer when an announce or an event
+  can tell you instead; keep announce app data far below the ~284 bytes that
+  actually fit. **Be able to say why each packet type is sent and how often, or
+  it doesn't ship.** Anything that fetches from a node we don't own has its own
+  harder rules in that file: discover via announces and never probe, one request
+  per node per day, reuse links, one stable identity, and honour a refusal
+  permanently.
 
 ## License
 
