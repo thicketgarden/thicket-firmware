@@ -225,8 +225,7 @@ The identity itself is still a plaintext file on the same flash, so anyone who
 images the whole device reads it and derives the AES-256-CTR message keys from
 it. What the encryption buys is a store that stays unreadable to anyone who
 gets the flash without that identity file. Closing the rest needs a passphrase-
-protected identity, and `wiscore_rak4631-vault` is a first cut at one. It seals
-the 64 private key bytes with AES-256-CTR under a key from PBKDF2-HMAC-SHA256
+protected identity. `wiscore_rak4631-vault` seals the 64 private key bytes with AES-256-CTR under a key from PBKDF2-HMAC-SHA256
 at 100,000 iterations, and refuses to open on a wrong code & a single flipped
 bit. It costs 1,448 B of flash and no RAM.
 
@@ -253,9 +252,24 @@ power mid-attempt costs a try rather than granting a free one, and the tenth
 failure deletes the vault, which deletes the only copy of the key & every
 stored message with it.
 
-The code is a build flag rather than something anyone types, because the input
-design isn't settled. `wiscore_rak4631-vault` carries it & the stock env is
-untouched. The handheld's thumbwheel is the intended way to enter one, and none
+**A secure element on the carrier board is what closes that gap.** It sits on
+the I2C bus the board already runs. The key stays inside the part, the limit on
+guesses is enforced there rather than in a file an attacker can restore, and
+imaging the flash stops being enough on its own. That's the whole reason six
+digits is fine on a phone.
+
+A code is how a person opens it. The secure element doesn't replace the
+passphrase, it makes a short one worth something. **No part is selected:** the
+device, its current draw, package, and whether it needs a host-side driver are
+all open. Nothing is fabricated, so choosing costs a footprint and a few traces
+rather than a board respin.
+
+**Development builds are not sealed.** The stock `wiscore_rak4631` writes a
+plaintext identity to external flash and asks for nothing at boot, which is
+what a bench board reflashed twenty times in a morning wants.
+`wiscore_rak4631-vault` is the env that seals it. The code there is a build
+flag rather than something anyone types, because the input design isn't
+settled: the handheld's thumbwheel is the intended way to enter one, and none
 of that hardware is built.
 
 Check your own silicon before trusting internal flash. nRF52840 modules ship in
