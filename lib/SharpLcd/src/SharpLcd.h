@@ -65,6 +65,15 @@ public:
 	// text stays monospaced.
 	uint16_t draw_text_scaled(uint16_t x, uint16_t y, const char* s,
 	                          bool black = true, uint8_t scale = 1);
+	// Cozette hi-DPI, 12x26. A real 2x face, not the 6x13 pixel-doubled: the
+	// glyphs are drawn for the size. Only ASCII and Latin-1 are carried, and a
+	// codepoint outside that returns 0 so the caller can fall back rather than
+	// draw a hole at double size. Returns the x just past the last glyph.
+	uint16_t draw_text_big(uint16_t x, uint16_t y, const char* s, bool black = true);
+	static bool big_has(uint32_t cp);
+	static uint8_t big_text_w();
+	static uint8_t big_text_h();
+
 	void fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black);
 	void draw_hline(uint16_t x, uint16_t y, uint16_t w, bool black);
 	bool get_pixel(uint16_t x, uint16_t y) const;

@@ -3,6 +3,7 @@
 
 #include "SharpLcd.h"
 #include "CozetteFont.h"
+#include "CozetteBig.h"
 
 #include <string.h>
 
@@ -65,7 +66,8 @@ static const uint8_t* glyph_for(uint32_t cp) {
 }
 
 // Minimal UTF-8: advances `s` past one codepoint.
-static uint32_t next_cp(const char*& s) {
+uint32_t next_cp(const char*& s);
+uint32_t next_cp(const char*& s) {
 	const uint8_t c = (uint8_t)*s++;
 	if (c < 0x80) return c;
 	uint32_t cp; int extra;
@@ -187,6 +189,44 @@ void SharpLcd::clear() {
 
 	memset(_fb, 0xFF, LCD_FB_BYTES);
 	memset(_dirty, 0, sizeof(_dirty));   // panel & buffer now agree
+}
+
+}  // namespace thicket
+
+namespace thicket {
+namespace {
+const uint16_t* big_glyph(uint32_t cp) {
+	uint16_t lo = 0, hi = BIGFONT_COUNT;
+	while (lo < hi) {
+		const uint16_t mid = (uint16_t)((lo + hi) / 2);
+		if (BIGFONT[mid].cp == cp) return BIGFONT[mid].rows;
+		if (BIGFONT[mid].cp < cp) lo = (uint16_t)(mid + 1);
+		else hi = mid;
+	}
+	return nullptr;
+}
+}  // namespace
+
+bool SharpLcd::big_has(uint32_t cp) { return big_glyph(cp) != nullptr; }
+uint8_t SharpLcd::big_text_w() { return BIGFONT_W; }
+uint8_t SharpLcd::big_text_h() { return BIGFONT_H; }
+
+uint16_t SharpLcd::draw_text_big(uint16_t x, uint16_t y, const char* s, bool black) {
+	while (*s) {
+		const uint32_t cp = next_cp(s);
+		const uint16_t* g = big_glyph(cp);
+		if (g) {
+			for (uint8_t row = 0; row < BIGFONT_H; ++row) {
+				const uint16_t bits = g[row];
+				if (!bits) continue;
+				for (uint8_t col = 0; col < BIGFONT_INK_W; ++col)
+					if (bits & (uint16_t)(0x8000u >> col))
+						set_pixel((uint16_t)(x + col), (uint16_t)(y + row), black);
+			}
+		}
+		x = (uint16_t)(x + BIGFONT_W);
+	}
+	return x;
 }
 
 }  // namespace thicket

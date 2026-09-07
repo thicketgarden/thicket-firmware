@@ -42,9 +42,10 @@ static uint16_t render(SharpLcd& lcd, PageRenderer& r, uint16_t scroll) {
 }
 
 int main(int argc, char** argv) {
-	if (argc < 3) { std::fprintf(stderr, "usage: render_page <page.mu> <out-prefix> [leading] [flat]\n"); return 2; }
+	if (argc < 3) { std::fprintf(stderr, "usage: render_page <page.mu> <out-prefix> [leading] [flat|step] [2x]\n"); return 2; }
 	const uint8_t lead = argc > 3 ? (uint8_t)atoi(argv[3]) : 0;
 	const bool stepped = !(argc > 4 && std::strcmp(argv[4], "flat") == 0);
+	const bool big = argc > 5 && std::strcmp(argv[5], "2x") == 0;
 
 	FILE* f = std::fopen(argv[1], "rb");
 	if (!f) { std::fprintf(stderr, "cannot open %s\n", argv[1]); return 1; }
@@ -53,7 +54,7 @@ int main(int argc, char** argv) {
 	std::fclose(f);
 
 	VirtualPanel panel; SharpLcd lcd(panel, fb);
-	PageRenderer r(lcd, lead, stepped);
+	PageRenderer r(lcd, lead, stepped, big);
 
 	const uint16_t h = render(lcd, r, 0);
 	char out[512];

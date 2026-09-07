@@ -15,6 +15,12 @@ LEAD="${2:-0}"; FLAT="${3:-}"
 MC=.pio/libdeps/native/micron-cpp/src
 [[ -d "$MC" ]] || { echo "[pages] micron-cpp not fetched; run: pio test -e native"; exit 1; }
 
+# path -> mode, for files the manifest marks 100755.
+MODES=""
+if [[ -f "$CORPUS/MANIFEST.tsv" ]]; then
+  MODES=$(awk -F'\t' 'NR>1 && $6=="100755" {print $1"\t"}' "$CORPUS/MANIFEST.tsv")
+fi
+
 mkdir -p pages
 c++ -std=c++17 -O1 -Wall -Wextra -I lib/MicronRender/src -I lib/SharpLcd/src -I "$MC" \
     -o /tmp/render_page scripts/render_page.cpp lib/MicronRender/src/MicronRender.cpp \
@@ -23,11 +29,13 @@ c++ -std=c++17 -O1 -Wall -Wextra -I lib/MicronRender/src -I lib/SharpLcd/src -I 
 rm -f pages/*.pbm pages/*.png
 n=0
 while IFS= read -r p; do
-  # A page with the executable bit is a SCRIPT: NomadNet runs it and renders its
-  # OUTPUT. The .mu file is program source, so laying it out as Micron lays out
-  # the wrong thing. Skipped, and counted.
-  if [[ -x "$p" ]] || head -c 2 "$p" 2>/dev/null | grep -q '#!'; then
-    echo "  skip (executable page): ${p#"$CORPUS"/}"; continue
+  # A page with the executable bit is a PROGRAM whose output is Micron, so its
+  # source is not layout input. The MANIFEST is the authority: a shebang is not
+  # the marker (some static pages open with one, and #!c=3600 is a NomadNet
+  # cache directive, not a shebang), and a fetched copy has lost its mode.
+  rel="${p#"$CORPUS"/}"
+  if [[ -n "$MODES" ]] && grep -qF "$(printf '%s\t' "$rel")" <<< "$MODES"; then
+    echo "  skip (executable page): $rel"; continue
   fi
   slug=$(basename "$p" .mu | tr ' /' '__')
   /tmp/render_page "$p" "pages/$slug" "$LEAD" "$FLAT" && n=$((n+1))

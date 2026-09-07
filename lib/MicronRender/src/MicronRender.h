@@ -34,10 +34,18 @@ struct PageMetrics {
 	static const uint16_t MARGIN_X   = 2;    // left and right
 	static const uint16_t LINE_H     = 13;   // FONT_H; 18 rows on a 240px panel
 	static const uint16_t INDENT_PX  = 12;   // per section depth: 2 cells
-	// Micron puts no ceiling on section depth and real pages use absurd ones:
-	// the Guide's display test opens a depth-20 heading. Twenty levels is 240px
-	// of indent on a 400px panel, which pushes content off the right edge.
-	// Four levels is 48px and still leaves 58 columns to read in.
+	// INDENT CEILING, a guard rather than a patch. Micron puts no ceiling on
+	// section depth, and a page arriving over LoRa can carry any depth at all,
+	// whether by malformed markup or by a node that means it. The Guide's own
+	// display test already opens a depth-20 heading. Twenty levels is 240 px of
+	// indent on a 400 px panel: content walks off the right edge and the reader
+	// gets nothing.
+	//
+	// Four levels is 48 px and still leaves 58 columns. Every indent in this
+	// renderer goes through left_edge(), which clamps here, so no page can push
+	// content off-panel however deep it claims to be. The pen also restarts at
+	// the left edge on every new block, so a runaway x cannot be inherited by
+	// the row after it.
 	static const uint8_t  MAX_DEPTH  = 4;
 	static const uint16_t PARA_GAP   = 4;    // after a divider or a heading
 	static const uint16_t RULE_INSET = 1;    // divider inset from the margin
@@ -68,11 +76,23 @@ public:
 	//                  indent, depth 3 and beyond plain text over a rule. With
 	//                  this off every level is a full-width band and they are
 	//                  indistinguishable.
-	explicit PageRenderer(SharpLcd& lcd, uint8_t extra_leading = 0,
-	                      bool stepped_heads = true)
-		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads) {}
+	// +2 px of leading is the shipped default: 16 rows instead of 18, and a
+	// dense page reads markedly better for the two it costs.
+	static const uint8_t DEFAULT_LEADING = 2;
+
+	// head_2x draws a depth-1 heading in Cozette hi-DPI 12x26 instead of the
+	// body face. It is a SECOND answer to the same hierarchy question the rule
+	// already answers, so it is off by default and only worth its 10 KB if the
+	// size jump buys something the rule does not.
+	explicit PageRenderer(SharpLcd& lcd, uint8_t extra_leading = DEFAULT_LEADING,
+	                      bool stepped_heads = true, bool head_2x = false)
+		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads), _head2x(head_2x) {}
 
 	uint16_t line_h() const { return (uint16_t)(PageMetrics::LINE_H + _leading); }
+	// The row being laid out may be taller than a body row when a heading is
+	// drawn in the large face.
+	uint16_t row_h() const { return _row_h ? _row_h : line_h(); }
+	uint8_t  advance() const { return _big ? SharpLcd::big_text_w() : PageMetrics::FONT_ADVANCE; }
 
 	// Re-flow from the top with this scroll offset. Call, then feed every line
 	// of the page to a micron::Parser pointed at this renderer.
@@ -128,6 +148,9 @@ private:
 	SharpLcd& _lcd;
 	uint8_t   _leading = 0;
 	bool      _stepped = true;
+	bool      _head2x = false;
+	bool      _big = false;      // this row draws in the large face
+	uint16_t  _row_h = 0;        // height of the row being laid out
 	uint16_t  _scroll = 0;
 	uint16_t  _y = 0;            // virtual y of the current row, page coords
 	uint16_t  _x = 0;            // pen x in panel coords
