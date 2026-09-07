@@ -4,13 +4,20 @@
 """
 Python side of the NomadNet page-fetch interop scenario.
 
-A stock RNS node on the NomadNet aspect ("nomadnetwork.node"). It registers a
-request handler at "/page/index.mu" that serves a known Micron page, announces,
-and waits for the C++ requester to establish a Link and fetch it. This is what a
-real NomadNet node does; the C++ side is the browser's fetch edge.
+A stock RNS node on the NomadNet aspect ("nomadnetwork.node"). It serves a real
+page (desktop/pages/index.mu, passed with --page-file) at two paths:
 
-Exit 0 and print SUCCESS iff the handler served the page. Exit 2 on timeout,
-3 on setup error.
+  /page/index.mu   auto_compress=False -- an uncompressed Resource the C++ side
+                   must fetch and verify.
+  /page/gz.mu      auto_compress=True (the reference default) -- the same page,
+                   which bz2-compresses smaller, so RNS sends a compressed
+                   Resource the C++ port cannot decompress. The C++ side asserts
+                   this one fails, as a known divergence.
+
+This is what a real NomadNet node does; the C++ side is the browser's fetch edge.
+
+Exit 0 and print SUCCESS iff both handlers were hit. Exit 2 on timeout, 3 on
+setup error.
 """
 
 import argparse
@@ -27,26 +34,23 @@ except ImportError as e:  # pragma: no cover
 
 APP_NAME = "nomadnetwork"
 ASPECT = "node"
-PAGE_PATH = "/page/index.mu"
+PATH_PLAIN = "/page/index.mu"
+PATH_GZIP = "/page/gz.mu"
 NODE_NAME = "Interop Test Node"
 
-# The known page, byte-identical to EXPECTED_PAGE in the C++ requester. Kept
-# small so the response is a single-packet RPC and never a compressed Resource.
-PAGE = (
-    b">Interop Test Node\n"
-    b"\n"
-    b"This page proves the C++ page-fetch lifecycle end to end.\n"
-    b"\n"
-    b"`[Home`:/page/index.mu]\n"
-)
-
-state = {"served": False}
+state = {"plain": False, "gzip": False, "page": b""}
 
 
-def serve_page(path, data, request_id, link_id, remote_identity, requested_at):
-    print(f"[python] request handler called: path={path!r}", flush=True)
-    state["served"] = True
-    return PAGE
+def serve_plain(path, data, request_id, link_id, remote_identity, requested_at):
+    print(f"[python] handler {PATH_PLAIN} called (uncompressed)", flush=True)
+    state["plain"] = True
+    return state["page"]
+
+
+def serve_gzip(path, data, request_id, link_id, remote_identity, requested_at):
+    print(f"[python] handler {PATH_GZIP} called (auto_compress)", flush=True)
+    state["gzip"] = True
+    return state["page"]
 
 
 def on_link_established(link):
@@ -85,8 +89,17 @@ def main():
     # forwards to 14300.
     ap.add_argument("--listen-port", type=int, default=14301)
     ap.add_argument("--forward-port", type=int, default=14300)
-    ap.add_argument("--timeout", type=float, default=30.0)
+    ap.add_argument("--page-file", required=True)
+    ap.add_argument("--timeout", type=float, default=40.0)
     args = ap.parse_args()
+
+    try:
+        with open(args.page_file, "rb") as f:
+            state["page"] = f.read()
+    except OSError as e:
+        print(f"[python] cannot read page file: {e}", file=sys.stderr)
+        sys.exit(3)
+    print(f"[python] serving {args.page_file}: {len(state['page'])} bytes", flush=True)
 
     config_dir = tempfile.mkdtemp(prefix="rns_interop_page_")
     os.makedirs(os.path.join(config_dir, "storage", "resources"), exist_ok=True)
@@ -104,9 +117,12 @@ def main():
                                   RNS.Destination.SINGLE, APP_NAME, ASPECT)
     destination.set_link_established_callback(on_link_established)
     destination.set_proof_strategy(RNS.Destination.PROVE_ALL)
-    # ALLOW_ALL, as a public node serving a page to anyone who can reach it.
-    destination.register_request_handler(PAGE_PATH, serve_page,
-                                         allow=RNS.Destination.ALLOW_ALL)
+    destination.register_request_handler(PATH_PLAIN, serve_plain,
+                                         allow=RNS.Destination.ALLOW_ALL,
+                                         auto_compress=False)
+    destination.register_request_handler(PATH_GZIP, serve_gzip,
+                                         allow=RNS.Destination.ALLOW_ALL,
+                                         auto_compress=True)
 
     print(f"[python] node hash: {destination.hash.hex()}", flush=True)
     destination.announce(app_data=NODE_NAME.encode("utf-8"))
@@ -115,17 +131,18 @@ def main():
     start = time.time()
     last_announce = start
     while time.time() - start < args.timeout:
-        if not state["served"] and time.time() - last_announce >= 2.0:
+        if not state["plain"] and time.time() - last_announce >= 2.0:
             destination.announce(app_data=NODE_NAME.encode("utf-8"))
             last_announce = time.time()
-        if state["served"]:
-            # Give the response a moment to leave the wire before we exit.
-            time.sleep(1.0)
-            print("[python] SUCCESS served the page over a Link", flush=True)
+        if state["plain"] and state["gzip"]:
+            time.sleep(1.0)  # let the last response leave the wire
+            print("[python] SUCCESS served both the plain and compressed page",
+                  flush=True)
             sys.exit(0)
         time.sleep(0.05)
 
-    print("[python] TIMEOUT the page was never requested", flush=True)
+    print(f"[python] TIMEOUT (plain={state['plain']} gzip={state['gzip']})",
+          flush=True)
     sys.exit(2)
 
 

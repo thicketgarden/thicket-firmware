@@ -9,29 +9,35 @@
 // to a node and calling Link::request("/page/...") over it. Nothing in this
 // suite exercised that path. `Link::request` exists at our pin, but existence
 // is not proof: the same pin ships an empty Link watchdog. A capability the
-// browser depends on belongs under continuous test, so this scenario proves the
-// whole round trip against the reference: discover a Python NomadNet node by its
-// announce, establish a Link, request a known page, and verify the Micron comes
-// back byte-for-byte.
+// browser depends on belongs under continuous test, so this proves the whole
+// round trip against the reference.
 //
-// This is the browser's fetch edge, reduced to the wire. The C++ side is the
-// requester, exactly as the handheld and the desktop browser are; the Python
-// side is a stock RNS node serving a page through a registered request handler,
-// exactly as a real NomadNet node does.
+// The page is a real one, `desktop/pages/index.mu`, read by both sides. At 564
+// bytes it is larger than the 431-byte link MDU, so the response is a multi-
+// packet RESOURCE, not a single packet. That is the case that matters: a
+// Resource response comes back msgpack-`bin`-wrapped and has to be decoded, and
+// a Resource is where the reference's default compression bites.
 //
-// TWO DELIBERATE BOUNDS, both mirroring the reference client documented in
-// microReticulum's own examples/nomadnet:
-//   * The page is small, so the response is a single-packet RPC and not a
-//     Resource. Standard NomadNet nodes bz2-compress a Resource-sized response,
-//     and microReticulum has no bz2, so a large page is not retrievable at this
-//     pin. That bound belongs to the browser, not to this test, so the test
-//     stays on the single-packet path rather than working around it.
-//   * A page fetch carries no request body, which on the wire is msgpack nil
-//     (0xC0), not zero bytes: the request envelope is a 3-element msgpack array
-//     and the reference's unpackb rejects a short one.
+// TWO REQUESTS, over one Link, asserting opposite outcomes:
+//   1. /page/index.mu, served with auto_compress=False. Uncompressed Resource.
+//      Must succeed: the C++ side assembles it, msgpack-decodes it, and the
+//      page matches byte-for-byte. This is the browser's fetch, proven.
+//   2. /page/gz.mu, the same page served with the reference's default
+//      auto_compress=True. The page bz2-compresses smaller (564 -> 400), so the
+//      reference sends a bz2 Resource. microReticulum has no bz2, so
+//      Resource::assemble rejects it and the request FAILS. That failure is
+//      asserted as a KNOWN DIVERGENCE: it is the reason the browser can only
+//      fetch pages a node chose not to compress until microReticulum gains bz2.
+//      If this request ever SUCCEEDS, bz2 has arrived and the exemption below
+//      must go, so the scenario turns red to force it out.
+//
+// A page fetch carries no request body, which on the wire is msgpack nil
+// (0xC0), not zero bytes: the request envelope is a 3-element msgpack array and
+// the reference rejects a short one.
 //
 // Exit 0 and print SUCCESS iff the node was discovered, the Link established,
-// and the returned page equalled the known page.
+// the uncompressed page returned and matched, and the compressed page failed
+// exactly as the missing bz2 support predicts.
 
 #include <microStore/FileSystem.h>
 #include <microStore/Adapters/UniversalFileSystem.h>
@@ -41,24 +47,17 @@
 #include <microReticulum.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <string>
 
-// NomadNet aspect: the full aspect string is "nomadnetwork.node", matching
-// nomadnet/Node.py, so this requester is wire-compatible with a real node.
-static const char* APP_NAME  = "nomadnetwork";
-static const char* ASPECT    = "node";
-static const char* PAGE_PATH = "/page/index.mu";
+static const char* APP_NAME    = "nomadnetwork";
+static const char* ASPECT      = "node";
+static const char* PATH_PLAIN  = "/page/index.mu";  // served uncompressed
+static const char* PATH_GZIP   = "/page/gz.mu";     // served bz2-compressed
 
-// The known page, defined identically on both sides. Real Micron: a heading, a
-// line of prose, a link. Kept well under the link MDU so the response is a
-// single packet and never becomes a compressed Resource.
-static const char* EXPECTED_PAGE =
-	">Interop Test Node\n"
-	"\n"
-	"This page proves the C++ page-fetch lifecycle end to end.\n"
-	"\n"
-	"`[Home`:/page/index.mu]\n";
+// The page, loaded from THICKET_PAGE_FILE, identical to what the server serves.
+static RNS::Bytes expected_page;
 
 static RNS::Reticulum   reticulum({RNS::Type::NONE});
 static RNS::Interface   udp_interface(RNS::Type::NONE);
@@ -66,16 +65,20 @@ static RNS::Identity    client_identity({RNS::Type::NONE});
 static RNS::Destination outgoing_destination({RNS::Type::NONE});
 static RNS::Link        active_link({RNS::Type::NONE});
 
-static volatile bool announce_seen     = false;
-static volatile bool link_up           = false;
-static volatile bool response_received = false;
-static volatile bool response_ok       = false;
-static volatile bool request_failed    = false;
+enum Phase { PH_PLAIN = 0, PH_GZIP = 1, PH_DONE = 2 };
+static volatile int  phase = PH_PLAIN;
 
-// Unwrap a msgpack `bin` value. The response microReticulum delivers is the
-// still-encoded `response` element of the server's [request_id, response]
-// envelope; a NomadNet page is served as Python bytes, which is always msgpack
-// `bin`. Same pattern as microReticulum/examples/nomadnet.
+static volatile bool announce_seen   = false;
+static volatile bool link_up         = false;
+static volatile bool plain_done      = false;
+static volatile bool plain_ok        = false;   // page returned and matched
+static volatile bool plain_unwrapped = false;   // response needed msgpack unwrap
+static volatile bool gzip_done       = false;
+static volatile bool gzip_failed     = false;   // failed, as the missing bz2 predicts
+static volatile bool gzip_unexpected = false;   // succeeded: bz2 has arrived
+
+// Unwrap a msgpack `bin` value. A Resource response is delivered still
+// msgpack-encoded; a page served as bytes is always msgpack `bin`.
 static bool msgpack_unwrap_bin(const RNS::Bytes& packed, RNS::Bytes& out) {
 	if (packed.size() < 1) return false;
 	MsgPack::Unpacker u;
@@ -87,58 +90,62 @@ static bool msgpack_unwrap_bin(const RNS::Bytes& packed, RNS::Bytes& out) {
 	return true;
 }
 
+static void request_current();
+
 static void on_response(const RNS::RequestReceipt& receipt) {
 	RNS::Bytes encoded = const_cast<RNS::RequestReceipt&>(receipt).get_response();
-	response_received = true;
-	// A single-packet response arrives as the raw page bytes; a larger one can
-	// arrive still msgpack-bin-wrapped. Accept either: unwrap if it is a bin
-	// value, otherwise take the bytes as-is.
-	RNS::Bytes page = encoded;
-	RNS::Bytes unwrapped;
-	if (msgpack_unwrap_bin(encoded, unwrapped)) page = unwrapped;
-	const RNS::Bytes expected((const uint8_t*)EXPECTED_PAGE, strlen(EXPECTED_PAGE));
-	response_ok = (page.size() == expected.size() &&
-	               memcmp(page.data(), expected.data(), page.size()) == 0);
-	printf("[cpp] page received: %lu bytes, match=%s\n",
-	       (unsigned long)page.size(), response_ok ? "yes" : "no");
-	if (!response_ok) {
-		printf("[cpp] got:      %s\n", page.left(24).toHex().c_str());
-		printf("[cpp] expected: %s\n", expected.left(24).toHex().c_str());
+	RNS::Bytes page = encoded, unwrapped;
+	bool used_unwrap = false;
+	if (msgpack_unwrap_bin(encoded, unwrapped)) { page = unwrapped; used_unwrap = true; }
+	const bool match = (page.size() == expected_page.size() &&
+	                    memcmp(page.data(), expected_page.data(), page.size()) == 0);
+
+	if (phase == PH_PLAIN) {
+		plain_ok = match;
+		plain_unwrapped = used_unwrap;
+		plain_done = true;
+		printf("[cpp] /page/index.mu: %lu bytes, msgpack-unwrap=%s, match=%s\n",
+		       (unsigned long)page.size(), used_unwrap ? "yes" : "no",
+		       match ? "yes" : "no");
+	} else if (phase == PH_GZIP) {
+		gzip_unexpected = true;   // a compressed page came back: bz2 now works
+		gzip_done = true;
+		printf("[cpp] /page/gz.mu SUCCEEDED (%lu bytes) -- bz2 decompression has "
+		       "arrived at this pin\n", (unsigned long)page.size());
 	}
 	fflush(stdout);
 }
 
 static void on_failed(const RNS::RequestReceipt& receipt) {
 	(void)receipt;
-	request_failed = true;
-	printf("[cpp] request failed (timeout, missing handler, or a compressed "
-	       "response the C++ port cannot decompress)\n");
+	if (phase == PH_PLAIN) {
+		plain_done = true;
+		printf("[cpp] /page/index.mu FAILED (uncompressed page did not arrive)\n");
+	} else if (phase == PH_GZIP) {
+		gzip_failed = true;
+		gzip_done = true;
+		printf("[cpp] /page/gz.mu failed, as the missing bz2 support predicts\n");
+	}
 	fflush(stdout);
 }
 
-static void on_link_closed(RNS::Link& link) {
-	(void)link;
-	printf("[cpp] link closed\n");
+static void request_current() {
+	static const uint8_t MSGPACK_NIL = 0xC0;
+	const RNS::Bytes nil_payload(&MSGPACK_NIL, 1);
+	const char* path = (phase == PH_PLAIN) ? PATH_PLAIN : PATH_GZIP;
+	printf("[cpp] requesting %s\n", path);
 	fflush(stdout);
+	active_link.request(RNS::Bytes(path), nil_payload,
+	                    on_response, on_failed, nullptr, /*timeout=*/10.0);
 }
+
+static void on_link_closed(RNS::Link& link) { (void)link; }
 
 static void on_link_established(RNS::Link& link) {
 	link_up = true;
 	printf("[cpp] link established: %s\n", link.hash().toHex().c_str());
-
-	// Identify to the node over the encrypted link. Not required for an
-	// ALLOW_ALL page, but harmless and matches a real client.
 	link.identify(client_identity);
-
-	// A page fetch has no body. On the wire that is msgpack nil, one byte, not
-	// zero bytes: the request envelope is a 3-element array and a short one is
-	// rejected by the reference.
-	static const uint8_t MSGPACK_NIL = 0xC0;
-	const RNS::Bytes nil_payload(&MSGPACK_NIL, 1);
-	printf("[cpp] requesting %s\n", PAGE_PATH);
-	fflush(stdout);
-	link.request(RNS::Bytes(PAGE_PATH), nil_payload,
-	             on_response, on_failed, /*progress=*/nullptr, /*timeout=*/10.0);
+	request_current();
 }
 
 class AnnounceHandler : public RNS::AnnounceHandler {
@@ -164,8 +171,21 @@ public:
 };
 static RNS::HAnnounceHandler announce_handler(new AnnounceHandler());
 
+static bool load_page() {
+	const char* file = getenv("THICKET_PAGE_FILE");
+	if (!file) { printf("[cpp] THICKET_PAGE_FILE not set\n"); return false; }
+	FILE* f = fopen(file, "rb");
+	if (!f) { printf("[cpp] cannot open page file %s\n", file); return false; }
+	char buf[4096]; size_t n;
+	while ((n = fread(buf, 1, sizeof buf, f)) > 0) expected_page.append((uint8_t*)buf, n);
+	fclose(f);
+	printf("[cpp] page file %s: %lu bytes\n", file, (unsigned long)expected_page.size());
+	return expected_page.size() > 0;
+}
+
 int main() {
 	printf("[cpp] page_fetch_requester starting\n");
+	if (!load_page()) { printf("[cpp] FAIL setup\n"); return 1; }
 
 	microStore::FileSystem filesystem{microStore::Adapters::UniversalFileSystem()};
 	filesystem.init();
@@ -183,30 +203,53 @@ int main() {
 	client_identity = RNS::Identity();
 	RNS::Transport::register_announce_handler(announce_handler);
 
-	double TIMEOUT_S = 30.0;
+	double TIMEOUT_S = 40.0;
 	if (const char* env = getenv("THICKET_INTEROP_TIMEOUT_S")) {
 		const double v = atof(env);
 		if (v > 0.0) TIMEOUT_S = v;
 	}
 	const double start = RNS::Utilities::OS::time();
 
+	// The compressed request gets a bounded wait of its own. It is expected NOT
+	// to conclude: at this pin the bz2 Resource can neither be assembled (no
+	// bz2) nor timed out (no Link watchdog), so no callback fires and the
+	// request hangs. We wait past the request's own 10 s timeout to give a
+	// clean failure a chance, then record the non-conclusion as the divergence.
+	static const double GZ_WAIT = 14.0;
+	double gz_deadline = 0.0;
+	bool gzip_hung = false;
+
 	while (true) {
 		reticulum.loop();
-		if (response_received || request_failed) {
+		const double now = RNS::Utilities::OS::time();
+		// Advance from the uncompressed request to the compressed one once the
+		// first concludes, issued from the loop rather than inside a callback.
+		if (phase == PH_PLAIN && plain_done) {
+			phase = PH_GZIP;
+			if (active_link && active_link.status() != RNS::Type::Link::CLOSED) {
+				request_current();
+				gz_deadline = now + GZ_WAIT;
+			} else { gzip_done = true; printf("[cpp] link gone before gz request\n"); }
+		}
+		if (phase == PH_GZIP && !gzip_done && gz_deadline > 0.0 && now > gz_deadline) {
+			gzip_hung = true;
+			gzip_done = true;
+			printf("[cpp] /page/gz.mu did not conclude in %.0fs (bz2 Resource "
+			       "cannot be assembled, and no watchdog times it out)\n", GZ_WAIT);
+		}
+		if (gzip_done) {
 			if (active_link && active_link.status() != RNS::Type::Link::CLOSED)
 				active_link.teardown();
 			break;
 		}
-		if (RNS::Utilities::OS::time() - start > TIMEOUT_S) {
-			printf("[cpp] TIMEOUT (announce=%d link=%d resp=%d failed=%d)\n",
-			       announce_seen ? 1 : 0, link_up ? 1 : 0,
-			       response_received ? 1 : 0, request_failed ? 1 : 0);
+		if (now - start > TIMEOUT_S) {
+			printf("[cpp] TIMEOUT (announce=%d link=%d plain_done=%d gzip_done=%d)\n",
+			       announce_seen?1:0, link_up?1:0, plain_done?1:0, gzip_done?1:0);
 			break;
 		}
 		RNS::Utilities::OS::sleep(0.01);
 	}
 
-	// Let the teardown packet leave the wire.
 	const double cleanup_until = RNS::Utilities::OS::time() + 0.5;
 	while (RNS::Utilities::OS::time() < cleanup_until) {
 		reticulum.loop();
@@ -217,11 +260,39 @@ int main() {
 	printf("[cpp] --- results ---\n");
 	printf("[cpp]   %s node discovered by announce\n", announce_seen ? "OK  " : "FAIL");
 	printf("[cpp]   %s link established\n", link_up ? "OK  " : "FAIL");
-	printf("[cpp]   %s page returned and matched\n", response_ok ? "OK  " : "FAIL");
+	printf("[cpp]   %s uncompressed page returned and matched (multi-packet Resource, "
+	       "msgpack-decoded)\n", plain_ok ? "OK  " : "FAIL");
 
-	const int rc = (announce_seen && link_up && response_ok) ? 0 : 1;
-	if (rc == 0) printf("[cpp] SUCCESS page fetched and verified over a Link\n");
-	else         printf("[cpp] FAIL page fetch did not complete\n");
+	int failures = 0, divergences = 0;
+	if (!announce_seen) ++failures;
+	if (!link_up) ++failures;
+	if (!plain_ok) ++failures;
+
+	// The compressed page: a known divergence while microReticulum has no bz2.
+	// It is not retrievable, whether it fails cleanly or (as at this pin) hangs
+	// with no watchdog to end it. Either is the expected divergence; only a
+	// successful retrieval is a real failure, and means bz2 has arrived.
+	if (gzip_unexpected) {
+		++failures;
+		printf("[cpp]   FAIL compressed page was retrieved. bz2 decompression now "
+		       "exists; delete this exemption and assert the real behaviour.\n");
+	} else if (gzip_failed || gzip_hung) {
+		++divergences;
+		printf("[cpp]   XFAIL compressed page not retrievable (%s; no bz2 at this "
+		       "pin). A standard node compresses a Resource, so the browser can "
+		       "fetch only pages a node left uncompressed until bz2 lands.\n",
+		       gzip_failed ? "failed" : "hung, no watchdog");
+	} else {
+		++failures;
+		printf("[cpp]   FAIL the gz request did not conclude and was not bounded.\n");
+	}
+
+	int rc = failures ? 1 : 0;
+	if (rc == 0)
+		printf("[cpp] SUCCESS page fetched and verified over a Link; %d known "
+		       "divergence(s) present\n", divergences);
+	else
+		printf("[cpp] FAIL %d check(s) failed\n", failures);
 	printf("[cpp] exit code %d\n", rc);
 	return rc;
 }
