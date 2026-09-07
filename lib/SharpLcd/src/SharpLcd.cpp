@@ -209,6 +209,27 @@ const uint16_t* big_glyph(uint32_t cp) {
 
 bool SharpLcd::big_has(uint32_t cp) { return big_glyph(cp) != nullptr; }
 bool SharpLcd::has_glyph(uint32_t cp) { return glyph_for(cp) != nullptr; }
+
+// 4x4 Bayer, scaled to 0..255. Ordered rather than error-diffused because a
+// page re-flows on every scroll step: a diffused pattern would crawl as the
+// window moves, while an ordered one is a pure function of position.
+static const uint8_t BAYER4[16] = {
+	  8, 136,  40, 168,
+	200,  72, 232, 104,
+	 56, 184,  24, 152,
+	248, 120, 216,  88,
+};
+
+bool SharpLcd::dither_on(uint16_t x, uint16_t y, uint8_t level) {
+	return level <= BAYER4[(y & 3) * 4 + (x & 3)];
+}
+
+void SharpLcd::fill_dither(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t level) {
+	if (level >= 249) return;                       // nothing to draw
+	for (uint16_t yy = y; yy < (uint32_t)y + h && yy < LCD_HEIGHT; ++yy)
+		for (uint16_t xx = x; xx < (uint32_t)x + w && xx < LCD_WIDTH; ++xx)
+			if (dither_on(xx, yy, level)) set_pixel(xx, yy, true);
+}
 uint32_t SharpLcd::next_codepoint(const char*& s) { return next_cp(s); }
 uint8_t SharpLcd::big_text_w() { return BIGFONT_W; }
 uint8_t SharpLcd::big_text_h() { return BIGFONT_H; }

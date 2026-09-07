@@ -47,6 +47,9 @@ int main(int argc, char** argv) {
 	const bool stepped = !(argc > 4 && std::strcmp(argv[4], "flat") == 0);
 	// 2x headings are the shipped default; pass 1x to compare without.
 	const bool big = !(argc > 5 && std::strcmp(argv[5], "1x") == 0);
+	// "flatbg" renders backgrounds the old way, thresholded to black or
+	// nothing, so a dithered page can be compared against it.
+	const bool dither = !(argc > 6 && std::strcmp(argv[6], "flatbg") == 0);
 
 	FILE* f = std::fopen(argv[1], "rb");
 	if (!f) { std::fprintf(stderr, "cannot open %s\n", argv[1]); return 1; }
@@ -55,7 +58,7 @@ int main(int argc, char** argv) {
 	std::fclose(f);
 
 	VirtualPanel panel; SharpLcd lcd(panel, fb);
-	PageRenderer r(lcd, lead, stepped, big);
+	PageRenderer r(lcd, lead, stepped, big, dither);
 
 	const uint16_t h = render(lcd, r, 0);
 	char out[512];

@@ -88,9 +88,15 @@ public:
 	// head_2x draws a depth-1 heading in Cozette hi-DPI 12x26. It REPLACES the
 	// inversion bar rather than supplementing it: size carries H1, rules carry
 	// H2 and deeper, and nothing inverts for hierarchy at all.
+	// dither: carry a background's BRIGHTNESS as texture instead of collapsing
+	// it to black or nothing. The panel is pixel-addressable, so Micron's
+	// colour can survive below the size of a character cell, which is the
+	// smallest thing a terminal can colour.
 	explicit PageRenderer(SharpLcd& lcd, uint8_t extra_leading = DEFAULT_LEADING,
-	                      bool stepped_heads = true, bool head_2x = true)
-		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads), _head2x(head_2x) {}
+	                      bool stepped_heads = true, bool head_2x = true,
+	                      bool dither = true)
+		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads),
+		  _head2x(head_2x), _dither(dither) {}
 
 	uint16_t line_h() const { return (uint16_t)(PageMetrics::LINE_H + _leading); }
 	// The row being laid out may be taller than a body row when a heading is
@@ -151,6 +157,12 @@ private:
 	// it is dark enough to read white text on. Anything else is ignored, which
 	// is the safe direction: normal text on white always reads.
 	static bool background_is_dark(const micron::Color& c);
+	// Rec. 601 luma, 0 dark to 255 light. The one number a colour reduces to
+	// on a panel with no hue.
+	static uint8_t luma_of(const micron::Color& c);
+	// Paint a run's background: dithered to its brightness, or the flat
+	// black-or-nothing the threshold used to give.
+	void paint_bg(uint16_t x, uint16_t w, uint8_t luma);
 
 	// Draw one codepoint run without copying it. Cozette advances 6px for every
 	// glyph, so width is codepoints * 6 and no measuring pass is needed.
@@ -173,6 +185,7 @@ private:
 	uint8_t   _leading = 0;
 	bool      _stepped = true;
 	bool      _head2x = false;
+	bool      _dither = true;
 	bool      _big = false;      // this row draws in the large face
 	uint16_t  _row_h = 0;        // height of the row being laid out
 	uint16_t  _scroll = 0;
@@ -183,6 +196,8 @@ private:
 	bool      _invert = false;   // current row is a dark-background block
 	bool      _head_rule = false;
 	bool      _literal = false;   // this row is inside a `= block
+	bool      _has_bg = false;    // the page asked for a background on this row
+	uint8_t   _bg_luma = 255;
 	bool      _blank_pending = true;  // a blank gap is already open
 
 	// TABLE STATE, in a bounded buffer.

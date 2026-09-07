@@ -82,6 +82,18 @@ public:
 	static uint8_t big_text_h();
 
 	void fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black);
+
+	// Ordered dither, 4x4 Bayer, seventeen levels.
+	//
+	// The panel has one ink, but it is PIXEL addressable, so brightness need
+	// not collapse to two states. `level` is 0 (solid black) to 255 (left
+	// white), and the pattern is positioned in absolute panel coordinates so
+	// adjacent fills tile continuously instead of showing a seam.
+	//
+	// A terminal cannot do this: its smallest unit of colour is a character
+	// cell. This is texture below that size.
+	void fill_dither(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint8_t level);
+	static bool dither_on(uint16_t x, uint16_t y, uint8_t level);
 	void draw_hline(uint16_t x, uint16_t y, uint16_t w, bool black);
 	bool get_pixel(uint16_t x, uint16_t y) const;
 

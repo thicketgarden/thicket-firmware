@@ -30,6 +30,21 @@ inline bool is_space(char c) { return c == ' ' || c == '\t'; }
 
 }  // namespace
 
+uint8_t PageRenderer::luma_of(const micron::Color& c) {
+	if (c.is_default || !c.is_valid) return 255;
+	const uint32_t r = (c.rgb >> 16) & 0xff, g = (c.rgb >> 8) & 0xff, b = c.rgb & 0xff;
+	return (uint8_t)((299u * r + 587u * g + 114u * b) / 1000u);
+}
+
+// A background is drawn as texture carrying its brightness. Ink stays black and
+// the rule that overrides everything still holds: whichever way the background
+// went, the text on it must read.
+void PageRenderer::paint_bg(uint16_t x, uint16_t w, uint8_t luma) {
+	if (!row_visible(row_h())) return;
+	if (_dither) _lcd.fill_dither(x, screen_y(), w, row_h(), luma);
+	else if (luma < 128) _lcd.fill_rect(x, screen_y(), w, row_h(), true);
+}
+
 bool PageRenderer::background_is_dark(const micron::Color& c) {
 	if (c.is_default || !c.is_valid) return false;
 	// Rec. 601 luma, integer. Below half is dark enough that white-on-it reads.
@@ -177,9 +192,15 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 		// Leading spaces are dropped at a wrap, never carried to column 0.
 		if (_x + lead_w + word_w > right && _x > left_edge()) newline();
 		else if (lead_w) {
-			if (row_visible(row_h()) && invert)
-				_lcd.fill_rect(_x, screen_y(), lead_w, PageMetrics::LINE_H, true);
+			// Leading spaces carry the texture: there is no glyph to protect,
+			// and on a gradient bar the spaces ARE the bar.
+			if (_has_bg) paint_bg(_x, lead_w, _bg_luma);
 			_x = (uint16_t)(_x + lead_w);
+			// ANYTHING that consumes width opens the row. Only glyphs used to,
+			// so a run of pure spaces left the row closed and the next run
+			// reset the pen to the margin and painted over it: a sixteen-step
+			// gradient drew all sixteen steps in the same 24 pixels.
+			_row_open = true;
 		}
 
 		for (size_t k = sp; k < w; ) {
@@ -191,10 +212,22 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 			{ const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
 			  if (!(_big ? SharpLcd::big_has(cp) : SharpLcd::has_glyph(cp))) note_missing(cp); }
 			if (row_visible(row_h())) {
-				if (invert) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE,
-				                           row_h(), true);
-				if (_big) _lcd.draw_text_big(_x, screen_y(), g, !invert);
-				else      _lcd.draw_text(_x, screen_y(), g, !invert);
+				// Texture under every cell, then a KNOCKOUT under a glyph only:
+				// where a letter sits the cell goes solid so it has full
+				// contrast, and the texture survives everywhere else. On a
+				// gradient bar that is everywhere, because the bar is spaces.
+				// Legibility beats richness exactly where they collide.
+				const bool blank = (L == 1 && (g[0] == ' ' || g[0] == '\t'));
+				if (_has_bg) {
+					if (blank) paint_bg(_x, advance(), _bg_luma);
+					else _lcd.fill_rect(_x, screen_y(), advance(), row_h(), invert);
+				} else if (invert) {
+					_lcd.fill_rect(_x, screen_y(), advance(), row_h(), true);
+				}
+				if (!blank) {
+					if (_big) _lcd.draw_text_big(_x, screen_y(), g, !invert);
+					else      _lcd.draw_text(_x, screen_y(), g, !invert);
+				}
 			}
 			_x = (uint16_t)(_x + advance());
 			_row_open = true;
@@ -229,7 +262,9 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 
 	// A heading is inverted across the full content width, which is the only
 	// weight distinction a single-weight font can make.
-	const bool dark_bg = background_is_dark(s.bg);
+	_has_bg = !s.bg.is_default && s.bg.is_valid;
+	_bg_luma = luma_of(s.bg);
+	const bool dark_bg = _has_bg && _bg_luma < 128;
 	// Depth 3 and beyond stop inverting: three stacked bars is a page of bars.
 	// They get plain text over a rule instead, drawn at end of line.
 	// Only depth 1 gets the bar. An inset band at depth 2 is a 24px gap on a
@@ -259,16 +294,10 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	_head_rule = _stepped && s.heading && s.depth >= 2;
 	_invert = invert;
 
-	if (invert && !_row_open && row_visible(row_h())) {
-		// Depth 1 takes the full width; depth 2 a band inset to its own indent,
-		// so the levels read as different rather than as the same bar. A dark
-		// background block always takes the full width: that is the page's own
-		// colour, not a heading level.
-		const bool inset = _stepped && head_bar && !dark_bg && s.depth >= 2;
-		const uint16_t bx = inset ? left_edge() : PageMetrics::MARGIN_X;
-		_lcd.fill_rect(bx, screen_y(), (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X - bx),
-		               row_h(), true);
-	}
+	// No row-wide band. A gradient bar is many runs on ONE row, each with its
+	// own colour, so the background is painted per CELL as the run is drawn.
+	// Painting the row once with the first run's colour is what turned a
+	// sixteen-step ramp into one black bar.
 	emit_run(t, n, invert);
 
 	// Underline stands in for the parser's underline AND for nothing else; the
