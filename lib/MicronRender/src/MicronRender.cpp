@@ -472,15 +472,24 @@ void PageRenderer::onField(const micron::Field& f, const micron::Style& s) {
 		return;
 	}
 
-	// Checkbox and radio are urwid CheckBox/RadioButton: "[ ] label",
-	// "[X] label", "( ) label". Capital X when checked, matching the widget.
-	const char open  = f.kind == micron::FieldKind::Radio ? '(' : '[';
-	const char close = f.kind == micron::FieldKind::Radio ? ')' : ']';
-	char cell[2] = { open, 0 };
-	emit_run(cell, 1, _invert);
-	emit_run(f.prechecked ? "X" : " ", 1, _invert);
-	cell[0] = close;
-	emit_run(cell, 1, _invert);
+	// Checkbox and radio use real Cozette glyphs rather than the reference's
+	// ASCII [ ]/( ). The reference is a text terminal and has only characters;
+	// this is a pixel device with the geometric shapes bundled, so a radio is
+	// the circle everyone knows and a checkbox is a box with a check in it.
+	//   radio     U+25CB empty   U+25CF filled
+	//   checkbox  U+25A1 box, with U+2713 check drawn INSIDE it when set
+	if (row_visible(row_h())) {
+		if (!_row_open) _x = left_edge();
+		const uint16_t gx = _x, gy = screen_y();
+		if (f.kind == micron::FieldKind::Radio) {
+			_lcd.draw_text(gx, gy, f.prechecked ? "\xE2\x97\x8F" : "\xE2\x97\x8B", !_invert);  // ● / ○
+		} else {
+			_lcd.draw_text(gx, gy, "\xE2\x96\xA1", !_invert);                    // □
+			if (f.prechecked) _lcd.draw_text(gx, gy, "\xE2\x9C\x93", !_invert);   // ✓ over the box
+		}
+	}
+	_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
+	_row_open = true;
 	if (f.label_len) { emit_run(" ", 1, _invert); emit_run(f.label, f.label_len, _invert); }
 }
 
