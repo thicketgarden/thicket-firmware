@@ -19,20 +19,16 @@
 // then cuts the wire through a UDP relay it controls and watches its own
 // watchdog time the link out.
 //
-// KNOWN DIVERGENCE, and the reason this scenario is shaped the way it is:
-// microReticulum at our pin HAS NO LINK WATCHDOG. Link::start_watchdog() is an
-// empty function and Link::__watchdog_job() is inside a /*p TODO */ comment
-// block, so Link::send_keepalive() -- which is compiled -- has no caller. This
-// side therefore:
-//   * never originates keepalives (it only answers them, Link.cpp:1455-1460,
-//     which IS live), and
-//   * never times a Link out. A link here survives the peer vanishing, for as
-//     long as the process runs.
-// Both are asserted below as strict expected failures, so that implementing
-// the watchdog turns this scenario red and forces the exemptions out.
+// LINK WATCHDOG. microReticulum now has one: Link::__watchdog_job() runs
+// cooperatively from Transport::jobs() (there are no threads on the device).
+// This side is the responder, so it does not originate keepalives, it answers
+// them; but the stale-detection half of the watchdog still fires. It sets a
+// short keepalive/stale window after establishment (3/12s, matching the Python
+// side) so the close lands inside the run, and asserts that once the Python
+// side cuts the wire the link is closed as TIMEOUT rather than left hanging.
 //
 // Exit 0 iff the link was established by the peer, data over it validated, and
-// the divergences are still exactly the divergences we have recorded.
+// the watchdog closed the silent link as timed out.
 
 #include <microStore/FileSystem.h>
 #include <microStore/Adapters/UniversalFileSystem.h>
@@ -124,7 +120,14 @@ static void on_link_established_cb(RNS::Link& link) {
 	inbound_link = link;
 	inbound_link.set_packet_callback(on_link_packet);
 	inbound_link.set_link_closed_callback(on_link_closed_cb);
-	printf("[cpp] inbound link established: %s\n", link.hash().toHex().c_str());
+	// Short keepalive/stale so the watchdog's stale close lands inside the run
+	// window; RNS ships 360/720s. These match the Python side's 3/12s. Set
+	// after establishment: the reference recomputes them from RTT there, and
+	// though this port does not, setting here is correct either way.
+	inbound_link.keepalive(3);
+	inbound_link.stale_time(12);
+	printf("[cpp] inbound link established: %s (keepalive=%us stale=%us)\n",
+	       link.hash().toHex().c_str(), inbound_link.keepalive(), inbound_link.stale_time());
 	fflush(stdout);
 }
 
@@ -188,37 +191,20 @@ int main() {
 	      data_mismatch ? "payload mismatch"
 	                    : (data_ok ? "200 bytes matched" : "no data arrived"));
 
-	// --- KNOWN DIVERGENCE ---------------------------------------------------
-	// No watchdog means no timeout. The Python side cut the wire well over its
-	// own stale window ago; a conforming implementation would have closed this
-	// link by now. Recorded strictly: if this ever DOES close, the watchdog has
-	// been implemented and the exemption below must go.
-	++checks;
-	if (!link_closed) {
-		++divergences;
-		printf("[cpp]   XFAIL %-21s link still open after the peer vanished "
-		       "(no Link watchdog at this pin -- see the header comment)\n",
-		       "link timeout");
-	}
-	else if (close_reason == (uint8_t)RNS::Type::Link::TIMEOUT) {
-		++failures;
-		printf("[cpp]   FAIL %-22s the link timed out on its own. A watchdog now\n",
-		       "link timeout");
-		printf("[cpp]          exists; delete the known-divergence exemption in\n");
-		printf("[cpp]          link_inbound_responder/src/main.cpp and assert the\n");
-		printf("[cpp]          real timeout behaviour instead.\n");
-	}
-	else {
-		// Closed, but by the peer rather than by us. That's not the watchdog
-		// appearing -- it means the peer gave up on this link, which is a
-		// failure of something earlier in the scenario.
-		++failures;
-		printf("[cpp]   FAIL %-22s the peer closed the link (reason=%u, not\n",
-		       "link timeout", (unsigned)close_reason);
-		printf("[cpp]          TIMEOUT=%u). Something upstream of this check went\n",
-		       (unsigned)RNS::Type::Link::TIMEOUT);
-		printf("[cpp]          wrong -- read the Python side's phases.\n");
-	}
+	// --- LINK WATCHDOG ------------------------------------------------------
+	// The Python side cut the wire past this link's stale window. The watchdog
+	// must have noticed the silence and closed the link as timed out. Before
+	// the watchdog existed this was a known divergence (the link hung open);
+	// now it is a required check, and the reason to have it: a field device
+	// that never times out a silent peer locks up in exactly the adverse
+	// conditions it is built for.
+	check(link_closed && close_reason == (uint8_t)RNS::Type::Link::TIMEOUT,
+	      "silent link timed out",
+	      !link_closed
+	          ? "link never closed -- watchdog did not fire on a silent peer"
+	          : (close_reason == (uint8_t)RNS::Type::Link::TIMEOUT
+	                 ? "watchdog closed the link as timed out"
+	                 : "closed, but not by timeout (peer gave up earlier)"));
 
 	int rc = 0;
 	if (failures > 0) {

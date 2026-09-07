@@ -210,11 +210,10 @@ int main() {
 	}
 	const double start = RNS::Utilities::OS::time();
 
-	// The compressed request gets a bounded wait of its own. It is expected NOT
-	// to conclude: at this pin the bz2 Resource can neither be assembled (no
-	// bz2) nor timed out (no Link watchdog), so no callback fires and the
-	// request hangs. We wait past the request's own 10 s timeout to give a
-	// clean failure a chance, then record the non-conclusion as the divergence.
+	// The compressed request should now fail fast: the resource is rejected as
+	// uncompressable and concluded, so on_failed fires. This bounded wait is a
+	// backstop against a regression to the old hang (no conclusion at all); if
+	// it ever trips, the resource-conclusion fix has been undone.
 	static const double GZ_WAIT = 14.0;
 	double gz_deadline = 0.0;
 	bool gzip_hung = false;
