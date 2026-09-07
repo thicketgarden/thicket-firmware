@@ -68,9 +68,19 @@ int main(int argc, char** argv) {
 		std::snprintf(out, sizeof out, "%s@%d.pbm", argv[2], ++screens);
 		panel.write_pbm(out);
 	}
-	std::printf("%-44s %5u px  %d screen(s)  %2u link(s)%s%s\n",
+	std::printf("%-44s %5u px  %d screen(s)  %2u link(s)%s%s%s\n",
 	            argv[2], h, screens, r.link_count(),
 	            r.links_overflowed() ? "  LINKS-OVERFLOW" : "",
-	            panel.overflowed() ? "  WIRE-OVERFLOW" : "");
+	            panel.overflowed() ? "  WIRE-OVERFLOW" : "",
+	            r.table_overflowed() ? "  TABLE-OVERFLOW" : "");
+
+	// Every codepoint that hit the blank-advancing fallback. A hole is silent
+	// and stays aligned, so it never shows up unless it is counted.
+	if (r.missing_kinds()) {
+		std::printf("  MISSING %u glyph(s), %u occurrence(s):", r.missing_kinds(), r.missing_total());
+		for (uint8_t i = 0; i < r.missing_kinds(); ++i)
+			std::printf(" U+%04X x%u", r.missing_cp(i), r.missing_count(i));
+		std::printf("%s\n", r.missing_overflowed() ? "  (more kinds not listed)" : "");
+	}
 	return 0;
 }

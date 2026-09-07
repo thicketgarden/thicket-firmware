@@ -71,6 +71,13 @@ public:
 	// draw a hole at double size. Returns the x just past the last glyph.
 	uint16_t draw_text_big(uint16_t x, uint16_t y, const char* s, bool black = true);
 	static bool big_has(uint32_t cp);
+	// Whether the body face carries a codepoint. A codepoint it does not carry
+	// still ADVANCES, so the hole is silent and stays aligned: callers that
+	// care have to ask.
+	static bool has_glyph(uint32_t cp);
+	// Decode one UTF-8 sequence, advancing the pointer. Exposed so a caller can
+	// walk a run the same way the drawing does.
+	static uint32_t next_codepoint(const char*& s);
 	static uint8_t big_text_w();
 	static uint8_t big_text_h();
 

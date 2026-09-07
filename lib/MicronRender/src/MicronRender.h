@@ -51,6 +51,9 @@ struct PageMetrics {
 	static const uint16_t HEAD_GAP_BIG = 9;  // after the 26px heading, which
 	                                         // otherwise sits on the body
 	static const uint16_t RULE_INSET = 1;    // divider inset from the margin
+	// Drawn in the last column of a clipped literal line. Latin-1, so it is in
+	// the bundled font, and it reads as "there is more to the right".
+	static const uint32_t CLIP_MARK  = 0x00BB;   // >>
 
 	static uint16_t content_w() { return LCD_WIDTH - 2 * MARGIN_X; }   // 396
 	static uint16_t cols()      { return content_w() / FONT_ADVANCE; } // 66
@@ -112,6 +115,16 @@ public:
 	uint8_t link_count() const { return _link_count; }
 	const LinkBox& link(uint8_t i) const { return _links[i]; }
 	bool links_overflowed() const { return _links_overflowed; }
+
+	// MISSING GLYPHS. A codepoint the font does not carry draws blank and still
+	// advances, so a page loses characters silently and stays aligned. Counting
+	// them is the only way a hole becomes visible without eyes on every render.
+	static const uint8_t MAX_MISSING = 24;
+	uint8_t  missing_kinds() const { return _missing_n; }
+	uint32_t missing_cp(uint8_t i) const { return _missing[i].cp; }
+	uint16_t missing_count(uint8_t i) const { return _missing[i].n; }
+	uint32_t missing_total() const { return _missing_total; }
+	bool missing_overflowed() const { return _missing_over; }
 	// A table larger than the fixed buffer. Reported, never silent.
 	bool table_overflowed() const { return _table_overflowed; }
 
@@ -141,7 +154,15 @@ private:
 
 	// Draw one codepoint run without copying it. Cozette advances 6px for every
 	// glyph, so width is codepoints * 6 and no measuring pass is needed.
+	// OVERFLOW IS CONTENT-TYPE DEPENDENT.
+	//   prose      wraps at a word boundary, and hard-breaks a token that has
+	//              no boundary to wrap at.
+	//   literal    never wraps. An over-wide line is clipped at the margin with
+	//              an indicator in the last column, because wrapping ASCII art
+	//              shears it and breaking a token mid-art corrupts the same
+	//              alignment the block exists to preserve.
 	void emit_run(const char* t, size_t n, bool invert);
+	void emit_literal(const char* t, size_t n, bool invert);
 	void wrap_if_needed(uint16_t next_w);
 	void newline();
 	uint16_t left_edge() const;
@@ -161,6 +182,7 @@ private:
 	uint8_t   _depth = 0;
 	bool      _invert = false;   // current row is a dark-background block
 	bool      _head_rule = false;
+	bool      _literal = false;   // this row is inside a `= block
 	bool      _blank_pending = true;  // a blank gap is already open
 
 	// TABLE STATE, in a bounded buffer.
@@ -193,6 +215,13 @@ private:
 	LinkBox _links[MAX_LINKS];
 	uint8_t _link_count = 0;
 	bool    _links_overflowed = false;
+
+	struct Missing { uint32_t cp; uint16_t n; };
+	Missing  _missing[MAX_MISSING];
+	uint8_t  _missing_n = 0;
+	uint32_t _missing_total = 0;
+	bool     _missing_over = false;
+	void note_missing(uint32_t cp);
 };
 
 }  // namespace thicket

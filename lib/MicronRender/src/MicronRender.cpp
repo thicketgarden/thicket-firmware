@@ -42,6 +42,7 @@ void PageRenderer::begin(uint16_t scroll_y) {
 	_y = 0; _x = 0; _row_open = false; _depth = 0; _invert = false;
 	_in_table = false; _table_row = 0; _table_cols = 0;
 	_link_count = 0; _links_overflowed = false;
+	_missing_n = 0; _missing_total = 0; _missing_over = false;
 	_blank_pending = true;   // no leading gap at the top of a page
 }
 
@@ -51,6 +52,14 @@ void PageRenderer::blankLine() {
 	if (_blank_pending) return;
 	_y = (uint16_t)(_y + line_h());
 	_blank_pending = true;
+}
+
+void PageRenderer::note_missing(uint32_t cp) {
+	++_missing_total;
+	for (uint8_t i = 0; i < _missing_n; ++i)
+		if (_missing[i].cp == cp) { ++_missing[i].n; return; }
+	if (_missing_n < MAX_MISSING) { _missing[_missing_n].cp = cp; _missing[_missing_n].n = 1; ++_missing_n; }
+	else _missing_over = true;
 }
 
 uint16_t PageRenderer::left_edge() const {
@@ -85,7 +94,46 @@ void PageRenderer::wrap_if_needed(uint16_t next_w) {
 
 // Draw a run, wrapping at word boundaries. Nothing is copied: the pen walks
 // the caller's bytes and draws a glyph at a time.
+// A literal line is drawn as-is and clipped. No wrapping, no hard-breaking:
+// both destroy the alignment a preformatted block exists to hold. Wide art
+// authored for 80 columns cannot be made right on 66; showing its left portion
+// intact with a mark beats showing it in fragments.
+void PageRenderer::emit_literal(const char* t, size_t n, bool invert) {
+	if (!_row_open) _x = left_edge();
+	const uint16_t right = LCD_WIDTH - PageMetrics::MARGIN_X;
+	const uint16_t last_cell = (uint16_t)(right - PageMetrics::FONT_ADVANCE);
+
+	size_t k = 0;
+	while (k < n) {
+		const uint8_t L = seq_len((uint8_t)t[k]);
+		if (_x + PageMetrics::FONT_ADVANCE > right) {
+			// Something is still to come: mark the last column and stop.
+			if (row_visible(row_h())) {
+				char m[3] = { (char)0xC2, (char)0xBB, 0 };      // U+00BB
+				_lcd.fill_rect(last_cell, screen_y(), PageMetrics::FONT_ADVANCE,
+				               row_h(), invert);
+				_lcd.draw_text(last_cell, screen_y(), m, !invert);
+			}
+			_row_open = true;
+			return;
+		}
+		char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
+		// Counted whether or not it is on screen: a missing glyph is a fact
+		// about the page, not about the current scroll window.
+		{ const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
+		  if (!SharpLcd::has_glyph(cp)) note_missing(cp); }
+		if (row_visible(row_h())) {
+			if (invert) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE, row_h(), true);
+			_lcd.draw_text(_x, screen_y(), g, !invert);
+		}
+		_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
+		_row_open = true;
+		k += L;
+	}
+}
+
 void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
+	if (_literal) { emit_literal(t, n, invert); return; }
 	// THE choke point for the indent guard. Every glyph this renderer draws
 	// passes through here, so resetting unconditionally on a fresh row means no
 	// caller can leave the pen somewhere a previous block left it, and no depth
@@ -111,8 +159,10 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 			for (size_t k = i; k < w; ) {
 				const uint8_t L = seq_len((uint8_t)t[k]);
 				wrap_if_needed(advance());
+				char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
+				{ const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
+				  if (!(_big ? SharpLcd::big_has(cp) : SharpLcd::has_glyph(cp))) note_missing(cp); }
 				if (row_visible(row_h())) {
-					char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
 					if (_big) _lcd.draw_text_big(_x, screen_y(), g, !invert);
 					else      _lcd.draw_text(_x, screen_y(), g, !invert);
 				}
@@ -134,10 +184,15 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 
 		for (size_t k = sp; k < w; ) {
 			const uint8_t L = seq_len((uint8_t)t[k]);
+			char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
+			// Counted whether or not it is on screen: a codepoint the font does
+			// not carry draws blank and still advances, so the hole is silent
+			// and stays aligned. It is a fact about the page, not the window.
+			{ const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
+			  if (!(_big ? SharpLcd::big_has(cp) : SharpLcd::has_glyph(cp))) note_missing(cp); }
 			if (row_visible(row_h())) {
-				char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
 				if (invert) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE,
-				                           PageMetrics::LINE_H, true);
+				                           row_h(), true);
 				if (_big) _lcd.draw_text_big(_x, screen_y(), g, !invert);
 				else      _lcd.draw_text(_x, screen_y(), g, !invert);
 			}
@@ -152,6 +207,7 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	_depth = s.depth;
 	_blank_pending = false;
+	_literal = s.literal;
 	// A fresh row restarts at the left edge. Only moving forward to it leaves
 	// the pen wherever the previous row ended, which is how a deep-indented
 	// divider dragged the following paragraph to the right margin.
@@ -253,16 +309,24 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 	}
 }
 
-void PageRenderer::onDivider(uint32_t /*ch*/, const micron::Style& s) {
+void PageRenderer::onDivider(uint32_t ch, const micron::Style& s) {
 	_depth = s.depth;
 	if (!_row_open) _x = left_edge();
-	// A rule, not a row of glyphs. The parser reports the fill character the
-	// page asked for; a 1px line reads better on this panel than any of them.
+	// The reference fills the row with the character the page asked for, so
+	// three dividers with three fills have three textures. The default U+2500
+	// still reads as a continuous rule, because the box glyphs are 7px of ink
+	// against a 6px advance and neighbouring cells touch.
 	if (row_visible(row_h())) {
-		const uint16_t y = (uint16_t)(screen_y() + row_h() / 2);
-		_lcd.draw_hline((uint16_t)(left_edge() + PageMetrics::RULE_INSET), y,
-		                (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X
-		                           - PageMetrics::RULE_INSET - left_edge()), true);
+		char g[5]; uint8_t n = 0;
+		if (ch < 0x80) { g[n++] = (char)ch; }
+		else if (ch < 0x800) { g[n++] = (char)(0xC0 | (ch >> 6)); g[n++] = (char)(0x80 | (ch & 0x3F)); }
+		else { g[n++] = (char)(0xE0 | (ch >> 12)); g[n++] = (char)(0x80 | ((ch >> 6) & 0x3F));
+		       g[n++] = (char)(0x80 | (ch & 0x3F)); }
+		g[n] = 0;
+		if (!SharpLcd::has_glyph(ch)) note_missing(ch);
+		for (uint16_t x = left_edge(); x + PageMetrics::FONT_ADVANCE <= LCD_WIDTH - PageMetrics::MARGIN_X;
+		     x = (uint16_t)(x + PageMetrics::FONT_ADVANCE))
+			_lcd.draw_text(x, screen_y(), g, true);
 	}
 	_row_open = true;
 }
@@ -285,7 +349,22 @@ void PageRenderer::onField(const micron::Field& f, const micron::Style& s) {
 	}
 	box[0] = close;
 	emit_run(box, 1, _invert);
-	if (f.value_len) { emit_run(" ", 1, _invert); emit_run(f.value, f.value_len, _invert); }
+
+	// A text field shows its preset content; a box shows its label. A MASKED
+	// field shows neither: the reference passes mask="*" to the edit widget, so
+	// the value never reaches the screen, and printing it here would defeat the
+	// only thing the flag is for.
+	if (f.kind == micron::FieldKind::Text) {
+		if (f.value_len) {
+			emit_run(" ", 1, _invert);
+			if (f.masked) for (size_t k = 0; k < cells(f.value, f.value_len); ++k)
+				emit_run("*", 1, _invert);
+			else emit_run(f.value, f.value_len, _invert);
+		}
+	} else if (f.label_len) {
+		emit_run(" ", 1, _invert);
+		emit_run(f.label, f.label_len, _invert);
+	}
 }
 
 void PageRenderer::onAnchor(const char* /*name*/, size_t /*len*/) {
@@ -355,12 +434,43 @@ void PageRenderer::onTableRow(const char* row, size_t len, const micron::Style& 
 		while (cs < ce && is_space(row[cs])) ++cs;
 		while (ce > cs && is_space(row[ce - 1])) --ce;
 
-		size_t n = ce - cs;
-		if (n > 255) n = 255;
-		if (_tlen + n > T_BYTES) { _table_overflowed = true; n = 0; }
+		// Cells carry inline markup, and the reference re-parses every table
+		// line so it is interpreted. Colour and weight are unavailable on this
+		// panel anyway, so the commands are STRIPPED here rather than styled:
+		// what matters is that the reader sees "Apple" and not "`F3a3Apple`f".
 		_cell_off[r][col] = _tlen;
+		size_t n = 0;
+		for (size_t k = cs; k < ce && n < 255; ) {
+			if (row[k] == '`' && k + 1 < ce) {
+				const char cmd = row[k + 1];
+				size_t skip = 2;
+				if (cmd == 'F' || cmd == 'B') {
+					// `Frgb, or `FTrrggbb. The reference consumes the digits
+					// whatever they are, so the same count is skipped here.
+					// backtick + F + three digits = 5; with T, six digits = 9.
+					skip = (k + 2 < ce && row[k + 2] == 'T') ? 9 : 5;
+				} else if (cmd == '[') {
+					// A link's label survives; its target does not belong in a
+					// column two words wide.
+					size_t e = k + 2, bar = ce;
+					while (e < ce && row[e] != ']') { if (row[e] == '`' && bar == ce) bar = e; ++e; }
+					const size_t stop = (bar < ce) ? bar : e;
+					for (size_t q = k + 2; q < stop && n < 255; ++q) {
+						if (_tlen + n < T_BYTES) _tbuf[_tlen + n] = row[q];
+						else { _table_overflowed = true; break; }
+						++n;
+					}
+					k = (e < ce) ? e + 1 : ce;
+					continue;
+				}
+				k += (k + skip <= ce) ? skip : (ce - k);
+				continue;
+			}
+			if (_tlen + n < T_BYTES) _tbuf[_tlen + n] = row[k];
+			else { _table_overflowed = true; break; }
+			++n; ++k;
+		}
 		_cell_len[r][col] = (uint8_t)n;
-		for (size_t k = 0; k < n; ++k) _tbuf[_tlen + k] = row[cs + k];
 		_tlen = (uint16_t)(_tlen + n);
 
 		if (n) {

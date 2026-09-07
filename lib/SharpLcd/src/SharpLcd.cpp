@@ -208,6 +208,8 @@ const uint16_t* big_glyph(uint32_t cp) {
 }  // namespace
 
 bool SharpLcd::big_has(uint32_t cp) { return big_glyph(cp) != nullptr; }
+bool SharpLcd::has_glyph(uint32_t cp) { return glyph_for(cp) != nullptr; }
+uint32_t SharpLcd::next_codepoint(const char*& s) { return next_cp(s); }
 uint8_t SharpLcd::big_text_w() { return BIGFONT_W; }
 uint8_t SharpLcd::big_text_h() { return BIGFONT_H; }
 
