@@ -176,7 +176,7 @@ a bespoke renderer, not a character grid. Micron can be presented *better* here
 than in a terminal for the content that matters, rather than merely degraded to
 one ink. Each item below is marked **cheap win** or **real project**.
 
-## 1. Dither, not threshold — DONE, cheap win
+## 1. Dither, not threshold: DONE, cheap win
 
 Shipped. A background is painted with a 4x4 ordered dither at its luma, so
 brightness survives as texture below the size of a character cell, which is the
@@ -186,7 +186,7 @@ Measured on a sixteen-step ramp: thresholding gives two solid bars that stop
 dead at the halfway point; dithering gives the ramp. Legibility still wins where
 they collide, via a knockout under each glyph.
 
-## 2. Drawn rules instead of glyph rules — MIXED, and the reference wins
+## 2. Drawn rules instead of glyph rules: MIXED, and the reference wins
 
 Dividers now draw the fill character the page asked for, because the reference
 does and three fills were collapsing into one rule. On this panel that is also
@@ -203,7 +203,7 @@ tables are currently whitespace. Hairlines between columns would be a picture no
 terminal can draw. Not built; whitespace reads well enough at 66 cells that it
 has not earned the complexity yet.
 
-## 3. Per-service rendering — the detection question, INVESTIGATED ONLY
+## 3. Per-service rendering: the detection question, INVESTIGATED ONLY
 
 The opportunity is real and no terminal client can do it. The blocker is
 knowing what a page **is**. What exists today:
@@ -232,7 +232,7 @@ mechanism, and degrades to nothing on clients that ignore it. Guessing from
 structure would present a documentation page as a message board, which is worse
 than presenting everything generically.
 
-## 4. Tamzen as a second face — metrics MEASURED, viable with caveats
+## 4. Tamzen as a second face: metrics MEASURED, viable with caveats
 
 The question that decides it: do the cells line up when a Cozette glyph falls
 back inside Tamzen text? Measured against Tamzen 1.11.5:
