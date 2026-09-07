@@ -344,6 +344,9 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	// Inline bold, for a run that is NOT a heading. Headings are already a bold
 	// face, so bold there is a no-op rather than a double weight. Falls back to
 	// Cozette per glyph inside draw_glyph.
+	// Bold switches to the Tamzen bold face; underline stays Cozette with a
+	// drawn rule. Stacked, bold+underline is Tamzen with the rule on top,
+	// because bold sets the face and underline adds the rule independently.
 	_bold = s.bold && _head == 0;
 	_underline = s.underline;
 
@@ -697,6 +700,16 @@ void PageRenderer::table_flush() {
 						emit_run(p + from, to - from, false);
 					}
 					x = (uint16_t)(x + (_col_w[c] + GAP) * PageMetrics::FONT_ADVANCE);
+				}
+				// A 1px column separator in each gutter, drawn per line so it
+				// stacks into a continuous rule and scrolls and clips for free.
+				// A drawn hairline, not a column of box glyphs: the pixel device
+				// draws the line a terminal can only approximate.
+				uint16_t sx = left_edge();
+				for (uint8_t c = 0; c + 1 < _table_cols; ++c) {
+					sx = (uint16_t)(sx + (_col_w[c] + GAP) * PageMetrics::FONT_ADVANCE);
+					_lcd.fill_rect((uint16_t)(sx - GAP * PageMetrics::FONT_ADVANCE / 2 - 1),
+					               screen_y(), 1, line_h(), true);
 				}
 			}
 			_y = (uint16_t)(_y + line_h());

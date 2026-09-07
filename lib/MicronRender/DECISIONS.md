@@ -49,6 +49,11 @@ Cozette lacks, weight, as three bold faces:
 | H2 | Tamzen bold | 8x16 |
 | H1 | Cozette hi-DPI | 12x26 |
 
+**Bold switches to Tamzen; underline stays Cozette with a drawn rule.** Stacked,
+bold+underline is the Tamzen face with the rule on top, because the face comes
+from bold and the rule from underline, independently. Underline alone is not
+heavier, only ruled.
+
 **Inline bold is drawn in Tamzen 6x12 bold and falls back to Cozette per glyph.**
 Both advance 6, so the horizontal grid holds within a line, and both have
 ascent 10, so a bold word sits on the same baseline as the Cozette around it.
@@ -122,6 +127,11 @@ in a narrow column a word break can waste more than it saves. The line count is
 computed by walking with the same rule the drawing uses; a plain divide
 under-counts when a word break pushes a cell onto another line, and a row too
 short overlaps the one beneath it.
+
+**Columns are separated by a drawn 1px rule**, one per gutter, stacked per line
+so it scrolls and clips for free. A hairline the pixel device draws directly,
+where a terminal can only stack box glyphs. Whitespace alignment still does the
+column widths; the rule just makes the boundary explicit.
 
 **The header is ruled, not inverted**, matching the heading decision: inversion
 means a dark background the page asked for and nothing else. A second rule
