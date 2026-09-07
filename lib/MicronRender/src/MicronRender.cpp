@@ -431,27 +431,36 @@ void PageRenderer::onField(const micron::Field& f, const micron::Style& s) {
 	                 : f.kind == micron::FieldKind::Radio    ? ')' : ']';
 	char box[2] = { open, 0 };
 	emit_run(box, 1, _invert);
+
 	if (f.kind == micron::FieldKind::Text) {
+		// The value goes INSIDE the box, the way a prefilled form field shows
+		// its content. A masked field shows asterisks instead of the value, so
+		// the value never reaches the screen. Underscores fill the rest of the
+		// declared width, so the box still shows how wide the input is.
 		const uint8_t w = f.width ? f.width : 1;
-		for (uint8_t k = 0; k < w; ++k) emit_run("_", 1, _invert);
+		const size_t vis = f.value_len ? cells(f.value, f.value_len) : 0;
+		if (f.masked) {
+			for (size_t k = 0; k < vis && k < w; ++k) emit_run("*", 1, _invert);
+		} else if (vis) {
+			// Draw only as much of the value as fits the width.
+			size_t k = 0, drawn = 0;
+			while (k < f.value_len && drawn < w) {
+				const uint8_t L = seq_len((uint8_t)f.value[k]);
+				emit_run(f.value + k, L, _invert);
+				k += L; ++drawn;
+			}
+		}
+		for (size_t k = vis; k < w; ++k) emit_run("_", 1, _invert);
 	} else {
 		emit_run(f.prechecked ? "x" : " ", 1, _invert);
 	}
+
 	box[0] = close;
 	emit_run(box, 1, _invert);
 
-	// A text field shows its preset content; a box shows its label. A MASKED
-	// field shows neither: the reference passes mask="*" to the edit widget, so
-	// the value never reaches the screen, and printing it here would defeat the
-	// only thing the flag is for.
-	if (f.kind == micron::FieldKind::Text) {
-		if (f.value_len) {
-			emit_run(" ", 1, _invert);
-			if (f.masked) for (size_t k = 0; k < cells(f.value, f.value_len); ++k)
-				emit_run("*", 1, _invert);
-			else emit_run(f.value, f.value_len, _invert);
-		}
-	} else if (f.label_len) {
+	// A checkbox or radio shows its label after the box; a text field does not,
+	// its content is already inside.
+	if (f.kind != micron::FieldKind::Text && f.label_len) {
 		emit_run(" ", 1, _invert);
 		emit_run(f.label, f.label_len, _invert);
 	}
