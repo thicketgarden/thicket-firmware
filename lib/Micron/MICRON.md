@@ -5,6 +5,12 @@ lines), read 2026-08-01. **That file is the grammar of record.** This document
 exists because a careful second-hand summary of it was wrong in five places,
 and every correction below is a passing test in `test/test_micron/`.
 
+**This file is the single source for the grammar and the edge cases.**
+`Micron.h` points here rather than restating any of it. It used to restate a
+short version, which drifted: the header claimed four commonly-missed details
+and named a different set from the five below. Nothing that appears here gets
+copied into a comment.
+
 ## Line level
 
 | Construct | Meaning |

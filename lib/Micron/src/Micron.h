@@ -25,15 +25,18 @@
 //
 // GRAMMAR OF RECORD
 //
-// markqvist/NomadNet, nomadnet/ui/textui/MicronParser.py, read 2026-08-01.
-// Implemented against that file directly rather than against any secondhand
-// description of the format. Four details secondhand accounts commonly get
-// wrong: `= is the literal toggle, not a divider; a lone backtick is a style
-// reset, not the literal toggle; tables exist; and the `FT/`BT true-colour
-// forms exist. See MICRON.md for the full delta.
+// markqvist/NomadNet, nomadnet/ui/textui/MicronParser.py. Implemented against
+// that file directly rather than against any secondhand description of the
+// format, because a careful secondhand summary of it was wrong in five places.
+//
+// MICRON.md IS THE SINGLE SOURCE for the grammar, the edge cases secondhand
+// accounts get wrong, and every deliberate deviation. It is not restated here.
+// A list kept in two files is a list that drifts, and this comment is what
+// drifted: it claimed four items and named a different set from the five in
+// MICRON.md.
 //
 // NOT YET IMPLEMENTED, deliberately, each a no-op that doesn't corrupt the
-// rest of the line:  `t tables  ·  `{ partials
+// rest of the line:  `t tables  ·  `{ partials.  MICRON.md says why.
 // ---------------------------------------------------------------------------
 
 #ifndef THICKET_MICRON_H
