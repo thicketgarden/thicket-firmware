@@ -194,6 +194,10 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 			// Leading spaces carry the texture: there is no glyph to protect,
 			// and on a gradient bar the spaces ARE the bar.
 			if (_has_bg) paint_bg(_x, lead_w, _bg_luma);
+			// And the underline: a link or `_ run must underline THROUGH its
+			// internal spaces, not break into a dash under each word.
+			if (_underline && row_visible(row_h()))
+				_lcd.draw_hline(_x, (uint16_t)(screen_y() + row_h() - 2), lead_w, !invert);
 			_x = (uint16_t)(_x + lead_w);
 			// ANYTHING that consumes width opens the row. Only glyphs used to,
 			// so a run of pure spaces left the row closed and the next run
