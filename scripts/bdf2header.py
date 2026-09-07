@@ -12,20 +12,34 @@ import sys
 
 FIRST, LAST = 32, 126
 
-# Beyond ASCII, only what the UI actually draws. A curated list rather than
-# whole blocks: every one is verified present in Cozette, and unused glyphs are
-# flash we don't spend.
-EXTRA = [
-    0x2500, 0x2502, 0x250C, 0x2510, 0x2514, 0x2518,       # box drawing
-    0x251C, 0x2524, 0x252C, 0x2534, 0x253C,
-    0x256D, 0x256E, 0x256F, 0x2570,                        # rounded corners
-    0x2580, 0x2584, 0x2588, 0x2591, 0x2592, 0x2593,        # blocks and dither
-    0x25A0, 0x25A1, 0x25CF, 0x25CB, 0x25C6, 0x25C7,        # geometric
-    0x25B2, 0x25BC, 0x25C0, 0x25B6,
-    0x2190, 0x2191, 0x2192, 0x2193,                        # arrows
-    0x2661, 0x2665, 0x2713, 0x2717,                        # hearts, tick, cross
-    0x00B0, 0x00B7, 0x2022, 0x2026,                        # degree, dots, ellipsis
+# Beyond ASCII, WHOLE RANGES rather than a hand-picked list.
+#
+# A curated list saves flash and costs correctness: a page using one character
+# nobody thought of renders a hole, and the hole is silent because a missing
+# glyph still advances. Real corpus pages hit exactly that with German text.
+# Ranges are cheap enough that picking is not worth the risk.
+#
+# Everything here is verified present in Cozette; the generator fails loudly if
+# a range it was asked for is not.
+EXTRA_RANGES = [
+    (0x00A0, 0x00FF, "Latin-1 Supplement"),      # accented Latin, punctuation
+    (0x0100, 0x017F, "Latin Extended-A"),        # the rest of European Latin
+    (0x2500, 0x257F, "Box Drawing"),             # literal page content, and
+                                                 # box-drawn tables as an option
+    (0x2580, 0x259F, "Block Elements"),
+    (0x25A0, 0x25FF, "Geometric Shapes"),
 ]
+
+# Odds and ends outside those blocks that the UI already draws.
+EXTRA_SINGLES = [
+    0x2190, 0x2191, 0x2192, 0x2193,                        # arrows
+    0x2022, 0x2026,                                        # bullet, ellipsis
+    0x2661, 0x2665, 0x2713, 0x2717,                        # hearts, tick, cross
+]
+
+EXTRA = sorted(set(
+    [c for lo, hi, _ in EXTRA_RANGES for c in range(lo, hi + 1)] + EXTRA_SINGLES))
+
 
 
 def parse(path):
@@ -59,9 +73,23 @@ def parse(path):
     # DWIDTH is the ADVANCE (6). BBX width is how far the ink reaches, and
     # box/block glyphs are 7 wide on purpose so neighbouring cells touch and
     # rules join up. Store the ink width; lay out on the advance.
-    advance = max(g[2] for g in glyphs.values())
+    #
+    # The advance is the MODE, not the maximum: Cozette carries a handful of
+    # double-width glyphs, and one of them would otherwise redefine the cell for
+    # the whole font.
+    from collections import Counter
+    advance = Counter(g[2] for g in glyphs.values()).most_common(1)[0][0]
+
+    # A glyph that is not one cell wide cannot sit in a monospace grid. Drop it
+    # and say so; it falls back to blank-but-advancing like any other unknown,
+    # which keeps layout intact.
+    oversize = sorted(c for c, g in glyphs.items()
+                      if g[2] != advance or g[0][0] + max(0, g[0][2]) > 8)
+    for c in oversize:
+        del glyphs[c]
+
     ink_w = max(g[0][0] + max(0, g[0][2]) for g in glyphs.values())
-    return ascent, descent, advance, ink_w, glyphs
+    return ascent, descent, advance, ink_w, glyphs, oversize
 
 
 def render(bbx, rows, dwidth, cell_w, cell_h, ascent):
@@ -89,13 +117,16 @@ def main():
     if len(sys.argv) != 3:
         sys.exit("usage: bdf2header.py IN.bdf OUT.h")
     src, dst = sys.argv[1], sys.argv[2]
-    ascent, descent, advance, cell_w, glyphs = parse(src)
+    ascent, descent, advance, cell_w, glyphs, oversize = parse(src)
     cell_h = ascent + descent
 
     missing = [c for c in list(range(FIRST, LAST + 1)) + EXTRA
-               if c not in glyphs]
+               if c not in glyphs and c not in oversize]
     if missing:
         sys.exit(f"{src}: missing glyphs for {missing}")
+    if oversize:
+        print(f"[bdf2header] skipped {len(oversize)} glyph(s) wider than one cell: "
+              + " ".join(f"U+{c:04X}" for c in oversize), file=sys.stderr)
     if cell_w > 8:
         sys.exit(f"{src}: ink width {cell_w} does not fit one byte per row")
 
@@ -126,8 +157,10 @@ def main():
                      f"\t{{{body}}},  // {c} apostrophe")
     lines += ["};", ""]
 
-    # Extended glyphs: sorted, looked up by codepoint.
-    extra = sorted(EXTRA)
+    # Extended glyphs: sorted, looked up by codepoint. Anything the font does
+    # not carry at one cell wide is simply absent, and falls back to
+    # blank-but-advancing at draw time.
+    extra = sorted(c for c in EXTRA if c in glyphs)
     lines += [
         "struct FontExtra { uint16_t cp; uint8_t rows[%d]; };" % cell_h,
         "",
@@ -141,7 +174,11 @@ def main():
     lines += ["};", "", "}  // namespace thicket", ""]
 
     open(dst, "w").write("\n".join(lines))
-    print(f"[bdf2header] {cell_w}x{cell_h}, {LAST-FIRST+1} glyphs -> {dst}")
+    print(f"[bdf2header] {cell_w}x{cell_h} cell, advance {advance}: "
+          f"{LAST-FIRST+1} ASCII + {len(extra)} extended -> {dst}")
+    for lo, hi, name in EXTRA_RANGES:
+        have = sum(1 for c in extra if lo <= c <= hi)
+        print(f"[bdf2header]   {name:22} {have:4} of {hi - lo + 1}")
 
 
 if __name__ == "__main__":

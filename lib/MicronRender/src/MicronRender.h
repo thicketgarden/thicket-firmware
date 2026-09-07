@@ -34,6 +34,11 @@ struct PageMetrics {
 	static const uint16_t MARGIN_X   = 2;    // left and right
 	static const uint16_t LINE_H     = 13;   // FONT_H; 18 rows on a 240px panel
 	static const uint16_t INDENT_PX  = 12;   // per section depth: 2 cells
+	// Micron puts no ceiling on section depth and real pages use absurd ones:
+	// the Guide's display test opens a depth-20 heading. Twenty levels is 240px
+	// of indent on a 400px panel, which pushes content off the right edge.
+	// Four levels is 48px and still leaves 58 columns to read in.
+	static const uint8_t  MAX_DEPTH  = 4;
 	static const uint16_t PARA_GAP   = 4;    // after a divider or a heading
 	static const uint16_t RULE_INSET = 1;    // divider inset from the margin
 
@@ -53,7 +58,21 @@ class PageRenderer : public micron::Renderer {
 public:
 	static const uint8_t MAX_LINKS = 48;
 
-	PageRenderer(SharpLcd& lcd) : _lcd(lcd) {}
+	// Two knobs, both set once at construction so a comparison render costs a
+	// flag rather than a rebuild.
+	//   extra_leading: pixels added to every row. Cozette's 13px cell is tight
+	//                  for long-form reading and there is vertical room to
+	//                  spend: 18 rows at 13px, 16 at 15px.
+	//   stepped_heads: distinguish heading levels from each other. Depth 1 is a
+	//                  full-width inverted band, depth 2 a band inset to its
+	//                  indent, depth 3 and beyond plain text over a rule. With
+	//                  this off every level is a full-width band and they are
+	//                  indistinguishable.
+	explicit PageRenderer(SharpLcd& lcd, uint8_t extra_leading = 0,
+	                      bool stepped_heads = true)
+		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads) {}
+
+	uint16_t line_h() const { return (uint16_t)(PageMetrics::LINE_H + _leading); }
 
 	// Re-flow from the top with this scroll offset. Call, then feed every line
 	// of the page to a micron::Parser pointed at this renderer.
@@ -107,12 +126,15 @@ private:
 	uint16_t screen_y() const;   // virtual y mapped into the panel
 
 	SharpLcd& _lcd;
+	uint8_t   _leading = 0;
+	bool      _stepped = true;
 	uint16_t  _scroll = 0;
 	uint16_t  _y = 0;            // virtual y of the current row, page coords
 	uint16_t  _x = 0;            // pen x in panel coords
 	bool      _row_open = false; // something has been drawn on this row
 	uint8_t   _depth = 0;
 	bool      _invert = false;   // current row is a dark-background block
+	bool      _head_rule = false;
 	bool      _blank_pending = true;  // a blank gap is already open
 
 	// Table state. Rows are laid into columns here because the parser refuses

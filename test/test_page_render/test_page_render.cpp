@@ -78,14 +78,21 @@ void test_render_pages(void) {
 	for (char* tok = strtok(buf, " \n"); tok; tok = strtok(nullptr, " \n")) {
 		if (!load(tok)) { printf("  MISSING %s\n", tok); continue; }
 
+		// MICRON_LEADING and MICRON_FLAT let a comparison render be produced
+		// without a rebuild, so two treatments can be judged side by side.
+		const char* lead_s = getenv("MICRON_LEADING");
+		const uint8_t lead = lead_s ? (uint8_t)atoi(lead_s) : 0;
+		const bool stepped = getenv("MICRON_FLAT") == nullptr;
+		const char* suffix = getenv("MICRON_SUFFIX");
+
 		VirtualPanel panel;
 		SharpLcd lcd(panel, fb);
-		PageRenderer r(lcd);
+		PageRenderer r(lcd, lead, stepped);
 
 		const uint16_t h = render(lcd, r, 0);
 		char slug[128]; slug_of(tok, slug, sizeof(slug));
 		char out[256];
-		snprintf(out, sizeof(out), "pages/%s.pbm", slug);
+		snprintf(out, sizeof(out), "pages/%s%s.pbm", slug, suffix ? suffix : "");
 		panel.write_pbm(out);
 
 		const uint16_t screens = (uint16_t)((h + LCD_HEIGHT - 1) / LCD_HEIGHT);
@@ -97,7 +104,7 @@ void test_render_pages(void) {
 		// rather than assumed.
 		if (h > LCD_HEIGHT) {
 			render(lcd, r, LCD_HEIGHT);
-			snprintf(out, sizeof(out), "pages/%s@2.pbm", slug);
+			snprintf(out, sizeof(out), "pages/%s%s@2.pbm", slug, suffix ? suffix : "");
 			panel.write_pbm(out);
 		}
 		if (panel.overflowed()) ++clipped;

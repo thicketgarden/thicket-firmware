@@ -49,22 +49,29 @@ void PageRenderer::blankLine() {
 	// Collapse runs of blank lines to one gap, the way a reader expects and a
 	// page full of trailing whitespace does not deserve.
 	if (_blank_pending) return;
-	_y = (uint16_t)(_y + PageMetrics::LINE_H);
+	_y = (uint16_t)(_y + line_h());
 	_blank_pending = true;
 }
 
 uint16_t PageRenderer::left_edge() const {
-	return (uint16_t)(PageMetrics::MARGIN_X + _depth * PageMetrics::INDENT_PX);
+	const uint8_t d = _depth > PageMetrics::MAX_DEPTH ? PageMetrics::MAX_DEPTH : _depth;
+	return (uint16_t)(PageMetrics::MARGIN_X + d * PageMetrics::INDENT_PX);
 }
 
 bool PageRenderer::row_visible(uint16_t h) const {
-	return _y + h > _scroll && _y < (uint16_t)(_scroll + LCD_HEIGHT);
+	// The top edge must be AT OR BELOW the window, not merely overlapping it.
+	// A row straddling the top gives screen_y() a negative value, which is
+	// unsigned here and wraps to about 65000; fill_rect's loop counter then
+	// wraps with it and never terminates. Scroll offsets are whole rows in
+	// practice, so nothing straddles.
+	(void)h;
+	return _y >= _scroll && (uint32_t)_y < (uint32_t)_scroll + LCD_HEIGHT;
 }
 
 uint16_t PageRenderer::screen_y() const { return (uint16_t)(_y - _scroll); }
 
 void PageRenderer::newline() {
-	_y = (uint16_t)(_y + PageMetrics::LINE_H);
+	_y = (uint16_t)(_y + line_h());
 	_x = left_edge();
 	_row_open = false;
 }
@@ -77,7 +84,7 @@ void PageRenderer::wrap_if_needed(uint16_t next_w) {
 // Draw a run, wrapping at word boundaries. Nothing is copied: the pen walks
 // the caller's bytes and draws a glyph at a time.
 void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
-	if (_x < left_edge()) _x = left_edge();
+	if (!_row_open && _x < left_edge()) _x = left_edge();
 	const uint16_t right = LCD_WIDTH - PageMetrics::MARGIN_X;
 
 	size_t i = 0;
@@ -98,7 +105,7 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 			for (size_t k = i; k < w; ) {
 				const uint8_t L = seq_len((uint8_t)t[k]);
 				wrap_if_needed(PageMetrics::FONT_ADVANCE);
-				if (row_visible(PageMetrics::LINE_H)) {
+				if (row_visible(line_h())) {
 					char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
 					_lcd.draw_text(_x, screen_y(), g, !invert);
 				}
@@ -113,14 +120,14 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 		// Leading spaces are dropped at a wrap, never carried to column 0.
 		if (_x + lead_w + word_w > right && _x > left_edge()) newline();
 		else if (lead_w) {
-			if (row_visible(PageMetrics::LINE_H) && invert)
+			if (row_visible(line_h()) && invert)
 				_lcd.fill_rect(_x, screen_y(), lead_w, PageMetrics::LINE_H, true);
 			_x = (uint16_t)(_x + lead_w);
 		}
 
 		for (size_t k = sp; k < w; ) {
 			const uint8_t L = seq_len((uint8_t)t[k]);
-			if (row_visible(PageMetrics::LINE_H)) {
+			if (row_visible(line_h())) {
 				char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
 				if (invert) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE,
 				                           PageMetrics::LINE_H, true);
@@ -137,7 +144,10 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	_depth = s.depth;
 	_blank_pending = false;
-	if (_x < left_edge()) _x = left_edge();
+	// A fresh row restarts at the left edge. Only moving forward to it leaves
+	// the pen wherever the previous row ended, which is how a deep-indented
+	// divider dragged the following paragraph to the right margin.
+	if (!_row_open) _x = left_edge();
 
 	// ALIGNMENT. Centring needs the row's width before the row is drawn, and
 	// this renderer holds no row. Where the whole span fits one row the offset
@@ -156,19 +166,31 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	// A heading is inverted across the full content width, which is the only
 	// weight distinction a single-weight font can make.
 	const bool dark_bg = background_is_dark(s.bg);
-	const bool invert = s.heading || dark_bg;
+	// Depth 3 and beyond stop inverting: three stacked bars is a page of bars.
+	// They get plain text over a rule instead, drawn at end of line.
+	// Only depth 1 gets the bar. An inset band at depth 2 is a 24px gap on a
+	// 400px bar and does not read; a rule under the text does.
+	const bool head_bar = s.heading && (!_stepped || s.depth <= 1);
+	const bool invert = head_bar || dark_bg;
+	_head_rule = _stepped && s.heading && s.depth >= 2;
 	_invert = invert;
 
-	if (invert && !_row_open && row_visible(PageMetrics::LINE_H)) {
-		_lcd.fill_rect(PageMetrics::MARGIN_X, screen_y(),
-		               PageMetrics::content_w(), PageMetrics::LINE_H, true);
+	if (invert && !_row_open && row_visible(line_h())) {
+		// Depth 1 takes the full width; depth 2 a band inset to its own indent,
+		// so the levels read as different rather than as the same bar. A dark
+		// background block always takes the full width: that is the page's own
+		// colour, not a heading level.
+		const bool inset = _stepped && head_bar && !dark_bg && s.depth >= 2;
+		const uint16_t bx = inset ? left_edge() : PageMetrics::MARGIN_X;
+		_lcd.fill_rect(bx, screen_y(), (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X - bx),
+		               line_h(), true);
 	}
 	emit_run(t, n, invert);
 
 	// Underline stands in for the parser's underline AND for nothing else; the
 	// font has no second weight to spend.
-	if (s.underline && _row_open && row_visible(PageMetrics::LINE_H))
-		_lcd.draw_hline(left_edge(), (uint16_t)(screen_y() + PageMetrics::LINE_H - 1),
+	if (s.underline && _row_open && row_visible(line_h()))
+		_lcd.draw_hline(left_edge(), (uint16_t)(screen_y() + line_h() - 1),
 		                (uint16_t)(_x - left_edge()), !invert);
 }
 
@@ -177,7 +199,8 @@ void PageRenderer::onLink(const char* label, size_t label_len,
                           const char* /*fields*/, size_t /*fields_len*/,
                           const micron::Style& s) {
 	_depth = s.depth;
-	const uint16_t x0 = _x < left_edge() ? left_edge() : _x;
+	if (!_row_open) _x = left_edge();
+	const uint16_t x0 = _x;
 	const uint16_t y0 = screen_y();
 
 	emit_run(label, label_len, _invert);
@@ -185,16 +208,16 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 	// Underlined so a link reads as one without colour, and recorded so input
 	// can hit-test later. A link that wrapped is boxed on its last row only,
 	// which is enough to press.
-	if (row_visible(PageMetrics::LINE_H)) {
+	if (row_visible(line_h())) {
 		const uint16_t x1 = _x;
 		if (x1 > x0)
-			_lcd.draw_hline(x0, (uint16_t)(y0 + PageMetrics::LINE_H - 2),
+			_lcd.draw_hline(x0, (uint16_t)(y0 + line_h() - 2),
 			                (uint16_t)(x1 - x0), !_invert);
 		if (_link_count < MAX_LINKS) {
 			LinkBox& b = _links[_link_count++];
 			b.x = x0; b.y = y0;
 			b.w = (uint16_t)(x1 > x0 ? x1 - x0 : 0);
-			b.h = PageMetrics::LINE_H;
+			b.h = line_h();
 			b.target = target; b.target_len = (uint16_t)target_len;
 		} else {
 			_links_overflowed = true;
@@ -204,10 +227,11 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 
 void PageRenderer::onDivider(uint32_t /*ch*/, const micron::Style& s) {
 	_depth = s.depth;
+	if (!_row_open) _x = left_edge();
 	// A rule, not a row of glyphs. The parser reports the fill character the
 	// page asked for; a 1px line reads better on this panel than any of them.
-	if (row_visible(PageMetrics::LINE_H)) {
-		const uint16_t y = (uint16_t)(screen_y() + PageMetrics::LINE_H / 2);
+	if (row_visible(line_h())) {
+		const uint16_t y = (uint16_t)(screen_y() + line_h() / 2);
 		_lcd.draw_hline((uint16_t)(left_edge() + PageMetrics::RULE_INSET), y,
 		                (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X
 		                           - PageMetrics::RULE_INSET - left_edge()), true);
@@ -244,6 +268,18 @@ void PageRenderer::onLineEnd(const micron::Style& s) {
 	_depth = s.depth;
 	// A heading's inverted band already covers the row; add a little air after
 	// it so the next paragraph does not sit against the bar.
+	// A deep heading is ruled rather than barred, so the rule is drawn once the
+	// row's width is known, which is here.
+	if (_head_rule && _row_open && row_visible(line_h())) {
+		// Depth 2 rules the full content width, deeper ones only their own
+		// text, so the levels keep stepping down in weight.
+		const uint16_t w = s.depth <= 2
+			? (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X - left_edge())
+			: (uint16_t)(_x - left_edge());
+		_lcd.draw_hline(left_edge(), (uint16_t)(screen_y() + line_h() - 1), w, true);
+	}
+	_head_rule = false;
+
 	const bool was_heading = s.heading;
 	newline();
 	if (was_heading) _y = (uint16_t)(_y + PageMetrics::PARA_GAP);
@@ -286,7 +322,7 @@ void PageRenderer::onTableRow(const char* row, size_t len, const micron::Style& 
 	if (sep) { _table_row++; return; }
 
 	const bool header = (_table_row == 0);
-	if (header && row_visible(PageMetrics::LINE_H))
+	if (header && row_visible(line_h()))
 		_lcd.fill_rect(PageMetrics::MARGIN_X, screen_y(),
 		               PageMetrics::content_w(), PageMetrics::LINE_H, true);
 
@@ -310,7 +346,7 @@ void PageRenderer::onTableRow(const char* row, size_t len, const micron::Style& 
 			shown = k - cs;
 		}
 		_x = cx;
-		if (row_visible(PageMetrics::LINE_H)) emit_run(row + cs, shown, header);
+		if (row_visible(line_h())) emit_run(row + cs, shown, header);
 		++col;
 		i = cell + 1;
 	}
@@ -321,7 +357,7 @@ void PageRenderer::onTableRow(const char* row, size_t len, const micron::Style& 
 void PageRenderer::onTableEnd(const micron::Style& /*s*/) {
 	_in_table = false;
 	// A rule under the table, so it reads as a block rather than as stray text.
-	if (row_visible(PageMetrics::LINE_H))
+	if (row_visible(line_h()))
 		_lcd.draw_hline(left_edge(), screen_y(),
 		                (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X - left_edge()), true);
 	_y = (uint16_t)(_y + PageMetrics::PARA_GAP);
