@@ -80,20 +80,23 @@ Cozette's 9 KB and the hi-DPI face's 10.3 KB.
 
 ## Links
 
-Micron has one link grammar, `` `[label`target] ``. A page that makes a link
-stand out does it with ordinary colour or underline tags, not a link variant, so
-there is nothing to special-case: every link is rendered the same way.
+Micron has one link grammar, `` `[label`target] ``, and the reference adds no
+style of its own to it. Checked against NomadNet 1.4.0: a plain link renders
+`fg #dddddd`, the same as body text, with no underline and no colour flag. Its
+`LinkSpec` copies the surrounding style verbatim. A `` `_ `` word, by contrast,
+carries an explicit underline flag. So a link is only distinct when the page
+author made it so, by convention `` `F79d`_`[..]`_`f `` (teal plus underline);
+NomadNet's own `Channels.py` carries that `79d` as its default link colour.
 
-A link is underlined, which is the honest substitute for the link colour the
-reference uses and one ink cannot reproduce. The underline is drawn per cell so
-it follows the label across a wrap and through its internal spaces. Recorded per
+We render the same way: a link inherits the surrounding style and adds nothing.
+An author-styled link keeps its underline, because the author wrote `` `_ ``, and
+its colour resolves to ink like any other text. A plain link reads as body text,
+exactly as in the reference. The label's pixel extents are still recorded per
 link for a later input layer to hit-test.
 
-## Links (renderer detail)
-
-Underlined, one pixel above the cell floor. Colour is not available, so the
-underline carries it alone. Pixel extents are recorded per link. A link that
-wraps is boxed on its last row only, which is enough to press.
+The reference distinguishes links during navigation with reverse-video on the
+focused link, not with static styling. That is the pending input-layer behaviour
+(TODO in `emit_run`); until there is input there is no focused link to draw.
 
 ## Dividers
 

@@ -384,16 +384,18 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 	const uint16_t x0 = _x;
 	const uint16_t y0 = screen_y();
 
-	// A link is underlined, the honest substitute for the link colour the
-	// reference uses and we cannot reproduce on one ink. Micron has ONE link
-	// grammar; a page that makes a link stand out does so with ordinary colour
-	// tags, which resolve to ink like any other text, so every link renders the
-	// same way. The underline is drawn per cell inside emit_run, so it follows
-	// the label across a wrap.
-	const bool prev_ul = _underline;
-	_underline = true;
+	// A link is rendered in the SURROUNDING style, adding nothing of its own.
+	// The reference does the same: LinkSpec copies the current fg/bg and applies
+	// no colour, no underline, no bold. Pages that want a link to stand out
+	// style it themselves, by convention `F79d`_`[..]`_`f (teal plus underline);
+	// the underline comes through because the author wrote `_, and the colour
+	// resolves to ink. A plain link looks like body text, exactly as in the
+	// reference, and becomes distinct through selection.
+	//
+	// TODO(input layer): a focused/selected link renders reverse-video, which is
+	// how the reference distinguishes links during navigation. Until there is
+	// input there is no focused link to draw.
 	emit_run(label, label_len, _invert);
-	_underline = prev_ul;
 
 	// Recorded for a later input layer. A wrapped link is boxed on its last row
 	// only, which is enough to press; the visible underline spans every row.
