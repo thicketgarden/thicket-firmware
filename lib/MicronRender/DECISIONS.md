@@ -257,3 +257,27 @@ cannot misalign a heading.
 **Verdict: a real project, and now worth more than bold alone.** Bold and a
 four-step size ladder together are the case; either on its own is thinner. Not
 started, and the metrics no longer block it.
+
+
+## Parity is only as strong as the corpus AND the comparison
+
+Three bugs in fields and dividers survived a green parity run, and the reason is
+worth keeping because the obvious explanation is wrong. It was not that the
+corpus lacked cases: it already held four pages with a pre-checked box, five
+with a masked field and seven with a multi-byte divider fill.
+
+**Those constructs were excluded from the diff on both sides.** The reference
+returns fields and dividers as widgets rather than through the text path, so
+they were skipped, and parity passed over them by construction. Adding pages
+would not have caught anything; only comparing the constructs did, and doing so
+surfaced the differences immediately.
+
+**The renderer gallery is a second oracle.** All three bugs were found by
+looking at a rendered page and asking why it was wrong, not by the parity suite.
+A parser diff and a picture fail differently, and the picture found what the
+diff was configured not to look at.
+
+**So when the renderer finds a parser bug, the fix has three parts:** correct
+the parser in micron-cpp, make the parity harness compare the construct, and
+only then call it closed. Fixing the parser alone leaves parity green over the
+same hole.
