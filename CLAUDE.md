@@ -95,6 +95,10 @@ code), `-soak`, `-bench`, `-traffic`, `-traffic-format` (instrumentation).
   grant's* tested level, not a hardware limit.
 - Determinism: scripts build/flash; changes are judged by build + on-target
   behavior, not by reading tea leaves.
+- **The Micron parser is not in this repo.** It's `thicketgarden/micron-cpp`,
+  Apache-2.0, pinned by SHA in `lib_deps`, with its own unit tests and a parity
+  harness against NomadNet's own parser. Fix it there and bump the pin here.
+  A copy in `lib/` would be a second source of truth and a divergence waiting.
 - **Network citizenship: `docs/network-citizenship.md` binds every packet this
   firmware emits.** Links are shared and slow, and the budget is the LoRa link
   rather than the bench. Rate-limit every outbound class with exponential
