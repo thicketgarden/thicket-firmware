@@ -88,14 +88,35 @@ Consecutive blanks collapse to one.
 
 ## Tables
 
-Columns are **evenly divided** across the content width, not measured, because
-measuring needs the whole table held and holding it is what this renderer
-refuses to do. Header row inverted. A rule under the table. No box drawing: the
-font has blocks but no box-drawing lines, and whitespace columns read better at
-66 cells than a terminal's 100-column grid would.
+Laid out here, because layout is what a renderer is for and the parser
+deliberately refuses to do it.
 
-⚠ **Cell content wider than its column is currently clipped.** Wrapping inside a
-cell needs a variable row height, which needs the table held. Open.
+**Rows are collected into a fixed buffer, then laid out at the closing toggle.**
+Column widths need the widest cell in each column, which needs the whole table.
+A table is not a page though: 16 rows, 6 columns and 1 KB of text hold any
+sensible one, and anything past that is **reported** through
+`table_overflowed()` rather than silently truncated.
+
+**No column may take more than half the width** before fitting. One long cell
+otherwise absorbs everything proportional scaling has to give: a 60-cell price
+column squeezed a `Qty` header down to two cells and broke it across two lines
+for nothing. After capping, columns take their natural width if the table fits
+and are scaled proportionally if not, with a two-cell floor.
+
+**A cell wider than its column WRAPS, and the row gets taller.** Clipping loses
+the reader something a taller row would have shown. Wrapping is word-aware, and
+backs up to a space only when that still fills two thirds of the line, because
+in a narrow column a word break can waste more than it saves. The line count is
+computed by walking with the same rule the drawing uses; a plain divide
+under-counts when a word break pushes a cell onto another line, and a row too
+short overlaps the one beneath it.
+
+**The header is ruled, not inverted**, matching the heading decision: inversion
+means a dark background the page asked for and nothing else. A second rule
+closes the table.
+
+No box drawing. The font now carries it, and whitespace columns still read
+better at 66 cells than a terminal's 100-column grid.
 
 ## Images and partials
 

@@ -322,75 +322,195 @@ void PageRenderer::onLineEnd(const micron::Style& s) {
 void PageRenderer::onTableBegin(const micron::Table& t, const micron::Style& s) {
 	_depth = s.depth;
 	_in_table = true;
-	_table_row = 0;
-	_table_cols = 0;
+	_table_row = 0; _table_cols = 0; _t_rows = 0; _tlen = 0;
+	_table_overflowed = false;
 	_table_align = t.align_set ? t.align : micron::Align::Left;
-	for (uint8_t i = 0; i < 8; ++i) _col_w[i] = 0;
+	for (uint8_t i = 0; i < T_COLS; ++i) _col_w[i] = 0;
 }
 
+// Rows are collected, not drawn. Column widths need the widest cell in each
+// column, so nothing can be laid out until the table closes.
 void PageRenderer::onTableRow(const char* row, size_t len, const micron::Style& s) {
 	_depth = s.depth;
-	// Markdown pipe rows. The separator row is consumed for alignment only.
-	// Columns are sized evenly across the content width rather than measured,
-	// because measuring needs the whole table and the whole table is exactly
-	// what this renderer refuses to hold.
-	size_t start = 0, end = len;
-	while (start < end && (row[start] == '|' || is_space(row[start]))) ++start;
-	while (end > start && (row[end - 1] == '|' || is_space(row[end - 1]))) --end;
+	size_t a = 0, b = len;
+	while (a < b && (row[a] == '|' || is_space(row[a]))) ++a;
+	while (b > a && (row[b - 1] == '|' || is_space(row[b - 1]))) --b;
 
-	// Count columns once, on the first row.
-	if (_table_cols == 0) {
-		uint8_t c = 1;
-		for (size_t i = start; i < end; ++i) if (row[i] == '|') ++c;
-		_table_cols = c > 8 ? 8 : c;
-		const uint8_t total = (uint8_t)(PageMetrics::cols()
-		                                - _depth * (PageMetrics::INDENT_PX / advance()));
-		for (uint8_t i = 0; i < _table_cols; ++i) _col_w[i] = (uint8_t)(total / _table_cols);
-	}
-
-	// A separator row (only -, : and spaces) sets nothing visible.
-	bool sep = end > start;
-	for (size_t i = start; i < end && sep; ++i)
+	// A separator row carries alignment in markdown and no content here.
+	bool sep = b > a;
+	for (size_t i = a; i < b && sep; ++i)
 		if (row[i] != '-' && row[i] != ':' && row[i] != '|' && !is_space(row[i])) sep = false;
-	if (sep) { _table_row++; return; }
+	if (sep) return;
 
-	const bool header = (_table_row == 0);
-	if (header && row_visible(row_h()))
-		_lcd.fill_rect(PageMetrics::MARGIN_X, screen_y(),
-		               PageMetrics::content_w(), PageMetrics::LINE_H, true);
+	if (_t_rows >= T_ROWS) { _table_overflowed = true; return; }
+	const uint8_t r = _t_rows;
+	for (uint8_t k = 0; k < T_COLS; ++k) { _cell_off[r][k] = 0; _cell_len[r][k] = 0; }
 
 	uint8_t col = 0;
-	size_t i = start;
-	while (i <= end && col < _table_cols) {
+	size_t i = a;
+	while (i <= b && col < T_COLS) {
 		size_t cell = i;
-		while (cell < end && row[cell] != '|') ++cell;
+		while (cell < b && row[cell] != '|') ++cell;
 		size_t cs = i, ce = cell;
 		while (cs < ce && is_space(row[cs])) ++cs;
 		while (ce > cs && is_space(row[ce - 1])) --ce;
 
-		// Cell content longer than its column is clipped to the column here.
-		// Wrapping inside a cell needs a variable row height, which needs the
-		// table held; noted in the log as the next thing to do.
-		const uint16_t cx = (uint16_t)(left_edge() + col * _col_w[col] * advance());
-		size_t shown = ce - cs;
-		if (cells(row + cs, shown) > _col_w[col]) {
-			size_t k = cs; size_t c = 0;
-			while (k < ce && c < (size_t)_col_w[col]) { k += seq_len((uint8_t)row[k]); ++c; }
-			shown = k - cs;
+		size_t n = ce - cs;
+		if (n > 255) n = 255;
+		if (_tlen + n > T_BYTES) { _table_overflowed = true; n = 0; }
+		_cell_off[r][col] = _tlen;
+		_cell_len[r][col] = (uint8_t)n;
+		for (size_t k = 0; k < n; ++k) _tbuf[_tlen + k] = row[cs + k];
+		_tlen = (uint16_t)(_tlen + n);
+
+		if (n) {
+			const uint8_t w = (uint8_t)cells(_tbuf + _cell_off[r][col], n);
+			if (w > _col_w[col]) _col_w[col] = w;
 		}
-		_x = cx;
-		if (row_visible(row_h())) emit_run(row + cs, shown, header);
 		++col;
 		i = cell + 1;
 	}
-	_table_row++;
-	newline();
+	if (col > _table_cols) _table_cols = col;
+	++_t_rows;
 }
 
-void PageRenderer::onTableEnd(const micron::Style& /*s*/) {
+void PageRenderer::onTableEnd(const micron::Style& s) {
+	_depth = s.depth;
+	table_flush();
 	_in_table = false;
-	// A rule under the table, so it reads as a block rather than as stray text.
-	if (row_visible(row_h()))
+}
+
+// Lay the collected rows into columns and draw them.
+//
+// Columns take their natural width where the table fits, and are scaled down
+// proportionally where it does not, with a floor so no column collapses to
+// nothing. A cell wider than its column WRAPS, which makes the row taller; it
+// is never clipped, because a clipped cell loses the reader something a taller
+// row would have shown.
+void PageRenderer::table_flush() {
+	if (!_t_rows || !_table_cols) return;
+
+	const uint8_t GAP = 1;                       // a space between columns
+	const uint8_t avail = (uint8_t)((LCD_WIDTH - PageMetrics::MARGIN_X - left_edge())
+	                                / PageMetrics::FONT_ADVANCE);
+	// Cap any single column at half the width before fitting. One long cell
+	// otherwise takes everything proportional scaling has to give and starves
+	// the rest: a 60-cell price column squeezed Qty to two cells and broke the
+	// header across two lines for no reason.
+	const uint8_t cap = (uint8_t)(avail / 2);
+	for (uint8_t c = 0; c < _table_cols; ++c)
+		if (_col_w[c] > cap) _col_w[c] = cap;
+
+	uint16_t natural = 0;
+	for (uint8_t c = 0; c < _table_cols; ++c) natural = (uint16_t)(natural + _col_w[c] + GAP);
+
+	if (natural > avail) {
+		// Scale to fit. Two cells is the floor: narrower than that and a column
+		// is a column of hyphens.
+		const uint16_t room = (uint16_t)(avail - _table_cols * GAP);
+		uint16_t sum = 0;
+		for (uint8_t c = 0; c < _table_cols; ++c) sum = (uint16_t)(sum + _col_w[c]);
+		if (!sum) return;
+		uint16_t used = 0;
+		for (uint8_t c = 0; c < _table_cols; ++c) {
+			uint16_t w = (uint16_t)((uint32_t)_col_w[c] * room / sum);
+			if (w < 2) w = 2;
+			_col_w[c] = (uint8_t)w;
+			used = (uint16_t)(used + w);
+		}
+		// Give any rounding remainder to the widest column rather than losing it.
+		if (used < room) {
+			uint8_t widest = 0;
+			for (uint8_t c = 1; c < _table_cols; ++c) if (_col_w[c] > _col_w[widest]) widest = c;
+			_col_w[widest] = (uint8_t)(_col_w[widest] + (room - used));
+		}
+	}
+
+	for (uint8_t r = 0; r < _t_rows; ++r) {
+		// How many lines the tallest cell in this row needs.
+		uint8_t lines = 1;
+		for (uint8_t c = 0; c < _table_cols; ++c) {
+			if (!_cell_len[r][c] || !_col_w[c]) continue;
+			// Counted by walking with the SAME break rule the draw uses. A
+			// word break can push a cell onto one more line than a plain
+			// divide predicts, and a row too short overlaps the next.
+			const char* p = _tbuf + _cell_off[r][c];
+			const size_t n = _cell_len[r][c];
+			uint8_t need = 0;
+			size_t at = 0;
+			while (at < n && need < 32) {
+				size_t e = at, t2 = 0;
+				while (e < n && t2 < _col_w[c]) { e += seq_len((uint8_t)p[e]); ++t2; }
+				if (e < n && p[e] != ' ') {
+					size_t brk = e;
+					while (brk > at && p[brk - 1] != ' ') --brk;
+					if (brk > at && (brk - at) * 3 >= (e - at) * 2) e = brk;
+				}
+				at = e;
+				while (at < n && p[at] == ' ') ++at;
+				++need;
+			}
+			if (need > lines) lines = need;
+		}
+
+		for (uint8_t ln = 0; ln < lines; ++ln) {
+			if (row_visible(line_h())) {
+				uint16_t x = left_edge();
+				for (uint8_t c = 0; c < _table_cols; ++c) {
+					// The slice of this cell belonging to line `ln`.
+					const char* p = _tbuf + _cell_off[r][c];
+					const size_t n = _cell_len[r][c];
+					// Walk to this line's slice. A cell with fewer lines than
+					// the tallest in the row contributes NOTHING here; without
+					// that check a short cell reprints itself on every
+					// continuation line.
+					// Re-walk from the start each line, applying the same
+					// break rule, so a line begins where the previous one
+					// actually ended rather than at a fixed multiple.
+					size_t from = 0;
+					for (uint8_t pass = 0; pass < ln; ++pass) {
+						size_t e = from, t2 = 0;
+						while (e < n && t2 < _col_w[c]) { e += seq_len((uint8_t)p[e]); ++t2; }
+						if (e < n && p[e] != ' ') {
+							size_t brk = e;
+							while (brk > from && p[brk - 1] != ' ') --brk;
+							if (brk > from && (brk - from) * 3 >= (e - from) * 2) e = brk;
+						}
+						from = e;
+						while (from < n && p[from] == ' ') ++from;
+						if (from >= n) break;
+					}
+					size_t to = from, taken = 0;
+					while (to < n && taken < _col_w[c]) { to += seq_len((uint8_t)p[to]); ++taken; }
+					// Back up to a space rather than break a word, but only if
+					// that leaves most of the line used: in a narrow column a
+					// word break can waste more than it saves.
+					if (to < n && p[to] != ' ') {
+						size_t brk = to;
+						while (brk > from && p[brk - 1] != ' ') --brk;
+						if (brk > from && (brk - from) * 3 >= (to - from) * 2) to = brk;
+					}
+					if (from < to) {
+						_x = x;
+						_row_open = true;          // x is the column, not the margin
+						emit_run(p + from, to - from, false);
+					}
+					x = (uint16_t)(x + (_col_w[c] + GAP) * PageMetrics::FONT_ADVANCE);
+				}
+			}
+			_y = (uint16_t)(_y + line_h());
+			_row_open = false;
+			_x = left_edge();
+		}
+
+		// The header is RULED, not inverted: inversion means a dark background
+		// the page asked for, everywhere else in this renderer.
+		if (r == 0 && row_visible(line_h()))
+			_lcd.draw_hline(left_edge(), (uint16_t)(screen_y() - 1),
+			                (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X - left_edge()), true);
+	}
+
+	if (row_visible(line_h()))
 		_lcd.draw_hline(left_edge(), screen_y(),
 		                (uint16_t)(LCD_WIDTH - PageMetrics::MARGIN_X - left_edge()), true);
 	_y = (uint16_t)(_y + PageMetrics::PARA_GAP);

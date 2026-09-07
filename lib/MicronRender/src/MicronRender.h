@@ -112,6 +112,8 @@ public:
 	uint8_t link_count() const { return _link_count; }
 	const LinkBox& link(uint8_t i) const { return _links[i]; }
 	bool links_overflowed() const { return _links_overflowed; }
+	// A table larger than the fixed buffer. Reported, never silent.
+	bool table_overflowed() const { return _table_overflowed; }
 
 	// micron::Renderer
 	void onText(const char* t, size_t n, const micron::Style& s) override;
@@ -161,13 +163,32 @@ private:
 	bool      _head_rule = false;
 	bool      _blank_pending = true;  // a blank gap is already open
 
-	// Table state. Rows are laid into columns here because the parser refuses
-	// to, and a monochrome 66-cell panel is not a 100-column terminal.
+	// TABLE STATE, in a bounded buffer.
+	//
+	// Laying a table out needs its widest cell per column, which needs the
+	// whole table, which is the one thing this renderer otherwise refuses to
+	// hold. A table is not a page though: it is a handful of short cells, so a
+	// FIXED buffer holds it and anything past the bound is reported rather
+	// than silently truncated. Clipping a cell loses data the reader needed;
+	// wrapping it costs a taller row and nothing else.
+	static const uint8_t  T_ROWS = 16;
+	static const uint8_t  T_COLS = 6;      // more than six is unreadable at 66 cells
+	static const uint16_t T_BYTES = 1024;
+
 	bool     _in_table = false;
 	uint8_t  _table_row = 0;
 	uint8_t  _table_cols = 0;
-	uint8_t  _col_w[8] = {0};    // in cells; 8 columns is already unreadable
+	uint8_t  _col_w[T_COLS] = {0};         // in cells, after fitting
 	micron::Align _table_align = micron::Align::Left;
+
+	char     _tbuf[T_BYTES];
+	uint16_t _tlen = 0;
+	uint16_t _cell_off[T_ROWS][T_COLS];
+	uint8_t  _cell_len[T_ROWS][T_COLS];
+	uint8_t  _t_rows = 0;
+	bool     _table_overflowed = false;
+
+	void table_flush();
 
 	LinkBox _links[MAX_LINKS];
 	uint8_t _link_count = 0;
