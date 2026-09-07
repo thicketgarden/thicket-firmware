@@ -193,8 +193,13 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 		}
 		if (all) { _big = true; _row_h = (uint16_t)(SharpLcd::big_text_h() + _leading); }
 	}
-	const bool head_bar = s.heading && (!_stepped || s.depth <= 1);
+	// NO INVERSION FOR HEADINGS. Size carries H1 and rules carry the rest; a
+	// bar underneath either is a third signal saying the same thing. Inversion
+	// is reserved for a dark background the PAGE asked for, which is content
+	// rather than hierarchy.
+	const bool head_bar = false;
 	const bool invert = head_bar || dark_bg;
+	// H1 is carried by size alone. H2 and deeper get a rule.
 	_head_rule = _stepped && s.heading && s.depth >= 2;
 	_invert = invert;
 
@@ -304,8 +309,13 @@ void PageRenderer::onLineEnd(const micron::Style& s) {
 	_head_rule = false;
 
 	const bool was_heading = s.heading;
+	const bool was_big = _big;
 	newline();
-	if (was_heading) _y = (uint16_t)(_y + PageMetrics::PARA_GAP);
+	// A heading needs air under it, and the big one needs more: at 26 px its
+	// baseline otherwise sits hard against the first body line.
+	if (was_heading)
+		_y = (uint16_t)(_y + (was_big ? PageMetrics::HEAD_GAP_BIG
+		                              : PageMetrics::PARA_GAP));
 	_invert = false;
 }
 

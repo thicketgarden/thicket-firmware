@@ -7,7 +7,9 @@ Why each layout value is what it is. Numbers here are the ones in
 
 400x240, one ink, no grey, no antialiasing. Cozette advances **6 px** for every
 glyph, so the usable width is 396 px after a 2 px margin each side: **66 cells**.
-Line height is the font's own 13 px, giving **18 rows**.
+Line height is the font's own 13 px **plus 2 px of leading**, giving **16
+rows**. The two rows that costs buy a dense page that reads markedly better;
+both were rendered and compared.
 
 Because the advance is fixed, a run's width is its codepoint count times six.
 No measuring pass is needed and none exists.
@@ -34,11 +36,30 @@ The parser reports colour as the page asked for it and resolves nothing. Here:
 - The rule that overrides all of it: **never black on black, never white on
   white.** Ignoring a colour is always safe; honouring one is not.
 
-## Headings
+## Headings: size and rules, never inversion
 
-Inverted across the full content width, then 4 px of air. Cozette is
-single-weight, so inversion is the only distinction available that does not
-change the type. Depth indents by 12 px, two cells, matching Micron's own rule.
+**H1** is Cozette hi-DPI **12x26**, a face drawn for the size rather than the
+6x13 doubled. **H2** is body text over a full-width rule. **H3 and deeper** are
+body text over a rule under their own text only. Nothing inverts.
+
+**The 2x size REPLACES the bar rather than supplementing it.** Both were
+rendered and compared on the same page: an inverted H1 bar plus a ruled H2 gives
+two signals close enough in weight that a long page reads as a flat list of
+sections, and adding size on top of the bar is a third signal saying the same
+thing. Size alone separates H1 from everything; rules separate the rest.
+
+Inversion is now reserved for a dark background **the page asked for**, which is
+content rather than hierarchy. That keeps one meaning per treatment.
+
+An inset band at H2 was tried first and rejected: 24 px of gap on a 400 px bar
+does not read.
+
+**H1 takes 9 px of air beneath**, against 4 for the smaller headings. At 26 px
+its baseline otherwise sits hard against the first body line.
+
+⚠ The large face carries **ASCII and Latin-1 only**, 191 glyphs and 10,314
+bytes. A heading containing anything else falls back to 6x13 **as a whole
+line**, never per glyph: mixing two sizes on one line is worse than not doing it.
 
 ## Links
 

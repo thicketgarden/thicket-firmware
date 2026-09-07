@@ -47,7 +47,9 @@ struct PageMetrics {
 	// the left edge on every new block, so a runaway x cannot be inherited by
 	// the row after it.
 	static const uint8_t  MAX_DEPTH  = 4;
-	static const uint16_t PARA_GAP   = 4;    // after a divider or a heading
+	static const uint16_t PARA_GAP   = 4;    // after a divider or a small heading
+	static const uint16_t HEAD_GAP_BIG = 9;  // after the 26px heading, which
+	                                         // otherwise sits on the body
 	static const uint16_t RULE_INSET = 1;    // divider inset from the margin
 
 	static uint16_t content_w() { return LCD_WIDTH - 2 * MARGIN_X; }   // 396
@@ -80,12 +82,11 @@ public:
 	// dense page reads markedly better for the two it costs.
 	static const uint8_t DEFAULT_LEADING = 2;
 
-	// head_2x draws a depth-1 heading in Cozette hi-DPI 12x26 instead of the
-	// body face. It is a SECOND answer to the same hierarchy question the rule
-	// already answers, so it is off by default and only worth its 10 KB if the
-	// size jump buys something the rule does not.
+	// head_2x draws a depth-1 heading in Cozette hi-DPI 12x26. It REPLACES the
+	// inversion bar rather than supplementing it: size carries H1, rules carry
+	// H2 and deeper, and nothing inverts for hierarchy at all.
 	explicit PageRenderer(SharpLcd& lcd, uint8_t extra_leading = DEFAULT_LEADING,
-	                      bool stepped_heads = true, bool head_2x = false)
+	                      bool stepped_heads = true, bool head_2x = true)
 		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads), _head2x(head_2x) {}
 
 	uint16_t line_h() const { return (uint16_t)(PageMetrics::LINE_H + _leading); }
