@@ -196,6 +196,8 @@ private:
 	// any codepoint is missing from the face the whole row drops to body.
 	uint8_t   _head = 0;
 	bool      _bold = false;     // this run is inline `! bold, drawn in Tamzen
+	bool      _underline = false; // draw a 1px rule under each cell of this run,
+	                              // so a link or `_ run underlines across wraps
 	uint16_t  _row_h = 0;        // height of the row being laid out
 	uint16_t  _scroll = 0;
 	uint16_t  _y = 0;            // virtual y of the current row, page coords

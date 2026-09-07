@@ -96,10 +96,10 @@ uint16_t PageRenderer::screen_y() const { return (uint16_t)(_y - _scroll); }
 
 void PageRenderer::newline() {
 	_y = (uint16_t)(_y + row_h());
-	_row_h = 0;
-	_big = false;
-	_head = 0;
-	_bold = false;
+	// Face and row height are NOT cleared here. newline() also fires on a wrap
+	// inside a long heading, and a heading that spills onto a second line must
+	// stay the same size across the break rather than shearing to body. The
+	// logical line end clears them in onLineEnd.
 	_x = left_edge();
 	_row_open = false;
 }
@@ -225,6 +225,11 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 					const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
 					draw_glyph(_x, screen_y(), g, cp, !invert);
 				}
+				// Underline per cell, so it follows the run across a wrap. A
+				// single post-hoc rule underlined only the first row of a link
+				// that spilled onto a second line.
+				if (_underline)
+					_lcd.draw_hline(_x, (uint16_t)(screen_y() + row_h() - 2), advance(), !invert);
 			}
 			_x = (uint16_t)(_x + advance());
 			_row_open = true;
@@ -340,6 +345,7 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	// face, so bold there is a no-op rather than a double weight. Falls back to
 	// Cozette per glyph inside draw_glyph.
 	_bold = s.bold && _head == 0;
+	_underline = s.underline;
 
 	// No inversion for headings: the ladder carries hierarchy by size and
 	// weight. Inversion is reserved for a dark background the PAGE asked for.
@@ -359,11 +365,6 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	// sixteen-step ramp into one black bar.
 	emit_run(t, n, invert);
 
-	// Underline stands in for the parser's underline AND for nothing else; the
-	// font has no second weight to spend.
-	if (s.underline && _row_open && row_visible(row_h()))
-		_lcd.draw_hline(left_edge(), (uint16_t)(screen_y() + row_h() - 1),
-		                (uint16_t)(_x - left_edge()), !invert);
 }
 
 void PageRenderer::onLink(const char* label, size_t label_len,
@@ -375,25 +376,23 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 	const uint16_t x0 = _x;
 	const uint16_t y0 = screen_y();
 
+	// The underline is drawn per cell inside emit_run, so it follows the label
+	// across a wrap rather than underlining only the first row.
+	const bool prev_ul = _underline;
+	_underline = true;
 	emit_run(label, label_len, _invert);
+	_underline = prev_ul;
 
-	// Underlined so a link reads as one without colour, and recorded so input
-	// can hit-test later. A link that wrapped is boxed on its last row only,
-	// which is enough to press.
-	if (row_visible(row_h())) {
-		const uint16_t x1 = _x;
-		if (x1 > x0)
-			_lcd.draw_hline(x0, (uint16_t)(y0 + line_h() - 2),
-			                (uint16_t)(x1 - x0), !_invert);
-		if (_link_count < MAX_LINKS) {
-			LinkBox& b = _links[_link_count++];
-			b.x = x0; b.y = y0;
-			b.w = (uint16_t)(x1 > x0 ? x1 - x0 : 0);
-			b.h = row_h();
-			b.target = target; b.target_len = (uint16_t)target_len;
-		} else {
-			_links_overflowed = true;
-		}
+	// Recorded for a later input layer. A wrapped link is boxed on its last row
+	// only, which is enough to press; the visible underline spans every row.
+	if (row_visible(row_h()) && _link_count < MAX_LINKS) {
+		LinkBox& b = _links[_link_count++];
+		b.x = x0; b.y = y0;
+		b.w = (uint16_t)(_x > x0 ? _x - x0 : 0);
+		b.h = row_h();
+		b.target = target; b.target_len = (uint16_t)target_len;
+	} else if (row_visible(row_h())) {
+		_links_overflowed = true;
 	}
 }
 
@@ -478,6 +477,8 @@ void PageRenderer::onLineEnd(const micron::Style& s) {
 	const bool was_heading = s.heading;
 	const bool was_big = (_head == 1);
 	newline();
+	_row_h = 0;   // next logical line is body height unless it sets its own
+	_big = false;
 	_head = 0;
 	_bold = false;
 	// A heading needs air under it, and the big one needs more: at 26 px its
