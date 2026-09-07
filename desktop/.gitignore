@@ -1,0 +1,7 @@
+browser
+browser-headless
+out/
+out2/
+out3/
+*.pbm
+*.png

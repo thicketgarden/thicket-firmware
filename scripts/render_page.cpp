@@ -19,26 +19,17 @@
 #include "SharpLcd.h"
 #include "VirtualPanel.h"
 #include "MicronRender.h"
+#include "ComposePage.h"
 
 using namespace thicket;
 
 static uint8_t fb[LCD_FB_BYTES];
 static std::string src;
 
+// One-line wrapper over the shared compose_page(): the harness renders the
+// same frame the browser and the device do.
 static uint16_t render(SharpLcd& lcd, PageRenderer& r, uint16_t scroll) {
-	lcd.fill_white();
-	micron::Parser p; p.reset(); r.begin(scroll);
-	size_t i = 0;
-	while (i <= src.size()) {
-		size_t e = src.find('\n', i);
-		if (e == std::string::npos) e = src.size();
-		if (e == i) r.blankLine();
-		else        p.parseLine(src.data() + i, e - i, r);
-		if (e >= src.size()) break;
-		i = e + 1;
-	}
-	lcd.flush();
-	return r.content_height();
+	return compose_page(lcd, r, src.data(), src.size(), scroll);
 }
 
 int main(int argc, char** argv) {
