@@ -81,6 +81,17 @@ public:
 	static uint8_t big_text_w();
 	static uint8_t big_text_h();
 
+	// Tamzen bold, the weight Cozette lacks. Three faces selected by `face`:
+	// 0 inline bold (6x12), 1 an H3 (7x13), 2 an H2 (8x16). ASCII and Latin-1
+	// only; a codepoint outside that returns false so the caller falls back to
+	// Cozette. `y` is the TOP of the glyph's own cell.
+	enum BoldFace : uint8_t { BOLD_INLINE = 0, BOLD_H3 = 1, BOLD_H2 = 2 };
+	uint16_t draw_text_bold(uint16_t x, uint16_t y, const char* s, BoldFace face, bool black = true);
+	static bool bold_has(uint32_t cp, BoldFace face);
+	static uint8_t bold_w(BoldFace face);       // advance
+	static uint8_t bold_h(BoldFace face);       // cell height
+	static uint8_t bold_ascent(BoldFace face);  // baseline from the top
+
 	void fill_rect(uint16_t x, uint16_t y, uint16_t w, uint16_t h, bool black);
 
 	// Ordered dither, 4x4 Bayer, seventeen levels.

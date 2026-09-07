@@ -98,6 +98,8 @@ void PageRenderer::newline() {
 	_y = (uint16_t)(_y + row_h());
 	_row_h = 0;
 	_big = false;
+	_head = 0;
+	_bold = false;
 	_x = left_edge();
 	_row_open = false;
 }
@@ -139,7 +141,7 @@ void PageRenderer::emit_literal(const char* t, size_t n, bool invert) {
 		  if (!SharpLcd::has_glyph(cp)) note_missing(cp); }
 		if (row_visible(row_h())) {
 			if (invert) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE, row_h(), true);
-			_lcd.draw_text(_x, screen_y(), g, !invert);
+			_lcd.draw_text(_x, screen_y(), g, !invert);   // preformatted is always Cozette
 		}
 		_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
 		_row_open = true;
@@ -175,12 +177,9 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 				const uint8_t L = seq_len((uint8_t)t[k]);
 				wrap_if_needed(advance());
 				char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = t[k + b]; g[L] = 0;
-				{ const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
-				  if (!(_big ? SharpLcd::big_has(cp) : SharpLcd::has_glyph(cp))) note_missing(cp); }
-				if (row_visible(row_h())) {
-					if (_big) _lcd.draw_text_big(_x, screen_y(), g, !invert);
-					else      _lcd.draw_text(_x, screen_y(), g, !invert);
-				}
+				const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
+				if (!face_has(cp)) note_missing(cp);
+				if (row_visible(row_h())) draw_glyph(_x, screen_y(), g, cp, !invert);
 				_x = (uint16_t)(_x + advance());
 				_row_open = true;
 				k += L;
@@ -210,13 +209,11 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 			// not carry draws blank and still advances, so the hole is silent
 			// and stays aligned. It is a fact about the page, not the window.
 			{ const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
-			  if (!(_big ? SharpLcd::big_has(cp) : SharpLcd::has_glyph(cp))) note_missing(cp); }
+			  if (!face_has(cp)) note_missing(cp); }
 			if (row_visible(row_h())) {
 				// Texture under every cell, then a KNOCKOUT under a glyph only:
 				// where a letter sits the cell goes solid so it has full
-				// contrast, and the texture survives everywhere else. On a
-				// gradient bar that is everywhere, because the bar is spaces.
-				// Legibility beats richness exactly where they collide.
+				// contrast, and the texture survives everywhere else.
 				const bool blank = (L == 1 && (g[0] == ' ' || g[0] == '\t'));
 				if (_has_bg) {
 					if (blank) paint_bg(_x, advance(), _bg_luma);
@@ -225,8 +222,8 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 					_lcd.fill_rect(_x, screen_y(), advance(), row_h(), true);
 				}
 				if (!blank) {
-					if (_big) _lcd.draw_text_big(_x, screen_y(), g, !invert);
-					else      _lcd.draw_text(_x, screen_y(), g, !invert);
+					const char* q = g; const uint32_t cp = SharpLcd::next_codepoint(q);
+					draw_glyph(_x, screen_y(), g, cp, !invert);
 				}
 			}
 			_x = (uint16_t)(_x + advance());
@@ -235,6 +232,42 @@ void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 		}
 		i = w;
 	}
+}
+
+namespace {
+SharpLcd::BoldFace head_bold_face(uint8_t head) {
+	return head == 2 ? SharpLcd::BOLD_H2 : SharpLcd::BOLD_H3;
+}
+}  // namespace
+
+uint8_t PageRenderer::advance() const {
+	if (_head == 1) return SharpLcd::big_text_w();
+	if (_head == 2 || _head == 3) return SharpLcd::bold_w(head_bold_face(_head));
+	if (_bold) return SharpLcd::bold_w(SharpLcd::BOLD_INLINE);   // 6, same as body
+	return PageMetrics::FONT_ADVANCE;
+}
+
+bool PageRenderer::face_has(uint32_t cp) const {
+	if (_head == 1) return SharpLcd::big_has(cp);
+	if (_head == 2 || _head == 3) return SharpLcd::bold_has(cp, head_bold_face(_head));
+	return SharpLcd::has_glyph(cp);
+}
+
+uint8_t PageRenderer::draw_glyph(uint16_t x, uint16_t y, const char* g, uint32_t cp, bool black) {
+	if (_head == 1) { _lcd.draw_text_big(x, y, g, black); return SharpLcd::big_text_w(); }
+	if (_head == 2 || _head == 3) {
+		const SharpLcd::BoldFace f = head_bold_face(_head);
+		_lcd.draw_text_bold(x, y, g, f, black);
+		return SharpLcd::bold_w(f);
+	}
+	if (_bold && SharpLcd::bold_has(cp, SharpLcd::BOLD_INLINE)) {
+		// Inline bold sits in the 13px body row. Tamzen 6x12 ascent 10 equals
+		// Cozette's, so the same top gives the same baseline.
+		_lcd.draw_text_bold(x, y, g, SharpLcd::BOLD_INLINE, black);
+		return SharpLcd::bold_w(SharpLcd::BOLD_INLINE);
+	}
+	_lcd.draw_text(x, y, g, black);       // Cozette body, and the fallback for all
+	return PageMetrics::FONT_ADVANCE;
 }
 
 void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
@@ -272,26 +305,52 @@ void PageRenderer::onText(const char* t, size_t n, const micron::Style& s) {
 	// A depth-1 heading may take the large face. Only when every codepoint in
 	// it is carried there: falling back per glyph would mix two sizes on one
 	// line, which is worse than not doing it at all.
-	if (_head2x && s.heading && s.depth <= 1 && !_row_open) {
+	// THE HEADING LADDER. A heading is drawn whole-line in one face:
+	//   depth 1  Cozette hi-DPI 12x26
+	//   depth 2  Tamzen bold  8x16   (H2)
+	//   depth 3+ Tamzen bold  7x13   (H3)
+	// Whole-line-or-nothing: if any codepoint on the line is missing from the
+	// chosen face, the row drops to Cozette body, so two sizes never share a
+	// line and a fallback cannot misalign a heading.
+	if (_head2x && s.heading && !_row_open) {
+		const uint8_t want = s.depth <= 1 ? 1 : s.depth == 2 ? 2 : 3;
 		bool all = n > 0;
 		for (size_t k = 0; k < n && all; ) {
 			const uint8_t L = seq_len((uint8_t)t[k]);
 			uint32_t cp = (uint8_t)t[k];
 			if (L == 2) cp = ((uint32_t)(t[k] & 0x1F) << 6) | (t[k+1] & 0x3F);
-			else if (L > 2) cp = 0xFFFF;
-			if (!SharpLcd::big_has(cp)) all = false;
+			else if (L == 3) cp = ((uint32_t)(t[k] & 0x0F) << 12)
+			                    | ((uint32_t)(t[k+1] & 0x3F) << 6) | (t[k+2] & 0x3F);
+			else if (L > 3) cp = 0xFFFF;
+			const bool has = want == 1 ? SharpLcd::big_has(cp)
+			               : SharpLcd::bold_has(cp, want == 2 ? SharpLcd::BOLD_H2 : SharpLcd::BOLD_H3);
+			if (!has) all = false;
 			k += L;
 		}
-		if (all) { _big = true; _row_h = (uint16_t)(SharpLcd::big_text_h() + _leading); }
+		if (all) {
+			_head = want;
+			_big = (want == 1);
+			const uint8_t ch = want == 1 ? SharpLcd::big_text_h()
+			                 : SharpLcd::bold_h(want == 2 ? SharpLcd::BOLD_H2 : SharpLcd::BOLD_H3);
+			_row_h = (uint16_t)(ch + _leading);
+		}
 	}
-	// NO INVERSION FOR HEADINGS. Size carries H1 and rules carry the rest; a
-	// bar underneath either is a third signal saying the same thing. Inversion
-	// is reserved for a dark background the PAGE asked for, which is content
-	// rather than hierarchy.
+
+	// Inline bold, for a run that is NOT a heading. Headings are already a bold
+	// face, so bold there is a no-op rather than a double weight. Falls back to
+	// Cozette per glyph inside draw_glyph.
+	_bold = s.bold && _head == 0;
+
+	// No inversion for headings: the ladder carries hierarchy by size and
+	// weight. Inversion is reserved for a dark background the PAGE asked for.
 	const bool head_bar = false;
 	const bool invert = head_bar || dark_bg;
 	// H1 is carried by size alone. H2 and deeper get a rule.
-	_head_rule = _stepped && s.heading && s.depth >= 2;
+	// A rule under a heading is now only the FALLBACK cue. When the Tamzen
+	// ladder applied, size and weight carry it and a rule would be a third
+	// signal. When the line dropped to body size (a missing glyph), the rule is
+	// the only thing left distinguishing it, so it is drawn then.
+	_head_rule = _stepped && s.heading && s.depth >= 2 && _head == 0;
 	_invert = invert;
 
 	// No row-wide band. A gradient bar is many runs on ONE row, each with its
@@ -417,8 +476,10 @@ void PageRenderer::onLineEnd(const micron::Style& s) {
 	_head_rule = false;
 
 	const bool was_heading = s.heading;
-	const bool was_big = _big;
+	const bool was_big = (_head == 1);
 	newline();
+	_head = 0;
+	_bold = false;
 	// A heading needs air under it, and the big one needs more: at 26 px its
 	// baseline otherwise sits hard against the first body line.
 	if (was_heading)

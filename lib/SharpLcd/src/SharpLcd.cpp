@@ -4,6 +4,7 @@
 #include "SharpLcd.h"
 #include "CozetteFont.h"
 #include "CozetteBig.h"
+#include "TamzenFont.h"
 
 #include <string.h>
 
@@ -248,6 +249,66 @@ uint16_t SharpLcd::draw_text_big(uint16_t x, uint16_t y, const char* s, bool bla
 			}
 		}
 		x = (uint16_t)(x + BIGFONT_W);
+	}
+	return x;
+}
+
+}  // namespace thicket
+
+namespace thicket {
+namespace {
+const uint8_t* bold_glyph(uint32_t cp, SharpLcd::BoldFace face, uint8_t& adv, uint8_t& cell, uint8_t& asc) {
+	// One binary search per face. The tables are codepoint-sorted by the
+	// generator, ASCII then Latin-1.
+	switch (face) {
+		case SharpLcd::BOLD_INLINE: {
+			adv = BOLD6_W; cell = BOLD6_H; asc = BOLD6_ASCENT;
+			uint16_t lo = 0, hi = BOLD6_COUNT;
+			while (lo < hi) { uint16_t m = (lo + hi) / 2;
+				if (BOLD6[m].cp == cp) return BOLD6[m].rows;
+				if (BOLD6[m].cp < cp) lo = m + 1; else hi = m; }
+			return nullptr; }
+		case SharpLcd::BOLD_H3: {
+			adv = BOLD7_W; cell = BOLD7_H; asc = BOLD7_ASCENT;
+			uint16_t lo = 0, hi = BOLD7_COUNT;
+			while (lo < hi) { uint16_t m = (lo + hi) / 2;
+				if (BOLD7[m].cp == cp) return BOLD7[m].rows;
+				if (BOLD7[m].cp < cp) lo = m + 1; else hi = m; }
+			return nullptr; }
+		default: {
+			adv = BOLD8_W; cell = BOLD8_H; asc = BOLD8_ASCENT;
+			uint16_t lo = 0, hi = BOLD8_COUNT;
+			while (lo < hi) { uint16_t m = (lo + hi) / 2;
+				if (BOLD8[m].cp == cp) return BOLD8[m].rows;
+				if (BOLD8[m].cp < cp) lo = m + 1; else hi = m; }
+			return nullptr; }
+	}
+}
+}
+
+uint8_t SharpLcd::bold_w(BoldFace f) { return f == BOLD_INLINE ? BOLD6_W : f == BOLD_H3 ? BOLD7_W : BOLD8_W; }
+uint8_t SharpLcd::bold_h(BoldFace f) { return f == BOLD_INLINE ? BOLD6_H : f == BOLD_H3 ? BOLD7_H : BOLD8_H; }
+uint8_t SharpLcd::bold_ascent(BoldFace f) { return f == BOLD_INLINE ? BOLD6_ASCENT : f == BOLD_H3 ? BOLD7_ASCENT : BOLD8_ASCENT; }
+
+bool SharpLcd::bold_has(uint32_t cp, BoldFace face) {
+	uint8_t a, c, s; return bold_glyph(cp, face, a, c, s) != nullptr;
+}
+
+uint16_t SharpLcd::draw_text_bold(uint16_t x, uint16_t y, const char* str, BoldFace face, bool black) {
+	while (*str) {
+		const uint32_t cp = next_cp(str);
+		uint8_t adv, cell, asc;
+		const uint8_t* g = bold_glyph(cp, face, adv, cell, asc);
+		if (g) {
+			for (uint8_t row = 0; row < cell; ++row) {
+				const uint8_t bits = g[row];
+				if (!bits) continue;
+				for (uint8_t col = 0; col < 8; ++col)
+					if (bits & (uint8_t)(0x80u >> col))
+						set_pixel((uint16_t)(x + col), (uint16_t)(y + row), black);
+			}
+		}
+		x = (uint16_t)(x + adv);
 	}
 	return x;
 }

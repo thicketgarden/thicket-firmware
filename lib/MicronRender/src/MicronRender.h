@@ -99,10 +99,14 @@ public:
 		  _head2x(head_2x), _dither(dither) {}
 
 	uint16_t line_h() const { return (uint16_t)(PageMetrics::LINE_H + _leading); }
-	// The row being laid out may be taller than a body row when a heading is
-	// drawn in the large face.
+	// The row being laid out may be taller than a body row for a heading.
 	uint16_t row_h() const { return _row_h ? _row_h : line_h(); }
-	uint8_t  advance() const { return _big ? SharpLcd::big_text_w() : PageMetrics::FONT_ADVANCE; }
+	uint8_t  advance() const;
+	// Draw one codepoint in the current face (heading, inline bold, or Cozette
+	// body), with per-glyph fallback to Cozette where a bold or Tamzen face
+	// lacks it. Returns the advance consumed.
+	uint8_t  draw_glyph(uint16_t x, uint16_t y, const char* g, uint32_t cp, bool black);
+	bool     face_has(uint32_t cp) const;
 
 	// Re-flow from the top with this scroll offset. Call, then feed every line
 	// of the page to a micron::Parser pointed at this renderer.
@@ -186,7 +190,12 @@ private:
 	bool      _stepped = true;
 	bool      _head2x = false;
 	bool      _dither = true;
-	bool      _big = false;      // this row draws in the large face
+	bool      _big = false;      // this row draws in the Cozette hi-DPI H1 face
+	// Which heading face this row uses: 0 none, 1 H1 Cozette hi-DPI, 2 H2
+	// Tamzen 8x16, 3 H3 Tamzen 7x13. A heading is whole-line-or-nothing, so if
+	// any codepoint is missing from the face the whole row drops to body.
+	uint8_t   _head = 0;
+	bool      _bold = false;     // this run is inline `! bold, drawn in Tamzen
 	uint16_t  _row_h = 0;        // height of the row being laid out
 	uint16_t  _scroll = 0;
 	uint16_t  _y = 0;            // virtual y of the current row, page coords

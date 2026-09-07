@@ -36,30 +36,42 @@ The parser reports colour as the page asked for it and resolves nothing. Here:
 - The rule that overrides all of it: **never black on black, never white on
   white.** Ignoring a colour is always safe; honouring one is not.
 
-## Headings: size and rules, never inversion
+## Headings and bold: a Tamzen ladder over a Cozette body
 
-**H1** is Cozette hi-DPI **12x26**, a face drawn for the size rather than the
-6x13 doubled. **H2** is body text over a full-width rule. **H3 and deeper** are
-body text over a rule under their own text only. Nothing inverts.
+Cozette is the body face and the fallback face. Tamzen supplies the one thing
+Cozette lacks, weight, as three bold faces:
 
-**The 2x size REPLACES the bar rather than supplementing it.** Both were
-rendered and compared on the same page: an inverted H1 bar plus a ruled H2 gives
-two signals close enough in weight that a long page reads as a flat list of
-sections, and adding size on top of the bar is a third signal saying the same
-thing. Size alone separates H1 from everything; rules separate the rest.
+| level | face | cell |
+|---|---|---|
+| body | Cozette | 6x13 |
+| inline `! bold | Tamzen bold | 6x12 |
+| H3 | Tamzen bold | 7x13 |
+| H2 | Tamzen bold | 8x16 |
+| H1 | Cozette hi-DPI | 12x26 |
 
-Inversion is now reserved for a dark background **the page asked for**, which is
-content rather than hierarchy. That keeps one meaning per treatment.
+**Inline bold is drawn in Tamzen 6x12 bold and falls back to Cozette per glyph.**
+Both advance 6, so the horizontal grid holds within a line, and both have
+ascent 10, so a bold word sits on the same baseline as the Cozette around it.
+The shear question never arises: it only applied to box art on a mixed body
+line, and box art is never bolded. A codepoint Tamzen lacks (a box or block
+glyph) simply draws in Cozette.
 
-An inset band at H2 was tried first and rejected: 24 px of gap on a 400 px bar
-does not read.
+**Headings are whole-line-or-nothing.** A heading is drawn entirely in one
+Tamzen face; if any codepoint on the line is missing from that face the whole
+row drops to Cozette body. So two sizes never share a heading line, and a
+fallback cannot misalign one. In corpus practice this never fires: no heading
+line contains a non-Latin glyph.
 
-**H1 takes 9 px of air beneath**, against 4 for the smaller headings. At 26 px
-its baseline otherwise sits hard against the first body line.
+**Rules are now a fallback cue, not the treatment.** Size and weight carry the
+ladder. A rule under a heading is drawn only when the line dropped to body size,
+which is the one case where nothing else distinguishes it.
 
-⚠ The large face carries **ASCII and Latin-1 only**, 191 glyphs and 10,314
-bytes. A heading containing anything else falls back to 6x13 **as a whole
-line**, never per glyph: mixing two sizes on one line is worse than not doing it.
+Inversion is gone from headings entirely, reserved for a dark background the
+page asked for. Each treatment means one thing: size and weight for hierarchy,
+inversion for a colour the page chose.
+
+**Cost:** three Tamzen bold faces, ASCII and Latin-1, 8.2 KB, on top of
+Cozette's 9 KB and the hi-DPI face's 10.3 KB.
 
 ## Links
 
