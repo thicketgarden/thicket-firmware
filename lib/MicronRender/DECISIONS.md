@@ -222,13 +222,38 @@ built out of art, essentially everything falls back. That is coherent rather
 than fatal: Tamzen would supply Latin text, where the gain is, and Cozette would
 supply the art, where it already wins.
 
-**What it buys:** real inline **bold** at a matching advance, which Cozette
-cannot do at any size. Graduated heading sizes do NOT follow, because the larger
-Tamzen sizes have mismatched advances and would only be safe on heading-only
-lines, which is what the existing 2x already does.
+**What it buys, part one: real inline bold** at a matching advance, which
+Cozette cannot do at any size.
 
-**Cost:** about 5.3 KB for 6x12 regular and bold, on top of Cozette's 9 KB and
-the hi-DPI face's 10.3 KB.
+**Part two: a heading size ladder, which the 2x face does not provide.** The
+hi-DPI face covers H1 and nothing else. H2 and H3 render at body size today and
+are separated by rules alone, so there are two type sizes on the device, not
+four.
 
-**Verdict: a real project, and worth it for bold alone** if inline emphasis
-matters for page content. Not started; the metrics no longer block it.
+The advance-mismatch objection does **not** apply here, and conflating the two
+cases is what made this look impossible. Mismatched advances shear art on a
+BODY line, where prose and box drawing share a row. **A heading line is pure
+text**: across the whole corpus, zero heading lines contain a box or block
+glyph. Tamzen 7x13 and 8x16 are therefore usable for H2 and H3 even though they
+are unusable for body text.
+
+That gives a real ladder:
+
+| level | face | cell |
+|---|---|---|
+| H1 | Cozette hi-DPI | 12x26 |
+| H2 | Tamzen | 8x16 |
+| H3 | Tamzen | 7x13 |
+| body | Cozette | 6x13 |
+
+Each heading keeps the **whole-line-or-nothing** fallback the 2x face already
+uses: if any codepoint on the line is missing from the heading face, the entire
+line drops to body size. Two sizes never mix within one line, so a fallback
+cannot misalign a heading.
+
+**Cost:** roughly 5.3 KB for 6x12 regular and bold, and roughly 6.3 KB more for
+7x13 and 8x16, against Cozette's 9 KB and the hi-DPI face's 10.3 KB.
+
+**Verdict: a real project, and now worth more than bold alone.** Bold and a
+four-step size ladder together are the case; either on its own is thinner. Not
+started, and the metrics no longer block it.
