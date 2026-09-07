@@ -51,7 +51,7 @@ inbound 14262-14265 (the relay takes over 14262/14263 facing the leaf, so the
 leaf's own config is identical in both topologies), LXMF inbound 14272/14273,
 link inbound 14290-14293 (two of those four are the relay), transport forwarding
 14280-14283 (two segments: originator 14280/14281, far end 14282/14283, with the
-C++ router holding one interface on each). Identity vectors uses no network.
+C++ router holding one interface on each). Identity vectors uses no network. Page fetch owns 14300/14301.
 
 `python/lossy_relay.py` is the shared piece of test infrastructure: an
 in-process UDP forwarder that can be told to drop everything. Neither RNS nor
