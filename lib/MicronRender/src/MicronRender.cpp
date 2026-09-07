@@ -423,27 +423,51 @@ void PageRenderer::onDivider(uint32_t ch, const micron::Style& s) {
 
 void PageRenderer::onField(const micron::Field& f, const micron::Style& s) {
 	_depth = s.depth;
-	// An input as a bracketed slot of its declared width, so a form reads as a
-	// form before any input layer exists.
+	if (!_row_open) _x = left_edge();
+
 	if (f.kind == micron::FieldKind::Text) {
-		// Match the reference exactly: an Edit widget shows its content and
-		// nothing else, so a masked field is a row of asterisks and a plain
-		// one is its value. No brackets: urwid draws a styled region, not
-		// [ ], and inventing brackets would diverge from what the reference
-		// renders.
+		// A text field is an urwid Edit of the declared WIDTH, wrapped in the
+		// page's current style. That is what makes it visible: the page sets a
+		// background (`B333`<24|..`>`b) and the field is a shaded bar that many
+		// cells wide, with the value or, when masked, asterisks drawn in it.
 		//
-		// One deviation, deliberate: an EMPTY field has nothing to show at all
-		// in the reference, which reads as no field. On a device with no cursor
-		// a slot the reader can see matters, so an empty text field draws its
-		// width in underscores. A filled one does not.
+		// So the field is a region of `width` cells. Each cell is shaded with
+		// the field's background (dithered to its luma) if the page set one,
+		// and the value or asterisks are drawn over the leading cells. A field
+		// with no background falls back to underscores, so it still reads as an
+		// input on a device that has no cursor to place there.
 		const uint8_t w = f.width ? f.width : 1;
-		if (f.value_len == 0) {
-			for (uint8_t k = 0; k < w; ++k) emit_run("_", 1, _invert);
-		} else if (f.masked) {
-			for (size_t k = 0, v = cells(f.value, f.value_len); k < v; ++k)
-				emit_run("*", 1, _invert);
-		} else {
-			emit_run(f.value, f.value_len, _invert);
+		const bool has_bg = !s.bg.is_default && s.bg.is_valid;
+		const uint8_t luma = has_bg ? luma_of(s.bg) : 255;
+		const uint16_t right = LCD_WIDTH - PageMetrics::MARGIN_X;
+
+		// Walk the value one codepoint at a time, capped at the width.
+		size_t vk = 0;
+		for (uint8_t col = 0; col < w; ++col) {
+			if (_x + PageMetrics::FONT_ADVANCE > right) break;   // ran off the panel
+			const bool visible = row_visible(row_h());
+			if (visible && has_bg) paint_bg(_x, PageMetrics::FONT_ADVANCE, luma);
+
+			if (f.masked && vk < f.value_len) {
+				vk += seq_len((uint8_t)f.value[vk]);
+				if (visible) {
+					if (has_bg) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE, row_h(), false);
+					_lcd.draw_text(_x, screen_y(), "*", true);
+				}
+			} else if (!f.masked && vk < f.value_len) {
+				const uint8_t L = seq_len((uint8_t)f.value[vk]);
+				char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = f.value[vk + b]; g[L] = 0;
+				vk += L;
+				if (visible) {
+					if (has_bg) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE, row_h(), false);
+					_lcd.draw_text(_x, screen_y(), g, true);
+				}
+			} else if (!has_bg && visible) {
+				// Empty cell, no background: an underscore so the slot shows.
+				_lcd.draw_text(_x, screen_y(), "_", true);
+			}
+			_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
+			_row_open = true;
 		}
 		return;
 	}
