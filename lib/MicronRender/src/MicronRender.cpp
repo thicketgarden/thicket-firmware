@@ -425,45 +425,39 @@ void PageRenderer::onField(const micron::Field& f, const micron::Style& s) {
 	_depth = s.depth;
 	// An input as a bracketed slot of its declared width, so a form reads as a
 	// form before any input layer exists.
-	const char open = f.kind == micron::FieldKind::Checkbox ? '['
-	                : f.kind == micron::FieldKind::Radio    ? '(' : '[';
-	const char close = f.kind == micron::FieldKind::Checkbox ? ']'
-	                 : f.kind == micron::FieldKind::Radio    ? ')' : ']';
-	char box[2] = { open, 0 };
-	emit_run(box, 1, _invert);
-
 	if (f.kind == micron::FieldKind::Text) {
-		// The value goes INSIDE the box, the way a prefilled form field shows
-		// its content. A masked field shows asterisks instead of the value, so
-		// the value never reaches the screen. Underscores fill the rest of the
-		// declared width, so the box still shows how wide the input is.
+		// Match the reference exactly: an Edit widget shows its content and
+		// nothing else, so a masked field is a row of asterisks and a plain
+		// one is its value. No brackets: urwid draws a styled region, not
+		// [ ], and inventing brackets would diverge from what the reference
+		// renders.
+		//
+		// One deviation, deliberate: an EMPTY field has nothing to show at all
+		// in the reference, which reads as no field. On a device with no cursor
+		// a slot the reader can see matters, so an empty text field draws its
+		// width in underscores. A filled one does not.
 		const uint8_t w = f.width ? f.width : 1;
-		const size_t vis = f.value_len ? cells(f.value, f.value_len) : 0;
-		if (f.masked) {
-			for (size_t k = 0; k < vis && k < w; ++k) emit_run("*", 1, _invert);
-		} else if (vis) {
-			// Draw only as much of the value as fits the width.
-			size_t k = 0, drawn = 0;
-			while (k < f.value_len && drawn < w) {
-				const uint8_t L = seq_len((uint8_t)f.value[k]);
-				emit_run(f.value + k, L, _invert);
-				k += L; ++drawn;
-			}
+		if (f.value_len == 0) {
+			for (uint8_t k = 0; k < w; ++k) emit_run("_", 1, _invert);
+		} else if (f.masked) {
+			for (size_t k = 0, v = cells(f.value, f.value_len); k < v; ++k)
+				emit_run("*", 1, _invert);
+		} else {
+			emit_run(f.value, f.value_len, _invert);
 		}
-		for (size_t k = vis; k < w; ++k) emit_run("_", 1, _invert);
-	} else {
-		emit_run(f.prechecked ? "x" : " ", 1, _invert);
+		return;
 	}
 
-	box[0] = close;
-	emit_run(box, 1, _invert);
-
-	// A checkbox or radio shows its label after the box; a text field does not,
-	// its content is already inside.
-	if (f.kind != micron::FieldKind::Text && f.label_len) {
-		emit_run(" ", 1, _invert);
-		emit_run(f.label, f.label_len, _invert);
-	}
+	// Checkbox and radio are urwid CheckBox/RadioButton: "[ ] label",
+	// "[X] label", "( ) label". Capital X when checked, matching the widget.
+	const char open  = f.kind == micron::FieldKind::Radio ? '(' : '[';
+	const char close = f.kind == micron::FieldKind::Radio ? ')' : ']';
+	char cell[2] = { open, 0 };
+	emit_run(cell, 1, _invert);
+	emit_run(f.prechecked ? "X" : " ", 1, _invert);
+	cell[0] = close;
+	emit_run(cell, 1, _invert);
+	if (f.label_len) { emit_run(" ", 1, _invert); emit_run(f.label, f.label_len, _invert); }
 }
 
 void PageRenderer::onAnchor(const char* /*name*/, size_t /*len*/) {
