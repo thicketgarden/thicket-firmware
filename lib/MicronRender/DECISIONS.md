@@ -317,3 +317,14 @@ diff was configured not to look at.
 the parser in micron-cpp, make the parity harness compare the construct, and
 only then call it closed. Fixing the parser alone leaves parity green over the
 same hole.
+
+## Braille
+
+Synthesized, not stored. U+2800..U+28FF encode a 2x4 dot cell in their low 8
+bits, so `braille_for()` in SharpLcd builds the glyph from the codepoint rather
+than carrying 256 table entries. Dots are two cells wide on a 3px pitch that
+repeats at the 6px advance, so a run tiles into continuous art. This is the
+plotter case: nodes draw graphs and banners dot by dot, and Cozette carries no
+braille, so before this every such page was a blank screen that still counted
+its glyphs as missing. Layout is unchanged; a braille cell always advanced 6px,
+whether it drew or not.

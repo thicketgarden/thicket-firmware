@@ -53,9 +53,36 @@ bool SharpLcd::get_pixel(uint16_t x, uint16_t y) const {
 	return (b & (uint8_t)(0x80u >> (x & 7))) == 0;   // 0 = black
 }
 
+// Braille (U+2800..U+28FF) is the one script we synthesize rather than store:
+// the low 8 bits of the codepoint ARE the cell, a 2x4 grid of dots, so a table
+// would be 256 entries of redundant data. The dot-to-bit order is Unicode's
+// (1,2,3 down the left column, 4,5,6 down the right, then 7,8 across the
+// bottom). Dots land two cells wide on a 3px pitch that repeats at the 6px
+// advance, so adjacent glyphs tile into continuous art, which is the whole
+// point of braille on a page: plots and banners drawn dot by dot. U+2800 is a
+// blank cell and correctly draws nothing while still counting as present.
+static const uint8_t* braille_for(uint32_t cp) {
+	static uint8_t rows[FONT_H];
+	for (uint8_t i = 0; i < FONT_H; ++i) rows[i] = 0;
+	const uint8_t n = (uint8_t)(cp - 0x2800u);
+	static const uint8_t lmask[4] = {0x01, 0x02, 0x04, 0x40};  // left col, top->bottom
+	static const uint8_t rmask[4] = {0x08, 0x10, 0x20, 0x80};  // right col
+	static const uint8_t ytop[4]  = {1, 4, 7, 10};             // 2px dots in the 13px cell
+	for (uint8_t d = 0; d < 4; ++d) {
+		uint8_t bits = 0;
+		if (n & lmask[d]) bits |= 0xC0u;   // cols 0,1
+		if (n & rmask[d]) bits |= 0x18u;   // cols 3,4
+		if (!bits) continue;
+		rows[ytop[d]] = bits;
+		if ((uint8_t)(ytop[d] + 1) < FONT_H) rows[ytop[d] + 1] = bits;
+	}
+	return rows;
+}
+
 // Returns the glyph rows for a codepoint, or nullptr.
 static const uint8_t* glyph_for(uint32_t cp) {
 	if (cp >= FONT_FIRST && cp <= FONT_LAST) return FONT[cp - FONT_FIRST];
+	if (cp >= 0x2800u && cp <= 0x28FFu) return braille_for(cp);
 	uint16_t lo = 0, hi = FONT_EXTRA_COUNT;
 	while (lo < hi) {
 		const uint16_t mid = (uint16_t)((lo + hi) / 2);
