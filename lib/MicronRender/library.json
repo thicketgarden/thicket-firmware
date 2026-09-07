@@ -1,0 +1,8 @@
+{
+  "name": "MicronRender",
+  "version": "0.1.0",
+  "description": "Lay a Micron page out on the Sharp memory LCD. Allocation-free, re-flows per frame.",
+  "license": "GPL-3.0-or-later",
+  "dependencies": { "micron-cpp": "*", "SharpLcd": "*" },
+  "build": { "srcDir": "src", "includeDir": "src" }
+}

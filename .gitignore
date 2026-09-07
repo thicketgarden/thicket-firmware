@@ -27,3 +27,7 @@ test_interop/vault_vectors/vault_test
 test_interop/vault_vectors/vault_short
 test_interop/vault_vectors/vault_tampered
 test_interop/vault_vectors/vault_tries
+
+# rendered page proofs
+pages/*.pbm
+pages/*.png
