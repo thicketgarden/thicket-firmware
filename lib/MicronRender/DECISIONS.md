@@ -130,3 +130,105 @@ check and cross. It has **no box-drawing lines and no accented Latin**. A
 missing glyph draws blank while still advancing, so text stays aligned and
 characters silently vanish. German pages in the corpus and any page drawing a
 box will show holes. Not fixed here; it is a font question, not a layout one.
+
+---
+
+# Design direction
+
+Where rendering goes next. The framing: this is a pixel-addressable device with
+a bespoke renderer, not a character grid. Micron can be presented *better* here
+than in a terminal for the content that matters, rather than merely degraded to
+one ink. Each item below is marked **cheap win** or **real project**.
+
+## 1. Dither, not threshold — DONE, cheap win
+
+Shipped. A background is painted with a 4x4 ordered dither at its luma, so
+brightness survives as texture below the size of a character cell, which is the
+smallest thing a terminal can colour.
+
+Measured on a sixteen-step ramp: thresholding gives two solid bars that stop
+dead at the halfway point; dithering gives the ramp. Legibility still wins where
+they collide, via a knockout under each glyph.
+
+## 2. Drawn rules instead of glyph rules — MIXED, and the reference wins
+
+Dividers now draw the fill character the page asked for, because the reference
+does and three fills were collapsing into one rule. On this panel that is also
+the better picture: Cozette's box glyphs are 7 px of ink against a 6 px advance,
+so neighbouring cells touch and a row of `U+2500` IS a continuous hairline. A
+drawn rule and a glyph rule are the same pixels.
+
+**Where a drawn rule genuinely wins is where no glyph exists**: the table header
+underline and the closing rule are drawn, at 1 px, positioned to the row rather
+than snapped to a cell. That is already the case.
+
+⚠ Remaining opportunity, **real project**: column separators and cell borders in
+tables are currently whitespace. Hairlines between columns would be a picture no
+terminal can draw. Not built; whitespace reads well enough at 66 cells that it
+has not earned the complexity yet.
+
+## 3. Per-service rendering — the detection question, INVESTIGATED ONLY
+
+The opportunity is real and no terminal client can do it. The blocker is
+knowing what a page **is**. What exists today:
+
+- **`#!` page directives are the only metadata channel, and they are
+  extensible.** NomadNet defines exactly three, parsed positionally at the top
+  of a page: `#!c=` cache seconds, `#!bg=`, `#!fg=`. Real pages in the corpus
+  use all three. **There is no type directive**, and adding `#!type=board`
+  unilaterally is a protocol proposal rather than a local decision. It is also
+  the obvious right place, and cheap for a node operator to add.
+- **Naming is a weak convention.** `index` appears 12 times across real nodes;
+  everything else is a long tail of one or two. There is no `board.mu` habit to
+  key off.
+- **Structure is suggestive but not decisive.** A board is a repeated
+  heading-plus-body run; a form-heavy page has many `` `< `` fields; a listing is
+  a table. Across the corpus these separate cleanly enough to *guess* and not
+  cleanly enough to *rely on*: one page has 36 headings, 22 fields and 4 tables
+  and is a documentation template, not an application.
+- **The announce carries no page-type field.** Interface discovery gained an
+  operator contact recently, so the announce is where node-level metadata goes,
+  but it describes a node, not a page.
+
+**Recommendation:** treat detection as a proposal, not a heuristic. A
+`#!type=` directive costs a node operator one line, matches an existing
+mechanism, and degrades to nothing on clients that ignore it. Guessing from
+structure would present a documentation page as a message board, which is worse
+than presenting everything generically.
+
+## 4. Tamzen as a second face — metrics MEASURED, viable with caveats
+
+The question that decides it: do the cells line up when a Cozette glyph falls
+back inside Tamzen text? Measured against Tamzen 1.11.5:
+
+| face | advance | cell | ascent | box drawing | blocks |
+|---|---|---|---|---|---|
+| Cozette | 6 | 13 | 10 | 128 | 32 |
+| Tamzen 6x12 r/b | **6** | 12 | 10 | **0** | **0** |
+| Tamzen 7x13 | 7 | 13 | 11 | 0 | 0 |
+| Tamzen 8x16 | 8 | 16 | 12 | 0 | 0 |
+
+**Only 6x12 is a candidate.** Its advance matches Cozette's exactly, so a
+fallback glyph keeps the horizontal grid. 7x13 and 8x16 shear art horizontally
+and are out for mixed content.
+
+**The 1 px height difference is safe**, which the numbers alone did not settle.
+A 12 px row pitch OVERLAPS a 13 px glyph rather than leaving a gap, and a frame
+drawn at both pitches still connects. A gap would have broken it; an overlap
+does not.
+
+⚠ **Tamzen carries no box drawing and no block elements at all**, so on a page
+built out of art, essentially everything falls back. That is coherent rather
+than fatal: Tamzen would supply Latin text, where the gain is, and Cozette would
+supply the art, where it already wins.
+
+**What it buys:** real inline **bold** at a matching advance, which Cozette
+cannot do at any size. Graduated heading sizes do NOT follow, because the larger
+Tamzen sizes have mismatched advances and would only be safe on heading-only
+lines, which is what the existing 2x already does.
+
+**Cost:** about 5.3 KB for 6x12 regular and bold, on top of Cozette's 9 KB and
+the hi-DPI face's 10.3 KB.
+
+**Verdict: a real project, and worth it for bold alone** if inline emphasis
+matters for page content. Not started; the metrics no longer block it.
