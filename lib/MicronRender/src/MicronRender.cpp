@@ -383,12 +383,22 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 	const uint16_t x0 = _x;
 	const uint16_t y0 = screen_y();
 
-	// The underline is drawn per cell inside emit_run, so it follows the label
-	// across a wrap rather than underlining only the first row.
-	const bool prev_ul = _underline;
+	// A link needs to read as actionable on a panel with no link colour. Three
+	// treatments, chosen by _link_style:
+	//   0  underline only            (thin, same as `_ text)
+	//   1  bold + underline          (Tamzen weight, heavier than surrounds)
+	//   2  a leading marker + underline (a glyph that says "follow this")
+	if (_link_style == 2 && row_visible(row_h())) {
+		_lcd.draw_text(_x, screen_y(), "\xC2\xBB", !_invert);   // » before the link
+		_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
+		_row_open = true;
+	}
+	const bool prev_ul = _underline, prev_bold = _bold;
 	_underline = true;
+	if (_link_style == 1) _bold = (_head == 0);   // Tamzen weight for the label
 	emit_run(label, label_len, _invert);
 	_underline = prev_ul;
+	_bold = prev_bold;
 
 	// Recorded for a later input layer. A wrapped link is boxed on its last row
 	// only, which is enough to press; the visible underline spans every row.
@@ -431,44 +441,49 @@ void PageRenderer::onField(const micron::Field& f, const micron::Style& s) {
 
 	if (f.kind == micron::FieldKind::Text) {
 		// A text field is an urwid Edit of the declared WIDTH, wrapped in the
-		// page's current style. That is what makes it visible: the page sets a
-		// background (`B333`<24|..`>`b) and the field is a shaded bar that many
-		// cells wide, with the value or, when masked, asterisks drawn in it.
-		//
-		// So the field is a region of `width` cells. Each cell is shaded with
-		// the field's background (dithered to its luma) if the page set one,
-		// and the value or asterisks are drawn over the leading cells. A field
-		// with no background falls back to underscores, so it still reads as an
-		// input on a device that has no cursor to place there.
+		// page's style. Its visibility is that style: pages write
+		// `B333`<24|name`>`b, a dark input bar. On one ink a dark field is
+		// rendered INVERTED, a solid bar with its value in white text, which is
+		// how a dark terminal field reads and is far more legible than a
+		// dithered bar with knocked-out text.
 		const uint8_t w = f.width ? f.width : 1;
 		const bool has_bg = !s.bg.is_default && s.bg.is_valid;
 		const uint8_t luma = has_bg ? luma_of(s.bg) : 255;
+		const bool dark = has_bg && luma < 128;         // white text on a black bar
 		const uint16_t right = LCD_WIDTH - PageMetrics::MARGIN_X;
 
-		// Walk the value one codepoint at a time, capped at the width.
+		// The whole field bar, filled first: solid when dark, a light dither
+		// when the page set a light background, nothing when it set none.
+		if (row_visible(row_h())) {
+			const uint16_t bw = (uint16_t)((_x + w * PageMetrics::FONT_ADVANCE <= right)
+			                    ? w * PageMetrics::FONT_ADVANCE : right - _x);
+			if (dark)          _lcd.fill_rect(_x, screen_y(), bw, row_h(), true);
+			else if (has_bg)   paint_bg(_x, bw, luma);
+		}
+
+		// Value or asterisks over the bar, white on a dark field, black
+		// otherwise. Empty cells with no background get an underscore so the
+		// slot is visible without a cursor.
+		const bool ink_black = !dark;                   // false => draw white
 		size_t vk = 0;
 		for (uint8_t col = 0; col < w; ++col) {
-			if (_x + PageMetrics::FONT_ADVANCE > right) break;   // ran off the panel
-			const bool visible = row_visible(row_h());
-			if (visible && has_bg) paint_bg(_x, PageMetrics::FONT_ADVANCE, luma);
-
-			if (f.masked && vk < f.value_len) {
-				vk += seq_len((uint8_t)f.value[vk]);
-				if (visible) {
-					if (has_bg) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE, row_h(), false);
-					_lcd.draw_text(_x, screen_y(), "*", true);
+			if (_x + PageMetrics::FONT_ADVANCE > right) break;
+			if (row_visible(row_h())) {
+				if (vk < f.value_len) {
+					if (f.masked) {
+						_lcd.draw_text(_x, screen_y(), "*", ink_black);
+						vk += seq_len((uint8_t)f.value[vk]);
+					} else {
+						const uint8_t L = seq_len((uint8_t)f.value[vk]);
+						char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = f.value[vk + b]; g[L] = 0;
+						_lcd.draw_text(_x, screen_y(), g, ink_black);
+						vk += L;
+					}
+				} else if (!has_bg) {
+					_lcd.draw_text(_x, screen_y(), "_", true);
 				}
-			} else if (!f.masked && vk < f.value_len) {
-				const uint8_t L = seq_len((uint8_t)f.value[vk]);
-				char g[5]; for (uint8_t b = 0; b < L; ++b) g[b] = f.value[vk + b]; g[L] = 0;
-				vk += L;
-				if (visible) {
-					if (has_bg) _lcd.fill_rect(_x, screen_y(), PageMetrics::FONT_ADVANCE, row_h(), false);
-					_lcd.draw_text(_x, screen_y(), g, true);
-				}
-			} else if (!has_bg && visible) {
-				// Empty cell, no background: an underscore so the slot shows.
-				_lcd.draw_text(_x, screen_y(), "_", true);
+			} else if (vk < f.value_len) {
+				vk += seq_len((uint8_t)f.value[vk]);   // keep the value cursor in step off-screen
 			}
 			_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
 			_row_open = true;
