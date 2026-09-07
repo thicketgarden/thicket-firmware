@@ -50,7 +50,6 @@ int main(int argc, char** argv) {
 	// "flatbg" renders backgrounds the old way, thresholded to black or
 	// nothing, so a dithered page can be compared against it.
 	const bool dither = !(argc > 6 && std::strcmp(argv[6], "flatbg") == 0);
-	const uint8_t link_style = argc > 7 ? (uint8_t)atoi(argv[7]) : 1;
 
 	FILE* f = std::fopen(argv[1], "rb");
 	if (!f) { std::fprintf(stderr, "cannot open %s\n", argv[1]); return 1; }
@@ -59,7 +58,7 @@ int main(int argc, char** argv) {
 	std::fclose(f);
 
 	VirtualPanel panel; SharpLcd lcd(panel, fb);
-	PageRenderer r(lcd, lead, stepped, big, dither, link_style);
+	PageRenderer r(lcd, lead, stepped, big, dither);
 
 	const uint16_t h = render(lcd, r, 0);
 	char out[512];

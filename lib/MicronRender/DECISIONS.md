@@ -80,6 +80,17 @@ Cozette's 9 KB and the hi-DPI face's 10.3 KB.
 
 ## Links
 
+Micron has one link grammar, `` `[label`target] ``. A page that makes a link
+stand out does it with ordinary colour or underline tags, not a link variant, so
+there is nothing to special-case: every link is rendered the same way.
+
+A link is underlined, which is the honest substitute for the link colour the
+reference uses and one ink cannot reproduce. The underline is drawn per cell so
+it follows the label across a wrap and through its internal spaces. Recorded per
+link for a later input layer to hit-test.
+
+## Links (renderer detail)
+
 Underlined, one pixel above the cell floor. Colour is not available, so the
 underline carries it alone. Pixel extents are recorded per link. A link that
 wraps is boxed on its last row only, which is enough to press.

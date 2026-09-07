@@ -151,11 +151,12 @@ void PageRenderer::emit_literal(const char* t, size_t n, bool invert) {
 
 void PageRenderer::emit_run(const char* t, size_t n, bool invert) {
 	if (_literal) { emit_literal(t, n, invert); return; }
-	// THE choke point for the indent guard. Every glyph this renderer draws
-	// passes through here, so resetting unconditionally on a fresh row means no
-	// caller can leave the pen somewhere a previous block left it, and no depth
-	// can push a row off-panel however deep the page claims to be.
-	if (!_row_open) _x = left_edge();
+	// The indent guard, but it must not clobber a centred or right-aligned pen.
+	// onText positions the pen RIGHTWARD of the left edge for alignment on a
+	// fresh row; the runaway case the guard exists for leaves it LEFT of the
+	// edge. So pull back only when the pen is left of the edge, which catches a
+	// runaway without undoing alignment.
+	if (!_row_open && _x < left_edge()) _x = left_edge();
 	const uint16_t right = LCD_WIDTH - PageMetrics::MARGIN_X;
 
 	size_t i = 0;
@@ -383,22 +384,16 @@ void PageRenderer::onLink(const char* label, size_t label_len,
 	const uint16_t x0 = _x;
 	const uint16_t y0 = screen_y();
 
-	// A link needs to read as actionable on a panel with no link colour. Three
-	// treatments, chosen by _link_style:
-	//   0  underline only            (thin, same as `_ text)
-	//   1  bold + underline          (Tamzen weight, heavier than surrounds)
-	//   2  a leading marker + underline (a glyph that says "follow this")
-	if (_link_style == 2 && row_visible(row_h())) {
-		_lcd.draw_text(_x, screen_y(), "\xC2\xBB", !_invert);   // » before the link
-		_x = (uint16_t)(_x + PageMetrics::FONT_ADVANCE);
-		_row_open = true;
-	}
-	const bool prev_ul = _underline, prev_bold = _bold;
+	// A link is underlined, the honest substitute for the link colour the
+	// reference uses and we cannot reproduce on one ink. Micron has ONE link
+	// grammar; a page that makes a link stand out does so with ordinary colour
+	// tags, which resolve to ink like any other text, so every link renders the
+	// same way. The underline is drawn per cell inside emit_run, so it follows
+	// the label across a wrap.
+	const bool prev_ul = _underline;
 	_underline = true;
-	if (_link_style == 1) _bold = (_head == 0);   // Tamzen weight for the label
 	emit_run(label, label_len, _invert);
 	_underline = prev_ul;
-	_bold = prev_bold;
 
 	// Recorded for a later input layer. A wrapped link is boxed on its last row
 	// only, which is enough to press; the visible underline spans every row.

@@ -94,9 +94,9 @@ public:
 	// smallest thing a terminal can colour.
 	explicit PageRenderer(SharpLcd& lcd, uint8_t extra_leading = DEFAULT_LEADING,
 	                      bool stepped_heads = true, bool head_2x = true,
-	                      bool dither = true, uint8_t link_style = 1)
+	                      bool dither = true)
 		: _lcd(lcd), _leading(extra_leading), _stepped(stepped_heads),
-		  _head2x(head_2x), _dither(dither), _link_style(link_style) {}
+		  _head2x(head_2x), _dither(dither) {}
 
 	uint16_t line_h() const { return (uint16_t)(PageMetrics::LINE_H + _leading); }
 	// The row being laid out may be taller than a body row for a heading.
@@ -190,7 +190,6 @@ private:
 	bool      _stepped = true;
 	bool      _head2x = false;
 	bool      _dither = true;
-	uint8_t   _link_style = 1;   // 0 underline, 1 bold+underline, 2 marker+underline
 	bool      _big = false;      // this row draws in the Cozette hi-DPI H1 face
 	// Which heading face this row uses: 0 none, 1 H1 Cozette hi-DPI, 2 H2
 	// Tamzen 8x16, 3 H3 Tamzen 7x13. A heading is whole-line-or-nothing, so if
