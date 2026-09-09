@@ -63,6 +63,7 @@ static const char* EXPECT_FIELD_VALUE = "thicket-interop-field-value";
 // means Resource::assemble decompressed it correctly while the LXMF store and
 // proof paths were live. Same LCG as the page-fetch scenario.
 static size_t g_large_size = 0;
+static bool   g_expect_reject = false;  // over-cap resource must be rejected, not delivered
 static RNS::Bytes g_expected_content;
 static RNS::Bytes gen_content(size_t n) {
 	static const char* A = "0123456789ABCDEF";
@@ -211,6 +212,10 @@ int main() {
 		const double v = atof(env);
 		if (v > 0.0) TIMEOUT_S = v;
 	}
+	if (getenv("THICKET_LXMF_EXPECT_REJECT")) {
+		g_expect_reject = true;
+		printf("[cpp] expecting the oversized resource to be REJECTED, not delivered\n");
+	}
 	if (const char* env = getenv("THICKET_LXMF_CONTENT_SIZE")) {
 		const long v = atol(env);
 		if (v > 0) {
@@ -247,6 +252,17 @@ int main() {
 	RNS::Transport::deregister_interface(udp_interface);
 
 	int rc = 0;
+	if (g_expect_reject) {
+		if (message_seen) {
+			printf("[cpp] FAIL: an over-cap resource was DELIVERED; the accept guard did not hold\n");
+			rc = 1;
+		}
+		else {
+			printf("[cpp] SUCCESS over-cap resource was rejected, not delivered, and the board did not fault\n");
+		}
+		printf("[cpp] exit code %d\n", rc);
+		return rc;
+	}
 	if (!message_seen) {
 		printf("[cpp] FAIL: no LXMF message arrived\n");
 		rc = 1;

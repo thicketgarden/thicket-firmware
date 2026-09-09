@@ -121,6 +121,12 @@ def main():
                          "forcing DIRECT link delivery as a compressed Resource")
     ap.add_argument("--method", choices=("opportunistic", "direct"),
                     default="opportunistic")
+    ap.add_argument("--incompressible", action="store_true",
+                    help="send random (uncompressed) bytes, to exercise the "
+                         "receiver's uncompressed-resource accept guard")
+    ap.add_argument("--expect-reject", action="store_true",
+                    help="the receiver should REJECT this resource: FAILED is "
+                         "then success, DELIVERED is failure")
     args = ap.parse_args()
 
     config_dir = tempfile.mkdtemp(prefix="thicket_interop_lxmf_")
@@ -144,7 +150,10 @@ def main():
     RNS.Transport.register_announce_handler(_DeliveryAnnounceHandler())
 
     title = TITLE
-    content = gen_content(args.content_size) if args.content_size > 0 else CONTENT
+    if args.content_size > 0:
+        content = os.urandom(args.content_size) if args.incompressible else gen_content(args.content_size)
+    else:
+        content = CONTENT
     timestamp = TIMESTAMP
     fields = {FIELD_KEY: FIELD_VALUE}
     method = (LXMF.LXMessage.DIRECT if args.method == "direct"
@@ -156,7 +165,7 @@ def main():
     # that here so the scenario fails loudly, rather than silently degrading to
     # an uncompressed multi-packet transfer, if the content is ever made
     # incompressible.
-    if args.content_size > 0:
+    if args.content_size > 0 and not args.incompressible:
         import bz2
         comp = len(bz2.compress(content))
         ratio = len(content) / comp if comp else 0.0
@@ -230,14 +239,24 @@ def main():
             print(f"[python]   fields     {fields!r}", flush=True)
 
         if message is not None:
-            if message.state == LXMF.LXMessage.DELIVERED:
-                print("[python] SUCCESS message state DELIVERED -- the C++ "
-                      "router unpacked, matched the destination and accepted "
-                      "the signature", flush=True)
-                sys.exit(0)
-            if message.state == LXMF.LXMessage.FAILED:
-                print("[python] FAILURE message state FAILED", flush=True)
-                sys.exit(1)
+            if args.expect_reject:
+                if message.state in (LXMF.LXMessage.REJECTED, LXMF.LXMessage.FAILED):
+                    print("[python] SUCCESS message REJECTED -- the receiver "
+                          "refused the over-cap resource, as intended", flush=True)
+                    sys.exit(0)
+                if message.state == LXMF.LXMessage.DELIVERED:
+                    print("[python] FAILURE over-cap resource was DELIVERED, "
+                          "not rejected", flush=True)
+                    sys.exit(1)
+            else:
+                if message.state == LXMF.LXMessage.DELIVERED:
+                    print("[python] SUCCESS message state DELIVERED -- the C++ "
+                          "router unpacked, matched the destination and accepted "
+                          "the signature", flush=True)
+                    sys.exit(0)
+                if message.state == LXMF.LXMessage.FAILED:
+                    print("[python] FAILURE message state FAILED", flush=True)
+                    sys.exit(1)
 
         time.sleep(0.1)
 

@@ -23,6 +23,9 @@ SCENARIOS=(
   # this second build is a no-op. Sends a ~16 KB DIRECT message: the C++ side
   # decompresses a bz2 multi-packet Resource inside the live LXMF flow.
   "lxmf-large-inbound|lxmf_inbound_receiver|run_lxmf_large_inbound.sh"
+  # The accept-size guard: an incompressible over-cap resource is rejected at
+  # accept, not received into the pool. Own project, built with a small cap.
+  "lxmf-oversized-reject|lxmf_oversized_reject|run_lxmf_oversized_reject.sh"
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
   "wire-oracle|wire_oracle|run_wire_oracle.sh"
   # Upstream's own Examples/Echo.py, unmodified. Every other scenario talks to
