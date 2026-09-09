@@ -3,12 +3,14 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
 # NomadNet PAGE FETCH. A Python NomadNet node serves a real page
-# (desktop/pages/index.mu) at two paths: /page/index.mu uncompressed, and
-# /page/gz.mu with the reference's default compression. The C++ side discovers
-# the node by announce, establishes a Link, and fetches both. It must retrieve
-# and verify the uncompressed page (a multi-packet Resource, msgpack-decoded),
-# and the compressed one must FAIL, because microReticulum has no bz2. This is
-# the desktop browser's fetch edge reduced to the wire.
+# (desktop/pages/index.mu) at four paths: /page/index.mu uncompressed,
+# /page/gz.mu with the reference's default compression, /page/mid.mu a 16 KB
+# compressed multi-packet page under the cap, and /page/big.mu a compressed
+# page over the cap. The C++ side discovers the node by announce, establishes a
+# Link, and fetches all four. It must retrieve and verify the uncompressed page
+# and both under-cap compressed pages (msgpack-decoded, bz2-decompressed on
+# device), and the over-cap page must be rejected cleanly, not hung. This is the
+# desktop browser's fetch edge reduced to the wire.
 #
 #   PATH="/tmp/rnsvenv/bin:$PATH" bash test_interop/run_page_fetch.sh
 #
