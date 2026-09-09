@@ -1859,7 +1859,18 @@ static void thicket_radio_wake() {
 static void thicket_task(void* arg) {
 	(void)arg;
 	for (;;) {
-		thicket_work();
+		// Defence in depth. A pool bad_alloc from an oversized inbound resource,
+		// or any exception escaping the stack, must not leave this task: on this
+		// core an uncaught throw faults the device. The accept-size guard should
+		// keep it from happening; this catches it if anything slips past.
+		try {
+			thicket_work();
+		}
+		catch (const std::exception& e) {
+			char buf[96];
+			snprintf(buf, sizeof(buf), "work loop caught, continuing: %s", e.what());
+			warn(buf);
+		}
 		// Any serial input restates the addresses. USB CDC discards writes
 		// made while no host is listening, so the boot banner is gone by the
 		// time a host attaches after a power cycle -- which is precisely when
