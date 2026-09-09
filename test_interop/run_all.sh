@@ -19,6 +19,10 @@ SCENARIOS=(
   # topology -- so the second build here is a no-op.
   "multihop-inbound|cold_inbound_receiver|run_multihop_inbound.sh"
   "lxmf-inbound|lxmf_inbound_receiver|run_lxmf_inbound.sh"
+  # Reuses lxmf_inbound_receiver's binary in large-message mode (env-gated), so
+  # this second build is a no-op. Sends a ~16 KB DIRECT message: the C++ side
+  # decompresses a bz2 multi-packet Resource inside the live LXMF flow.
+  "lxmf-large-inbound|lxmf_inbound_receiver|run_lxmf_large_inbound.sh"
   "identity-vectors|identity_vectors|run_identity_vectors.sh"
   "wire-oracle|wire_oracle|run_wire_oracle.sh"
   # Upstream's own Examples/Echo.py, unmodified. Every other scenario talks to

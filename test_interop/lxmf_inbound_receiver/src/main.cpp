@@ -37,6 +37,7 @@
 #include <string.h>
 #include <math.h>
 #include <string>
+#include <vector>
 
 // ---------------------------------------------------------------------------
 // The contract. Every one of these is duplicated verbatim in
@@ -54,6 +55,28 @@ static const double EXPECT_TIMESTAMP = 1750000000.5;
 // decoded value. Key 6 is a positive fixint, so one byte, 0x06.
 static const uint8_t EXPECT_FIELD_KEY = 0x06;
 static const char* EXPECT_FIELD_VALUE = "thicket-interop-field-value";
+
+// Large-message mode. When THICKET_LXMF_CONTENT_SIZE is set, the peer sends a
+// message whose content is this many bytes of deterministic, compressible data,
+// forcing DIRECT (link) delivery as a bz2-compressed multi-packet Resource. The
+// content is regenerated identically here and compared byte for byte, so a pass
+// means Resource::assemble decompressed it correctly while the LXMF store and
+// proof paths were live. Same LCG as the page-fetch scenario.
+static size_t g_large_size = 0;
+static RNS::Bytes g_expected_content;
+static RNS::Bytes gen_content(size_t n) {
+	static const char* A = "0123456789ABCDEF";
+	std::vector<uint8_t> buf(n);
+	uint32_t x = 0x1234u;
+	for (size_t i = 0; i < n; ++i) {
+		x = x * 1103515245u + 12345u;
+		x &= 0x7fffffffu;
+		buf[i] = (uint8_t)A[(x >> 16) & 0xF];
+	}
+	RNS::Bytes out;
+	out.append(buf.data(), buf.size());
+	return out;
+}
 
 static RNS::Reticulum reticulum({RNS::Type::NONE});
 static RNS::Interface udp_interface(RNS::Type::NONE);
@@ -102,8 +125,15 @@ static void on_delivery(LXMF::LXMessage& message) {
 	check(as_text(message.title()) == EXPECT_TITLE, "title",
 	      as_text(message.title()), EXPECT_TITLE);
 
-	check(as_text(message.content()) == EXPECT_CONTENT, "content",
-	      as_text(message.content()), EXPECT_CONTENT);
+	if (g_large_size > 0) {
+		check(message.content() == g_expected_content, "content",
+		      std::to_string(message.content().size()) + " bytes decompressed",
+		      std::to_string(g_expected_content.size()) + " bytes");
+	}
+	else {
+		check(as_text(message.content()) == EXPECT_CONTENT, "content",
+		      as_text(message.content()), EXPECT_CONTENT);
+	}
 
 	// The reference packs the timestamp as an IEEE-754 double, so this should
 	// be exact; compare with a tolerance far below one tick anyway so a
@@ -180,6 +210,14 @@ int main() {
 	if (const char* env = getenv("THICKET_INTEROP_TIMEOUT_S")) {
 		const double v = atof(env);
 		if (v > 0.0) TIMEOUT_S = v;
+	}
+	if (const char* env = getenv("THICKET_LXMF_CONTENT_SIZE")) {
+		const long v = atol(env);
+		if (v > 0) {
+			g_large_size = (size_t)v;
+			g_expected_content = gen_content(g_large_size);
+			printf("[cpp] large-message mode: expecting %zu bytes of content\n", g_large_size);
+		}
 	}
 	const double LINGER_S = 3.0;   // let the delivery proof leave.
 	const double start    = RNS::Utilities::OS::time();

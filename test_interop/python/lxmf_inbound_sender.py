@@ -49,6 +49,18 @@ FIELD_KEY = 6
 FIELD_VALUE = b"thicket-interop-field-value"
 
 
+def gen_content(n, seed=0x1234):
+    """Deterministic, compressible content, byte-identical to the C++ side's
+    gen_content in lxmf_inbound_receiver. Same LCG as the page-fetch scenario."""
+    A = b"0123456789ABCDEF"
+    x = seed
+    out = bytearray(n)
+    for i in range(n):
+        x = (x * 1103515245 + 12345) & 0x7fffffff
+        out[i] = A[(x >> 16) & 0xF]
+    return bytes(out)
+
+
 def write_config(config_dir: str, port: int, forward_port: int) -> None:
     cfg = f"""
 [reticulum]
@@ -104,6 +116,11 @@ def main():
                     choices=("none", "content", "field", "timestamp"),
                     default="none",
                     help="deliberately break one assertion, to prove it is live")
+    ap.add_argument("--content-size", type=int, default=0,
+                    help="if >0, send this many bytes of generated content, "
+                         "forcing DIRECT link delivery as a compressed Resource")
+    ap.add_argument("--method", choices=("opportunistic", "direct"),
+                    default="opportunistic")
     args = ap.parse_args()
 
     config_dir = tempfile.mkdtemp(prefix="thicket_interop_lxmf_")
@@ -127,9 +144,29 @@ def main():
     RNS.Transport.register_announce_handler(_DeliveryAnnounceHandler())
 
     title = TITLE
-    content = CONTENT
+    content = gen_content(args.content_size) if args.content_size > 0 else CONTENT
     timestamp = TIMESTAMP
     fields = {FIELD_KEY: FIELD_VALUE}
+    method = (LXMF.LXMessage.DIRECT if args.method == "direct"
+              else LXMF.LXMessage.OPPORTUNISTIC)
+
+    # The point of the large scenario is the on-device bz2 DECOMPRESS path, which
+    # only runs if RNS sends the resource compressed. RNS compresses a resource
+    # when bz2 of the data is smaller than the data (Resource.__init__). Assert
+    # that here so the scenario fails loudly, rather than silently degrading to
+    # an uncompressed multi-packet transfer, if the content is ever made
+    # incompressible.
+    if args.content_size > 0:
+        import bz2
+        comp = len(bz2.compress(content))
+        ratio = len(content) / comp if comp else 0.0
+        print(f"[python] content {len(content)} B -> bz2 {comp} B ({ratio:.2f}x); "
+              f"RNS will send a COMPRESSED resource", flush=True)
+        if comp >= len(content):
+            print("[python] SETUP ERROR: content does not compress, so RNS would "
+                  "send it uncompressed and the bz2 receive path would not run",
+                  file=sys.stderr)
+            sys.exit(3)
 
     if args.self_test_break == "content":
         content = CONTENT[:-1] + bytes([CONTENT[-1] ^ 0x01])
@@ -179,7 +216,7 @@ def main():
                                    RNS.Destination.SINGLE, "lxmf", "delivery")
             message = LXMF.LXMessage(dest, source, content, title,
                                      fields=fields,
-                                     desired_method=LXMF.LXMessage.OPPORTUNISTIC)
+                                     desired_method=method)
             # LXMessage.pack() only stamps time.time() when timestamp is None,
             # so pinning it here makes the C++ assertion exact.
             message.timestamp = timestamp
