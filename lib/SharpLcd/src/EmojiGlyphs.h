@@ -1,0 +1,46 @@
+// Copyright (C) 2026 Thicket contributors
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// Hand-authored 1-bit emoji, curated not comprehensive.
+//
+// Cozette and Tamzen stop at the Basic Multilingual Plane, so the common
+// emoji a real page leans on (a nav bar of house/globe/chat/chart/mail) carry
+// no glyph and would draw as the missing-glyph box. These are drawn for this
+// panel at the body cell: 6px advance, ink in columns 0..5 (bit 7 leftmost),
+// 13 rows. One cell wide, so layout and advance are identical to any letter.
+//
+// Monochrome silhouettes, not colour emoji: on a 1-bit panel an icon reads by
+// its outline. Codepoints live in the Supplementary Multilingual Plane, past
+// what the FontExtra table (16-bit key) can hold, so they get their own
+// 32-bit-keyed table, searched by SharpLcd for a codepoint the fonts lack.
+
+#pragma once
+
+#include <stdint.h>
+
+namespace thicket {
+
+struct EmojiGlyph { uint32_t cp; uint8_t rows[13]; };
+
+// Sorted by codepoint for the binary search in SharpLcd.cpp.
+static const uint16_t EMOJI_COUNT = 8;
+static const EmojiGlyph EMOJI[8] = {
+	// U+1F310 globe with meridians: circle, equator, one meridian.
+	{0x1F310, {0x00,0x00,0x30,0x48,0x94,0x94,0xFC,0x94,0x94,0x48,0x30,0x00,0x00}},
+	// U+1F3E0 house: pitched roof over a body with a door notch.
+	{0x1F3E0, {0x00,0x00,0x30,0x78,0xFC,0x78,0x78,0x78,0x78,0x68,0x68,0x00,0x00}},
+	// U+1F4AC speech balloon: rounded body with a tail.
+	{0x1F4AC, {0x00,0x78,0xFC,0xFC,0xFC,0x78,0x60,0x40,0x00,0x00,0x00,0x00,0x00}},
+	// U+1F4CA bar chart: three bars of rising height on a baseline.
+	{0x1F4CA, {0x00,0x00,0x00,0x08,0x08,0x28,0x28,0xA8,0xA8,0xA8,0xFC,0x00,0x00}},
+	// U+1F4E9 envelope with arrow: envelope; the arrow does not fit the cell.
+	{0x1F4E9, {0x00,0x00,0xFC,0x84,0xCC,0xB4,0x84,0x84,0xFC,0x00,0x00,0x00,0x00}},
+	// U+1F514 bell: solid bell with a clapper.
+	{0x1F514, {0x00,0x00,0x30,0x30,0x78,0x78,0xFC,0xFC,0xFC,0x30,0x00,0x00,0x00}},
+	// U+1F525 fire: flame silhouette.
+	{0x1F525, {0x00,0x00,0x10,0x30,0x30,0x70,0x78,0xFC,0xFC,0x78,0x30,0x00,0x00}},
+	// U+1F642 slightly smiling face: eyes and a smile in a circle.
+	{0x1F642, {0x00,0x00,0x30,0x48,0x84,0xCC,0x84,0xCC,0x78,0x30,0x00,0x00,0x00}},
+};
+
+}  // namespace thicket

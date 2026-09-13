@@ -5,6 +5,7 @@
 #include "CozetteFont.h"
 #include "CozetteBig.h"
 #include "TamzenFont.h"
+#include "EmojiGlyphs.h"
 
 #include <string.h>
 
@@ -79,15 +80,36 @@ static const uint8_t* braille_for(uint32_t cp) {
 	return rows;
 }
 
+// Emoji presentation joiners: a page may qualify an emoji with a variation
+// selector or glue a sequence with a zero-width joiner. We draw the base emoji
+// and treat these as present-but-blank, so they neither draw the missing-glyph
+// box nor break the run. They still advance one cell, like any codepoint.
+static const uint8_t* zero_glyph() {
+	static const uint8_t blank[FONT_H] = {0};
+	return blank;
+}
+
 // Returns the glyph rows for a codepoint, or nullptr.
 static const uint8_t* glyph_for(uint32_t cp) {
 	if (cp >= FONT_FIRST && cp <= FONT_LAST) return FONT[cp - FONT_FIRST];
 	if (cp >= 0x2800u && cp <= 0x28FFu) return braille_for(cp);
-	uint16_t lo = 0, hi = FONT_EXTRA_COUNT;
+	if (cp == 0x200Du || cp == 0xFE0Eu || cp == 0xFE0Fu) return zero_glyph();
+	if (cp <= 0xFFFFu) {
+		uint16_t lo = 0, hi = FONT_EXTRA_COUNT;
+		while (lo < hi) {
+			const uint16_t mid = (uint16_t)((lo + hi) / 2);
+			if (FONT_EXTRA[mid].cp == cp) return FONT_EXTRA[mid].rows;
+			if (FONT_EXTRA[mid].cp < cp) lo = (uint16_t)(mid + 1);
+			else hi = mid;
+		}
+		return nullptr;
+	}
+	// Astral plane: the curated emoji, keyed by 32-bit codepoint.
+	uint16_t lo = 0, hi = EMOJI_COUNT;
 	while (lo < hi) {
 		const uint16_t mid = (uint16_t)((lo + hi) / 2);
-		if (FONT_EXTRA[mid].cp == cp) return FONT_EXTRA[mid].rows;
-		if (FONT_EXTRA[mid].cp < cp) lo = (uint16_t)(mid + 1);
+		if (EMOJI[mid].cp == cp) return EMOJI[mid].rows;
+		if (EMOJI[mid].cp < cp) lo = (uint16_t)(mid + 1);
 		else hi = mid;
 	}
 	return nullptr;
@@ -110,13 +132,22 @@ uint32_t next_cp(const char*& s) {
 	return cp;
 }
 
+// Missing-glyph box (the "tofu"): a hollow rectangle about the x-height,
+// centred in the cell, drawn where the fonts carry no glyph. A reader then
+// sees that a character is here we cannot draw, instead of a silent hole. The
+// advance is unchanged, so layout is identical to drawing nothing.
+static const uint8_t MISSING_BOX[FONT_H] = {
+	0x00,0x00,0x00,0x00,0x78,0x48,0x48,0x48,0x48,0x48,0x78,0x00,0x00
+};
+
 uint16_t SharpLcd::draw_text(uint16_t x, uint16_t y, const char* s, bool black) {
 	// Cozette is monospaced and its 6px advance already includes side bearing,
 	// so glyphs butt up with no extra column.
 	while (*s) {
 		const uint32_t cp = next_cp(s);
 		const uint8_t* g = glyph_for(cp);
-		if (g) {
+		if (!g) g = MISSING_BOX;   // draw the box, not a hole
+		{
 			for (uint8_t row = 0; row < FONT_H; ++row) {
 				const uint8_t bits = g[row];
 				if (!bits) continue;
