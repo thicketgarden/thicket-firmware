@@ -11,9 +11,9 @@ the 400x240 framebuffer are the device's, called through the one shared
 
 - **display**: the composed framebuffer is read back into an SDL window scaled
   up, instead of being clocked out over SPI to the Sharp panel.
-- **fetch/input**: pages come from local files (and, next, from live nodes over
-  the network) rather than from an on-device store, and navigation comes from a
-  keyboard rather than the device's buttons.
+- **fetch/input**: pages come from local files, and in the live-fetch build
+  from live nodes over the network, rather than from an on-device store, and
+  navigation comes from a keyboard rather than the device's buttons.
 
 If the browser rendered a page differently from the device, it would stop being
 a faithful test of what the device shows. It does not: the pixels come from the
@@ -58,9 +58,37 @@ then Tab reaches the links further down.
 A Micron link target is `<destination-hash>:/page/<path>`. Locally, that maps to
 the frozen corpus naming `<hash16>__page__<path>.mu`; plain relative targets
 (`about.mu`, `/page/x.mu`) resolve against the current page's directory and the
-`--root`. A target with no local page reports "not held locally"; fetching it
-over the network is the next piece. In-page anchors (`:name`) are not yet
-followed.
+`--root`. In-page anchors (`:name`) are not yet followed.
+
+A target with no local page is the network edge. The local-only build reports
+"not held locally"; the live-fetch build fetches it over the mesh (see below).
+
+## Live fetch
+
+Following a link that resolves to no local page fetches it off the mesh. It is
+the same Link, Resource, msgpack and `request(path)` lifecycle the page-fetch
+interop scenario proves, made synchronous: the browser brings up microReticulum
+over a UDP bridge to a local `rnsd`, discovers the node by announce (nudged by a
+path request), establishes a Link, requests the path, decodes the msgpack-
+wrapped Resource, and hands the raw Micron to the same `compose_page()`. A
+compressed page is decompressed on the way in, capped like the device; a silent
+or dead peer is bounded by the Link watchdog and the request timeout, so a fetch
+never hangs. The fetch code is `LiveFetch.{h,cpp}`, behind the browser's
+not-held-locally edge.
+
+This build needs the whole Reticulum stack, so it is a PlatformIO env rather
+than the bare Makefile, and it is headless (`--script` only):
+
+```sh
+bash ../test_interop/scripts/fetch_deps.sh   # once: materialise the pinned tree
+pio run -e desktop_live                       # ./ .pio/build/desktop_live/program
+```
+
+The `-DDEFAULT_UDP_*` flags in `platformio.ini` point the browser at the `rnsd`
+that bridges to the mesh; the defaults match the loopback port pair the
+page-fetch interop server listens on, so the build can be exercised against it
+without a live network. Reaching a different bridge is a change to those flags,
+the same knob the interop scenarios set.
 
 ## Headless capture
 
@@ -73,5 +101,5 @@ display and doubles as a scriptable render test.
 ## Not this, yet
 
 No message list, no menus, no device chrome: the page browser alone. The full
-device-UI simulator can grow from here later. For now it fetches a page, renders
-it, scrolls it, and follows links.
+device-UI simulator can grow from here later. For now it opens a page, renders
+it, scrolls it, follows links, and fetches a linked page off the mesh.

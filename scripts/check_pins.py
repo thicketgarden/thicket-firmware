@@ -91,8 +91,12 @@ def main():
             )
             bad += 1
 
-    # R2, this repo's scenario projects carry their own copies of the pins.
-    for ini in sorted(REPO.glob("test_interop/*/platformio.ini")):
+    # R2, this repo's other build projects carry their own copies of the pins:
+    # the interop scenarios and the desktop browser's live-fetch build. A copy
+    # that drifts from the root builds against a stack we do not ship.
+    r2_inis = list(REPO.glob("test_interop/*/platformio.ini"))
+    r2_inis += [REPO / "desktop" / "platformio.ini"]
+    for ini in sorted(p for p in r2_inis if p.is_file()):
         for lib, (owner, ref, n) in sorted(deps_in(ini).items()):
             if lib not in root:
                 continue

@@ -39,6 +39,10 @@
 #include "MicronRender.h"
 #include "ComposePage.h"
 
+#ifdef THICKET_LIVE_FETCH
+#include "LiveFetch.h"
+#endif
+
 using namespace thicket;
 
 // ---------------------------------------------------------------------------
@@ -288,23 +292,33 @@ public:
 	}
 	bool follow_target(const std::string& target) {
 		std::string path = resolve(target, _cur.dir, _root);
-		if (path.empty()) {
-			// The fetch edge lands here next: a target with no local page is
-			// exactly what the network path is for.
-			_status = "not held locally: " + target;
-			return false;
+		if (!path.empty()) {
+			std::string src;
+			if (!read_file(path, src)) { _status = "cannot open " + path; return false; }
+			commit_page(std::move(src), target, dirname_of(path));
+			_status = "followed -> " + basename_of(path);
+			return true;
 		}
-		std::string src;
-		if (!read_file(path, src)) { _status = "cannot open " + path; return false; }
-		_cur.focus = -1;
-		_stack.push_back(_cur);
-		_cur = PageState{};
-		_cur.src = std::move(src);
-		_cur.address = target;
-		_cur.dir = dirname_of(path);
-		_last_scroll = 0;
-		_status = "followed -> " + basename_of(path);
-		return true;
+#ifdef THICKET_LIVE_FETCH
+		// No local page: the target names a node on the mesh. Fetch it live over
+		// the bridge and hand the raw Micron to the same renderer. A fetched
+		// page's own directory is unknown, so its relative links resolve against
+		// the root; hash-qualified links carry their own destination.
+		_status = "fetching " + target + " ...";
+		FetchResult fr = live_fetch(target);
+		if (fr.ok) {
+			commit_page(std::move(fr.page), target, std::string());
+			_status = "fetched -> " + target;
+			return true;
+		}
+		_status = "fetch failed: " + fr.error;
+		return false;
+#else
+		// The live-fetch build wires this edge to the network; a link with no
+		// local page is exactly what that network path is for.
+		_status = "not held locally: " + target;
+		return false;
+#endif
 	}
 	bool back() {
 		if (_stack.empty()) { _status = "no page to go back to"; return false; }
@@ -323,6 +337,18 @@ public:
 	}
 
 private:
+	// Push the current page and make `src` the new one. Shared by local follow
+	// and live fetch so the back stack and scroll reset are identical.
+	void commit_page(std::string src, const std::string& address, const std::string& dir) {
+		_cur.focus = -1;
+		_stack.push_back(_cur);
+		_cur = PageState{};
+		_cur.src = std::move(src);
+		_cur.address = address;
+		_cur.dir = dir;
+		_last_scroll = 0;
+	}
+
 	std::string _root;
 	PageState _cur;
 	Frame _frame;
