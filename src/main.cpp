@@ -34,6 +34,11 @@
 // fakes those.
 // ---------------------------------------------------------------------------
 
+// The display first-light build owns setup()/loop() from display_bringup.cpp,
+// so the whole stack skeleton below is compiled out under that flag. It keeps
+// the panel test to the fewest moving parts: no radio, no filesystem, no LXMF.
+#ifndef THICKET_DISPLAY_BRINGUP
+
 // Arduino.h first, then kill its abs()/round() function-like macros. Every
 // libstdc++ header after this point that mentions std::abs or std::round
 // (<chrono>, reached through <mutex> / MsgPack / ArduinoJson) fails to parse
@@ -1921,3 +1926,5 @@ void loop() {
 // but the Adafruit nRF52 core already retargets printf to Serial (CDC) in
 // cores/nRF5/main.cpp under CFG_LOGGER 0, which is the default. Defining our
 // own is a duplicate-symbol link error, not an improvement.
+
+#endif  // !THICKET_DISPLAY_BRINGUP
