@@ -54,11 +54,14 @@ if [[ "$BUILD" == "1" ]]; then
   for entry in "${SCENARIOS[@]}"; do
     IFS='|' read -r name project _ <<< "$entry"
     echo "=== building $name ==="
-    ( cd "$HERE/$project" && pio run -e native17 ) >/dev/null 2>&1 || {
-      echo "[run_all] BUILD FAILED for $name; rerun the build to see why:"
-      echo "[run_all]   cd $HERE/$project && pio run -e native17"
+    build_log="$(mktemp)"
+    if ! ( cd "$HERE/$project" && pio run -e native17 ) >"$build_log" 2>&1; then
+      echo "[run_all] BUILD FAILED for $name; build output follows:"
+      cat "$build_log"
+      rm -f "$build_log"
       exit 1
-    }
+    fi
+    rm -f "$build_log"
   done
 fi
 
