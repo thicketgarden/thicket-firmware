@@ -35,16 +35,28 @@ def rns_version():
 
 
 def fetch_examples(dest):
-    """Clone the reference at the version we have installed, for its Examples."""
-    version = rns_version()
-    print(f"[echo-server] fetching Examples/ from the reference at {version}",
-          flush=True)
-    subprocess.run(
-        ["git", "clone", "--depth", "1", "--branch", version, "-q", RNS_REPO, dest],
-        check=True)
+    """Clone the reference for its Examples/Echo.py.
+
+    markqvist publishes to PyPI without always creating a matching git tag:
+    1.5.6 and 1.5.7 ship on PyPI while the newest tag is 1.5.5, so a clone of
+    the exact installed version can exit 128. Fall back to master, which still
+    gives us upstream's own unmodified Echo.py exercising the shared protocol,
+    which is the point of this scenario.
+    """
+    for ref in (rns_version(), "master"):
+        print(f"[echo-server] fetching Examples/ from the reference at {ref}",
+              flush=True)
+        shutil.rmtree(dest, ignore_errors=True)
+        r = subprocess.run(
+            ["git", "clone", "--depth", "1", "--branch", ref, "-q", RNS_REPO, dest])
+        if r.returncode == 0:
+            break
+    else:
+        sys.exit("[echo-server] could not clone the reference at the installed "
+                 "version or master")
     script = os.path.join(dest, "Examples", "Echo.py")
     if not os.path.isfile(script):
-        sys.exit(f"[echo-server] no Examples/Echo.py at {version}")
+        sys.exit(f"[echo-server] no Examples/Echo.py in the cloned reference")
     return script
 
 
